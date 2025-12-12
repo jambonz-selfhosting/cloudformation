@@ -1,0 +1,573 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  InstanceType:
+    Description: jambonzMini EC2 instance type
+    Type: String
+    Default: c5n.large
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3a.small
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c6i.large
+      - c6i.xlarge
+      - c6i.2xlarge
+      - c6i.4xlarge
+      
+    ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Description: Name of an EC2 KeyPair to enable SSH access to the instance.
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  AllowedSshCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address ssh access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Default: 0.0.0.0/0
+    ConstraintDescription: must be a valid network CIDR
+  AllowedHttpCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address http(s) access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Default: 0.0.0.0/0
+    ConstraintDescription: must be a valid network CIDR
+  AllowedSipCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address sip access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    ConstraintDescription: must be a valid network CIDR
+    Default: 0.0.0.0/0
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+  AllowedRtpCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address to send RTP traffic, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    ConstraintDescription: must be a valid network CIDR
+    Default: 0.0.0.0/0
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+  VpcCidr:
+    Description: CIDR range for the VPC.
+    Type: String
+    ConstraintDescription: must be a valid network CIDR
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Default: 10.0.0.0/16
+  Cloudwatch:
+    Description: Send jambonz logs to cloudwatch
+    Type: String
+    Default: true
+    AllowedValues: [true, false]
+  CloudwatchLogRetention:
+    Description: "Number of days to retain cloudwatch logs"
+    Type: Number
+    Default: 3
+    AllowedValues:
+      - 1
+      - 3
+      - 5
+      - 7
+      - 14
+      - 30
+      - 60
+      - 90
+      - 120
+      - 150
+  URLPortal:
+    Type: String
+    Description: "The DNS name that you intend to use for the jambonz portal"
+    AllowedPattern: ^[a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,}$
+    ConstraintDescription: "Must be a valid domain name that you control the DNS records for (e.g., jambonz.mycompany.com)"
+
+Conditions:
+  ShouldEnableCloudWatch: !Equals
+    - true
+    - !Ref Cloudwatch
+  DontCreateDNS: !Equals
+    - !Ref URLPortal
+    - ""
+  CreateDNS: !Not
+    - !Equals 
+      - !Ref URLPortal
+      - ""
+
+Mappings:
+  AWSRegion2AMI:
+    us-west-2:
+      Ami: ami-018483ab84a5b0805
+
+Resources:
+  IamCloudwatchRole:
+    Type: AWS::IAM::Role
+    Condition: ShouldEnableCloudWatch
+    Properties: 
+      Description: jambonz mini IAM role
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: root 
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - 'cloudwatch:PutMetricData'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeTags'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:FilterLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !Ref VpcCidr
+  PublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VpcCidr
+  jambonzInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Condition: ShouldEnableCloudWatch
+    Properties:
+      Path: /
+      Roles:
+        - !Ref IamCloudwatchRole
+  jambonzInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: 
+        !If [ShouldEnableCloudWatch, !Ref jambonzInstanceProfile, !Ref "AWS::NoValue"]
+      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "Ami"]
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - GroupSet:
+            - !Ref jambonzSecurityGroup
+            - !Ref sshSecurityGroup
+          AssociatePublicIpAddress: true
+          DeviceIndex: '0'
+          DeleteOnTermination: true
+          SubnetId: !Ref PublicSubnet
+      UserData:
+        Fn::Base64: 
+          Fn::Sub:
+            - |
+              #!/bin/bash -xe
+
+              echo "update /etc/hosts file to include hostname: $(hostname)"
+              echo "127.0.0.1 $(hostname)" | sudo tee -a /etc/hosts > /dev/null
+
+              # Set default user (for SSH key source) and nginx config based on OS
+              if grep -q 'ID="rhel"' /etc/os-release; then
+                  DEFAULT_USER=ec2-user
+                  NGINX_CONFIG=/etc/nginx/conf.d/default.conf
+
+                  echo "Restarting mysql and postgresql"
+                  sudo systemctl restart mysqld
+                  sudo systemctl restart postgresql-14
+
+                  echo "Disabling firewalld"
+                  sudo systemctl stop firewalld
+                  sudo systemctl disable firewalld
+
+                  echo "Rebuild rtpengine kernel module"
+                  cd /usr/local/src/rtpengine/kernel-module
+                  make clean
+                  make && make install
+                  depmod -a
+                  modprobe xt_RTPENGINE
+
+              else
+                  DEFAULT_USER=admin
+                  NGINX_CONFIG=/etc/nginx/sites-available/default
+              fi
+
+              # Always use jambonz user for apps
+              USER=jambonz
+              HOME=/home/jambonz
+
+              # Sync SSH keys from default user to jambonz user
+              echo "Syncing SSH keys to jambonz user..."
+              if [ -f "/home/$DEFAULT_USER/.ssh/authorized_keys" ] && [ -s "/home/$DEFAULT_USER/.ssh/authorized_keys" ]; then
+                  mkdir -p /home/jambonz/.ssh
+                  cp "/home/$DEFAULT_USER/.ssh/authorized_keys" /home/jambonz/.ssh/
+                  chown -R jambonz:jambonz /home/jambonz/.ssh
+                  chmod 700 /home/jambonz/.ssh
+                  chmod 600 /home/jambonz/.ssh/authorized_keys
+                  echo "SSH keys copied from $DEFAULT_USER to jambonz"
+              else
+                  echo "Warning: No SSH keys found for $DEFAULT_USER"
+              fi
+
+              echo install rtpengine kernel module and iptables rule
+              if lsmod | grep -q xt_RTPENGINE; then
+                echo "xt_RTPENGINE module is already loaded."
+              else
+                echo "loading xt_RTPENGINE module."
+                modprobe xt_RTPENGINE
+                echo 'add 42' > /proc/rtpengine/control
+                iptables -I INPUT -p udp --dport 40000:60000 -j RTPENGINE --id 42
+              fi
+              echo "rtpengine module and iptables rule installed. Restarting rtpengine service."
+              systemctl restart rtpengine
+
+              # get instance metadata
+              # this can take a few secs after the instance is created to attach EIP
+              sleep 30
+              PRIVATE_IPV4="$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)" 
+              PUBLIC_IPV4="$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)" 
+              INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)" 
+              AWS_REGION_NAME="$(curl -s http://169.254.169.254/latest/meta-data/placement/region)" 
+              
+              # change the database password to a random id
+              NEW_DB_PASSWD=$(< /dev/urandom tr -dc A-Z | head -c1; < /dev/urandom tr -dc a-z | head -c1; < /dev/urandom tr -dc 0-9 | head -c1; < /dev/urandom tr -dc _ | head -c1; < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c8; echo;)
+              echo "alter user 'admin'@'%' identified by '$NEW_DB_PASSWD'" | mysql -h 127.0.0.1 -u admin -D jambones -pJambonzR0ck$ 
+              sudo sed -i -e "s/\(.*\)JAMBONES_MYSQL_PASSWORD.*/\1JAMBONES_MYSQL_PASSWORD: '$NEW_DB_PASSWD',/g" $HOME/apps/ecosystem.config.js 
+              
+              # replace ip addresses in the ecosystem.config.js file
+              sudo sed -i -e "s/\(.*\)PRIVATE_IP\(.*\)/\1$PRIVATE_IPV4\2/g" $HOME/apps/ecosystem.config.js 
+              sudo sed -i -e "s/\(.*\)AWS_REGION_NAME\(.*\)/\1$AWS_REGION_NAME\2/g" $HOME/apps/ecosystem.config.js 
+              sudo sed -i -e "s/\(.*\)--JAMBONES_API_BASE_URL--\(.*\)/\1http:\/\/$PUBLIC_IPV4\/v1\2/g" $HOME/apps/ecosystem.config.js 
+              
+              # replace JWT_SECRET
+              uuid=$(uuidgen)
+              sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1$uuid\2/g" $HOME/apps/ecosystem.config.js 
+
+              # reset the database
+              JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
+
+              # configure webapp
+              if [[ -z "${URLPortal}" ]]; then
+                # portals will be accessed by IP address of server
+                if [ -f "$HOME/apps/webapp/.env" ]; then
+                    echo "VITE_API_BASE_URL=http://$PUBLIC_IPV4/api/v1" > "$HOME/apps/webapp/.env"
+                fi
+                API_BASE_URL=http://$PUBLIC_IPV4/api/v1 TAG="<script>window.JAMBONZ = { API_BASE_URL: '$API_BASE_URL'};</script>"
+                sed -i -e "\@</head>@i\ $TAG" $HOME/apps/webapp/dist/index.html
+              else
+                # portals will be accessed by DNS name
+                #if [ -f "$HOME/apps/webapp/.env" ]; then
+                #    echo "VITE_API_BASE_URL=http://${URLPortal}/api/v1" > "$HOME/apps/webapp/.env"
+                #fi
+                API_BASE_URL=http://${URLPortal}/api/v1 TAG="<script>window.JAMBONZ = { API_BASE_URL: '$API_BASE_URL'};</script>"
+                sed -i -e "\@</head>@i\ $TAG" $HOME/apps/webapp/dist/index.html
+                # add row to system information table 
+                mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+              
+                sudo cat << EOF > $NGINX_CONFIG 
+                server {
+                    listen 80;
+                    server_name ${URLPortal};
+                    location /api/ {
+                        rewrite ^/api/(.*)$ /\$1 break;
+                        proxy_pass http://127.0.0.1:3002;
+                        proxy_set_header Host \$host;
+                    }
+                    location / {
+                        proxy_pass http://127.0.0.1:3001;
+                        proxy_set_header Host \$host;
+                    }
+                }
+                server {
+                  listen 80;
+                  server_name api.${URLPortal}; 
+                  location / {
+                    proxy_pass http://127.0.0.1:3002; 
+                    proxy_set_header Host \$host;
+                  }
+                }
+                server {
+                  listen 80;
+                  server_name grafana.${URLPortal}; 
+                  location / {
+                    proxy_pass http://127.0.0.1:3010; 
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_cache_bypass \$http_upgrade;
+                  }
+                }
+                server {
+                  listen 80;
+                  server_name homer.${URLPortal}; 
+                  location / {
+                    proxy_pass http://127.0.0.1:9080; 
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade \$http_upgrade;
+                    proxy_set_header Connection 'upgrade';
+                    proxy_set_header Host \$host;
+                    proxy_cache_bypass \$http_upgrade;
+                  }
+                }
+              EOF
+              
+                sudo systemctl restart nginx
+              fi
+              
+              mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e 'delete from sbc_addresses'
+
+              # point drachtio and rtpengine to the HEP endpoint on the localhost
+              sudo sed -i -e "s/--address 0.0.0.0 --port 9022/--address 0.0.0.0 --port 9022 --homer 127.0.0.1:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/--delete-delay 0/--delete-delay 0 --homer=127.0.0.1:9060 --homer-protocol=udp --homer-id=11/g"  /etc/systemd/system/rtpengine.service
+              sudo systemctl daemon-reload
+              sudo systemctl restart rtpengine
+
+              # restart heplify-server
+              sudo systemctl restart heplify-server
+
+              # restart drachtio server as it may have bound to the old public IP before the EIP was attached
+              systemctl restart drachtio
+
+              # enable cloudwatch
+              if [[ "${Cloudwatch}" == "true" ]]; then
+                echo "Enabling Cloudwatch for jambonz logs"
+                sudo sed -i -e "s/retention_in_days\": 3/retention_in_days\": ${CloudwatchLogRetention}/g" /opt/aws/amazon-cloudwatch-agent/bin/config.json 
+                sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
+              else
+                echo "Cloudwatch is not enabled for jambonz logs"
+                sudo sed -i -e "s/combine_logs: true/combine_logs: false/g" $HOME/apps/ecosystem.config.js 
+              fi
+
+              sudo systemctl restart cassandra.service        
+              echo "waiting 60 secs for cassandra to start.."
+              sleep 60
+              echo "now start jaeger"
+
+              # restart jaeger 
+              sudo systemctl restart jaeger-collector.service
+              sudo systemctl restart jaeger-query.service
+
+              # configure telegraf to send to local influxdb
+              sudo sed -i -e "s/influxdb:8086/127.0.0.1:8086/g"  /etc/telegraf/telegraf.conf
+              sudo systemctl restart telegraf
+
+              sudo -u $USER bash -c "pm2 restart $HOME/apps/ecosystem.config.js" 
+              sudo -u $USER bash -c "pm2 save"
+              sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+              
+              # configure upload_recordings service
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=$uuid/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=$uuid/g" /etc/systemd/system/upload_recordings.service
+              
+              # configure drachtio service
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/drachtio.service
+              
+              # configure freeswitch service
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=127.0.0.1/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/freeswitch.service
+              
+              sudo systemctl daemon-reload
+              sudo systemctl enable upload_recordings
+              sudo systemctl start upload_recordings
+
+              sudo systemctl restart drachtio
+              sudo systemctl restart freeswitch
+
+              # get an apiban key and install it
+              APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
+              sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
+              sudo /usr/local/bin/apiban/apiban-client-nftables FULL
+              
+            - URLPortal: !Ref URLPortal
+              Cloudwatch: !Ref Cloudwatch
+              CloudwatchLogRetention: !Ref CloudwatchLogRetention
+
+  jambonzSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: 'Allow sip, rtp, http and ssh access'
+      SecurityGroupIngress:
+        - Description: sip over udp
+          IpProtocol: udp
+          FromPort: 5060
+          ToPort: 5060
+          CidrIp: !Ref AllowedSipCidr
+        - Description: sip over tcp
+          IpProtocol: tcp
+          FromPort: 5060
+          ToPort: 5060
+          CidrIp: !Ref AllowedSipCidr
+        - Description: sip over tls
+          IpProtocol: tcp
+          FromPort: 5061
+          ToPort: 5061
+          CidrIp: !Ref AllowedSipCidr
+        - Description: sip over wss
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: !Ref AllowedSipCidr
+        - Description: rtp
+          IpProtocol: udp
+          FromPort: 40000
+          ToPort: 60000
+          CidrIp: !Ref AllowedRtpCidr
+        - Description: http
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AllowedHttpCidr
+        - Description: https
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedHttpCidr
+        - Description: homer
+          IpProtocol: tcp
+          FromPort: 9080
+          ToPort: 9080
+          CidrIp: !Ref AllowedHttpCidr
+        - Description: grafana
+          IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: !Ref AllowedHttpCidr
+        - Description: smpp
+          IpProtocol: tcp
+          FromPort: 3020
+          ToPort: 3020
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+    DependsOn:
+      - PublicRoute
+  sshSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: 'Allow sip, rtp, http and ssh access'
+      SecurityGroupIngress:
+        - Description: ssh
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSshCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+    DependsOn:
+      - PublicRoute
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties: {}
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref PublicRouteTable
+      GatewayId: !Ref InternetGateway
+    DependsOn:
+      - VPCGatewayAttachment
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  PublicSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+  EIP:
+    Type: 'AWS::EC2::EIP'
+    Properties:
+      Domain: vpc
+    DeletionPolicy: Retain
+  EIPAssociation:
+    Type: 'AWS::EC2::EIPAssociation'
+    Properties:
+      InstanceId: !Ref jambonzInstance
+      AllocationId: !GetAtt EIP.AllocationId
+
+Outputs:
+  PortalHttpURL:
+    Value: !Join 
+      - ''
+      - - 'http://'
+        - !GetAtt 
+          - jambonzInstance
+          - PublicIp
+    Description: URL for the jambonz portal
+    Condition: DontCreateDNS
+  PortalURL:
+    Value: !Join 
+      - ''
+      - - 'http://'
+        - !Ref URLPortal
+    Description: URL for the jambonz portal
+    Condition: CreateDNS
+  GrafanaURL:
+    Value: !Join 
+      - ''
+      - - 'http://grafana.'
+        - !Ref URLPortal
+    Description: URL for the grafana portal
+    Condition: CreateDNS
+  HomerURL:
+    Value: !Join 
+      - ''
+      - - 'http://homer.'
+        - !Ref URLPortal
+    Description: URL for the homer portal
+    Condition: CreateDNS
+  ServerIP:
+    Value: !GetAtt 
+      - jambonzInstance
+      - PublicIp
+    Description: Server IP address - create a DNS record for this domain as well as subdomains grafana, homer, and jaeger
+  User:
+    Value: admin
+    Description: Login username for the jambonz portal
+  Password:
+    Value: !Ref jambonzInstance
+    Description: Initial password for jambonz portal.  You will be forced to change it once you log in for the first time.
