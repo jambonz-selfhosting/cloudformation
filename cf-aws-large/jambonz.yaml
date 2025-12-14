@@ -1,0 +1,2508 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Mappings:
+  AWSRegion2AMI:
+    eu-central-1:
+      SbcSipAmi: ami-0d93408077175e33e
+      SbcRtpAmi: ami-07f88ca9769a0cae9
+      FsAmi: ami-00e38d4aa2af559b4
+      WebserverAmi: ami-07ac41b89d8e4fd3f
+      MonitoringServerAmi: ami-054802b728b7e2553
+      RecordingServerAmi: ami-099c6d78390720fbc
+
+Parameters:
+
+  EnablePcaps:
+    Description: "Do you want to enable PCAPs for SIP traffic?"
+    Type: String
+    AllowedValues:
+      - "yes"
+      - "no"
+  
+  KeyName:
+    Description: "The keypair that you will use to access the EC2 instances via ssh"
+    Type: "AWS::EC2::KeyPair::KeyName"
+
+  InstanceTypeSbcSip:
+    Description: "the EC2 instance type for the SBC SIP server"
+    Type: String
+    Default: c5n.xlarge
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c5n.18xlarge
+      - c5n.metal    
+  InstanceTypeSbcRtp:
+    Description: "the EC2 instance type to use for the SBC Media server"
+    Type: String
+    Default: c5n.xlarge
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c5n.18xlarge
+      - c5n.metal    
+  InstanceTypeFeatureServer:
+    Description: "the EC2 instance type to use for the Feature Server"
+    Type: String
+    Default: c5n.xlarge
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c5n.18xlarge
+      - c5n.metal    
+  RecordingInstanceType:
+    Description: "EC2 instance type for the Recording Server Auto Scaling Group"
+    Type: String
+    Default: t2.xlarge
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c6i.large
+      - c6i.xlarge
+      - c6i.2xlarge
+      - c6i.4xlarge
+      - c6i.8xlarge
+      - c6i.12xlarge
+      - c6i.16xlarge
+      - c6i.24xlarge
+      - c6i.32xlarge
+  InstanceTypeWebserver:
+    Description: "the EC2 instance type to use for webServer"
+    Type: String
+    Default: c5n.xlarge
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c5n.18xlarge
+      - c5n.metal    
+  InstanceTypeMonitoringServer:
+    Description: "the EC2 instance type for the monitoring server"
+    Type: String
+    Default: c5n.xlarge
+    AllowedValues:
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c5n.18xlarge
+      - c5n.metal    
+  ElastiCacheNodeType:
+    Type: String
+    Default: 'cache.t2.medium'
+    AllowedValues:
+      - cache.t3.micro
+      - cache.t3.small
+      - cache.t3.medium
+      - cache.t2.small
+      - cache.t2.medium
+      - cache.m6g.large
+      - cache.m6g.xlarge
+      - cache.m6g.2xlarge
+      - cache.m6g.4xlarge
+      - cache.m6g.8xlarge
+      - cache.m6g.12xlarge
+      - cache.m6g.16xlarge
+      - cache.m5.large
+      - cache.m5.xlarge
+      - cache.m5.2xlarge
+      - cache.m5.4xlarge
+      - cache.m5.12xlarge
+      - cache.m5.24xlarge
+      - cache.r6g.large
+      - cache.r6g.xlarge
+      - cache.r6g.2xlarge
+      - cache.r6g.4xlarge
+      - cache.r6g.8xlarge
+      - cache.r6g.12xlarge
+      - cache.r6g.16xlarge
+      - cache.r5.large
+      - cache.r5.xlarge
+      - cache.r5.2xlarge
+      - cache.r5.4xlarge
+      - cache.r5.12xlarge
+      - cache.r5.24xlarge
+  AuroraDBMinCapacity:
+    Description: "Minimum Aurora Capacity Units (ACU) for Serverless v2 (0.5 to 128)"
+    Type: Number
+    Default: 0.5
+    AllowedValues:
+      - 0.5
+      - 1
+      - 2
+      - 4
+      - 8
+      - 16
+      - 32
+      - 64
+      - 128
+  AuroraDBMaxCapacity:
+    Description: "Maximum Aurora Capacity Units (ACU) for Serverless v2 (0.5 to 128)"
+    Type: Number
+    Default: 8
+    AllowedValues:
+      - 0.5
+      - 1
+      - 2
+      - 4
+      - 8
+      - 16
+      - 32
+      - 64
+      - 128
+  AllowedSshCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address ssh access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    ConstraintDescription: must be a valid network CIDR
+    Default: 0.0.0.0/0
+  AllowedHttpCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address http(s) access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    ConstraintDescription: must be a valid network CIDR
+    Default: 0.0.0.0/0
+  AllowedSipCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address sip access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    ConstraintDescription: must be a valid network CIDR
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Default: 0.0.0.0/0
+  AllowedSmppCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address smpp access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    ConstraintDescription: must be a valid network CIDR
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Default: 0.0.0.0/0
+  AllowedRtpCidr:
+    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address to send RTP traffic, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Type: String
+    ConstraintDescription: must be a valid network CIDR
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Default: 0.0.0.0/0
+  VpcCidr:
+    Description: "The CIDR block for the whole VPC"
+    Type: "String"
+    Default: '172.20.0.0/16'
+  PublicSubnet1CIDR:
+    Description: "Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone"
+    Type: "String"
+    Default: '172.20.10.0/24'
+  PublicSubnet2CIDR:
+    Description: "Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone"
+    Type: "String"
+    Default: '172.20.11.0/24'
+  MySQLUsername:
+    Description: 'the database username'
+    Type: String
+    Default: 'admin'
+  MySQLPassword: 
+    NoEcho: true
+    Description: 'The database admin account password'
+    Type: String
+    Default: 'JambonzR0ck$'  
+  EncryptionSecret:
+    Type: String
+    Description: "secret to use for encrypting jwt and other data"
+    Default: "G=u$Dj%-97#TffYf"
+  URLPortal:
+    Type: String
+    Description: "DNS name you will point to the jambonz webserver(s)"
+    AllowedPattern : ".+"
+  StatsSampleRate: 
+    Type: Number
+    Description: sampling rate for metrics, a number between 0 and 1 inclusive
+    Default: 1
+  DbCachingTTS:
+    Type: Number
+    Description: Number of seconds to cache results from DB queries (0=no caching)
+    Default: 0
+  Cloudwatch:
+    Description: Send jambonz logs to cloudwatch
+    Type: String
+    Default: true
+    AllowedValues: [true, false]
+  CloudwatchLogRetention:
+    Description: "Number of days to retain cloudwatch logs"
+    Type: Number
+    Default: 3
+    AllowedValues:
+      - 1
+      - 3
+      - 5
+      - 7
+      - 14
+      - 30
+      - 60
+      - 90
+      - 120
+      - 150
+
+  DeployRecordingCluster:
+    Description: "Do you want to deploy the recording server cluster?"
+    Type: String
+    AllowedValues:
+      - "yes"
+      - "no"
+    Default: "no"
+
+  EnableEBSEncryption:
+    Description: "Do you want to encrypt all EBS volumes?"
+    Type: String
+    AllowedValues:
+      - "yes"
+      - "no"
+    Default: "no"
+
+Conditions:
+  DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "yes"]
+  ShouldEnableCloudWatch: !Equals
+  - true
+  - !Ref Cloudwatch
+  EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "yes"]
+
+
+Resources:
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: IAM role needed to ship logs to Cloudwatch
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: root 
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - 'cloudwatch:PutMetricData'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeTags'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:FilterLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+      - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
+      - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+
+###########################################
+#
+#      VPC Resources
+#
+###########################################
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: !Ref "VpcCidr"
+      Tags:
+      - Key: "Name"
+        Value: !Sub "${AWS::StackName}-VPC"
+        
+  # Create Internet Gateway
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+      - Key: "Name"
+        Value: !Sub "${AWS::StackName}-IGW"
+
+  # Attach Internet Gateway to VPC 
+  GatewayToInternet:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref "VPC"
+      InternetGatewayId: !Ref "InternetGateway"
+
+
+  # Create Public Subnet
+  PublicSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref "VPC"
+      CidrBlock: !Ref "PublicSubnet1CIDR"
+      AvailabilityZone: !Select [ '0', !GetAZs ]
+      MapPublicIpOnLaunch: "True"
+      Tags:
+      - Key: "Name"
+        Value: !Sub "${AWS::StackName}-${PublicSubnet1CIDR}-PublicSubnet1"
+
+  PublicSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref "VPC"
+      CidrBlock: !Ref "PublicSubnet2CIDR"
+      AvailabilityZone: !Select [ '1', !GetAZs ]
+      MapPublicIpOnLaunch: "True"
+      Tags:
+      - Key: "Name"
+        Value: !Sub "${AWS::StackName}-${PublicSubnet2CIDR}-PublicSubnet2"
+
+  # Create Public Route Table 1
+  PublicRouteTable1:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "VPC"
+      Tags:
+      - Key: "Name"
+        Value: !Sub "${AWS::StackName}-PublicRoute1"
+
+  # Create Public Route Table 2
+  PublicRouteTable2:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref "VPC"
+      Tags:
+      - Key: "Name"
+        Value: !Sub "${AWS::StackName}-PublicRoute2"
+
+  # Route-out Public Route Table to Internet Gateway (Internet connection)
+  PublicRouteIGW1:
+    Type: "AWS::EC2::Route"
+    DependsOn: "GatewayToInternet"
+    Properties:
+      RouteTableId: !Ref "PublicRouteTable1"
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref "InternetGateway"
+
+  PublicRouteIGW2:
+    Type: "AWS::EC2::Route"
+    DependsOn: "GatewayToInternet"
+    Properties:
+      RouteTableId: !Ref "PublicRouteTable2"
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref "InternetGateway"
+
+  # Associate Public Route Table with Public Subnet1 & Subnet2
+  PublicSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref "PublicSubnet1"
+      RouteTableId: !Ref "PublicRouteTable1"
+
+  PublicSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref "PublicSubnet2"
+      RouteTableId: !Ref "PublicRouteTable2"
+
+
+###########################################
+#
+#      SECURITY GROUPS
+#
+###########################################
+  SshSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-jambonz-ssh-sg'
+      GroupDescription: !Sub 'Security group for ssh to ${AWS::StackName} jambonz cluster'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSshCidr
+          Description: Allow SSH access
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-redis-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} Redis'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp:  !Ref VpcCidr
+          Description: Allow traffic from VPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+       - Key: Name
+         Value: !Sub '${AWS::StackName}-redis-sg'
+  
+  MySQLSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-mysql-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} MySQL'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp:  !Ref VpcCidr
+          Description: Allow HTTP traffic from VPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0    
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-mysql-sg'
+          
+  FeatureServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-feature-server-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} Feature Server'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3009
+          CidrIp: !Ref VpcCidr
+          Description: Allow HTTP from sbc/api server
+        - IpProtocol: tcp
+          FromPort: 3010
+          ToPort: 3019
+          CidrIp:   !Ref AllowedHttpCidr
+          Description: Allow http access from AWS SNS
+        - IpProtocol: tcp
+          FromPort: 5060
+          ToPort: 5060
+          CidrIp: !Ref VpcCidr
+          Description: Allow sip from VPC
+        - IpProtocol: udp
+          FromPort: 5060
+          ToPort: 5060
+          CidrIp: !Ref VpcCidr
+          Description: Allow sip from VPC
+        - IpProtocol: udp
+          FromPort: 25000
+          ToPort: 40000
+          CidrIp: !Ref VpcCidr
+          Description: rtp
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+       - Key: Name
+         Value: !Sub '${AWS::StackName}-feature-server-sg' 
+ 
+  WebserverSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-webserver-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} WebServer'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AllowedHttpCidr
+          Description: Allow HTTP access
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedHttpCidr
+          Description: Allow HTTPS access
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
+          Description: Allow HTTPS access
+        - IpProtocol: tcp
+          FromPort: 3017
+          ToPort: 3017
+          SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
+          Description: Allow Feature servers to access upload_recordings process
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0    
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-webserver-sg' 
+
+  SbcSipSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-sbc-sip-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} Sbc Sip Server'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3009
+          CidrIp: !Ref VpcCidr
+          Description: Allow HTTP from sbc/api server
+        - IpProtocol: tcp
+          FromPort: 3010
+          ToPort: 3019
+          CidrIp:   !Ref AllowedHttpCidr
+          Description: Allow http access from AWS SNS
+        - IpProtocol: tcp
+          FromPort: 5060
+          ToPort: 5061
+          CidrIp:  !Ref AllowedSipCidr
+          Description: Allow sip (tcp) from Internet
+        - IpProtocol: udp
+          FromPort: 5060
+          ToPort: 5060
+          CidrIp:   !Ref AllowedSipCidr
+          Description: Allow sip (udp) from Internet
+        - IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+          CidrIp: !Ref AllowedSipCidr
+          Description: sip over wss
+        - IpProtocol: tcp
+          FromPort: 4433
+          ToPort: 4433
+          CidrIp:   !Ref AllowedSipCidr
+          Description: Allow sip (wss) from Internet
+        - IpProtocol: tcp
+          FromPort: 9090
+          ToPort: 9090
+          CidrIp:  !Ref VpcCidr
+          Description: Allow access to prometheus scrape port from VPC
+        - IpProtocol: udp
+          FromPort: 22222
+          ToPort: 22223
+          CidrIp:  !Ref VpcCidr
+          Description: Allow rtpengine ng protocol from VPC
+        - IpProtocol: udp
+          FromPort: 22224
+          ToPort: 22233
+          CidrIp:  !Ref VpcCidr
+          Description: Allow dtmf events from rtpengine-sidecar in the VPC
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp:  !Ref VpcCidr
+          Description: rtpengine ws protocol from VPC
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          CidrIp:   !Ref AllowedHttpCidr
+          Description: Allow http access from AWS SNS
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0    
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-sbc-sip-sg'
+
+  SbcRtpSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-spc-rtp-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} sbc RTP'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: 40000
+          ToPort: 60000
+          CidrIp:  !Ref AllowedRtpCidr
+          Description: Allow RTP from everywhere
+        - IpProtocol: udp
+          FromPort: 40000
+          ToPort: 60000
+          CidrIp:   !Ref VpcCidr
+          Description: Allow RTP from VPC
+        - IpProtocol: udp
+          FromPort: 5060
+          ToPort: 5060
+          CidrIp:  !Ref VpcCidr
+          Description: Allow OPTIONS pings within VPC
+        - IpProtocol: udp
+          FromPort: 22222
+          ToPort: 22223
+          CidrIp:  !Ref VpcCidr
+          Description: Allow rtpengine ng protocol from VPC
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp:  !Ref VpcCidr
+          Description: rtpengine ws protocol from VPC
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          CidrIp:   !Ref AllowedHttpCidr
+          Description: Allow http access from AWS SNS
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0    
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-spc-rtp-sg'
+
+  MonitoringSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-monitoring-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} Monitoring'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3010
+          ToPort: 3010
+          CidrIp: !Ref AllowedHttpCidr
+          Description: Allow grafana access
+        - IpProtocol: tcp
+          FromPort: 8086
+          ToPort: 8086
+          CidrIp:  !Ref VpcCidr
+          Description: Allow influxdb access from VPC
+        - IpProtocol: tcp
+          FromPort: 8088
+          ToPort: 8088
+          CidrIp:  !Ref VpcCidr
+          Description: Allow influxdb backup access from VPC
+        - IpProtocol: tcp
+          FromPort: 9080
+          ToPort: 9080
+          CidrIp: !Ref VpcCidr
+          Description: Allow access to homer webapp
+        - IpProtocol: udp
+          FromPort: 9060
+          ToPort: 9060
+          CidrIp: !Ref VpcCidr
+          Description: Allow access to homer HEP
+        - IpProtocol: tcp
+          FromPort: 16686
+          ToPort: 16686
+          CidrIp: !Ref VpcCidr
+          Description: jaeger-query
+        - IpProtocol: tcp
+          FromPort: 14268
+          ToPort: 14269
+          CidrIp:  !Ref VpcCidr
+          Description: jaeger-collector (jaeger-thrift, health check)
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0    
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-monitoring-sg'
+
+###########################################
+#
+#      Recording server cluster (if requested)
+#
+###########################################   
+  RecordingALBSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Condition: DeployRecordingClusterCondition
+      Properties:
+        GroupName: !Sub '${AWS::StackName}-recording-alb-sg'
+        GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server ALB'
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: !Ref AllowedHttpCidr
+            Description: Allow HTTP access
+        SecurityGroupEgress:
+          - IpProtocol: -1
+            FromPort: 0
+            ToPort: 0
+            CidrIp: 0.0.0.0/0    
+        Tags:
+          - Key: Name
+            Value: !Sub '${AWS::StackName}-recording-alb-sg'
+
+  RecordingInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: DeployRecordingClusterCondition
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-recording-instance-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server instances'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref RecordingALBSecurityGroup
+          Description: Allow traffic from ALB
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0    
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-recording-instance-sg'
+
+  RecordingInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IamRole
+
+  RecordingLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Condition: DeployRecordingClusterCondition
+    Properties:
+      LaunchTemplateName: !Sub "${AWS::StackName}-recording-launch-template"
+      LaunchTemplateData:
+        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "RecordingServerAmi"]
+        InstanceType: !Ref RecordingInstanceType
+        KeyName: !Ref KeyName
+        IamInstanceProfile:
+          Name: !Ref RecordingInstanceProfile
+        SecurityGroupIds:
+          - !Ref RecordingInstanceSecurityGroup
+          - !Ref SshSecurityGroup
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeType: gp3
+              Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              DeleteOnTermination: true
+        UserData: 
+          Fn::Base64: 
+            Fn::Sub:
+              - |
+                #!/bin/bash
+                # configure upload_recordings service
+                echo "Configuring upload_recordings service"
+                sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/--port 3017/--port 3000/g" /etc/systemd/system/upload_recordings.service
+
+                # Insert the LD_LIBRARY_PATH environment variable into the [Service] section
+                sudo sed -i '/\[Service\]/a Environment=LD_LIBRARY_PATH=\/usr\/local\/lib' /etc/systemd/system/upload_recordings.service
+
+                sudo systemctl daemon-reload
+                sudo systemctl enable upload_recordings
+                sudo systemctl start upload_recordings
+
+                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g" /etc/telegraf/telegraf.conf
+                sudo systemctl restart telegraf
+
+
+              - JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
+                JAMBONES_MYSQL_USER: !Ref MySQLUsername
+                JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
+                MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
+                JWT_SECRET: !Ref EncryptionSecret
+
+  RecordingApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Condition: DeployRecordingClusterCondition
+    Properties:
+      Name: !Sub "${AWS::StackName}-recording-alb"
+      Scheme: internet-facing
+      Subnets: 
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref RecordingALBSecurityGroup
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: "4000"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-recording-alb"
+
+  RecordingTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: DeployRecordingClusterCondition
+    Properties:
+      Name: !Sub "${AWS::StackName}-recording-tg"
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "3000"
+      HealthCheckPath: "/health"
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-recording-tg"
+
+  RecordingALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: DeployRecordingClusterCondition
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref RecordingTargetGroup
+      LoadBalancerArn: !Ref RecordingApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  RecordingAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: DeployRecordingClusterCondition
+    Properties:
+      AutoScalingGroupName: !Sub "${AWS::StackName}-recording-asg"
+      VPCZoneIdentifier: 
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref RecordingLaunchTemplate
+        Version: !GetAtt RecordingLaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 8
+      DesiredCapacity: '1'
+      TargetGroupARNs:
+        - !Ref RecordingTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-recording-instance"
+          PropagateAtLaunch: true
+        - Key: AutoScaling
+          Value: "true"
+          PropagateAtLaunch: true
+
+###########################################
+#
+#      Aurora RDS Database
+#
+###########################################   
+  DatabaseParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      DBParameterGroupName: !Sub '${AWS::StackName}-aurora-mysql-instance-params'
+      Description: Custom parameter group for Aurora MySQL instance
+      Family: aurora-mysql8.0
+      Parameters:
+        max_connections: 500
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-instance-parameter-group'
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub '${AWS::StackName}-aurora-mysql-subnetgroup'
+      DBSubnetGroupDescription: CloudFormation managed DB subnet group.
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
+  DatabaseCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Sub '${AWS::StackName}-aurora-mysql-cluster'
+      Engine: aurora-mysql
+      EngineVersion: "8.0.mysql_aurora.3.04.0"
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref AuroraDBMinCapacity
+        MaxCapacity: !Ref AuroraDBMaxCapacity
+      MasterUsername: !Ref MySQLUsername
+      MasterUserPassword: !Ref MySQLPassword
+      DatabaseName: 'jambones'
+      BackupRetentionPeriod: 5
+      PreferredBackupWindow: 07:00-09:00
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref MySQLSecurityGroup
+
+  DatabaseInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref DatabaseCluster
+      DBInstanceClass: db.serverless
+      Engine: aurora-mysql
+      DBParameterGroupName: !Ref DatabaseParameterGroup
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-aurora-instance'
+
+###########################################
+#
+#      ElastiCache Redis
+#
+###########################################           
+  ElastiCacheSubnetGroup:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      CacheSubnetGroupName: !Sub '${AWS::StackName}-cache-subnetgroup'
+      Description: !Sub '${AWS::StackName} Subnet Group'
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
+  ElastiCacheParameterGroup:
+    Type: AWS::ElastiCache::ParameterGroup
+    Properties:
+      CacheParameterGroupFamily: redis7
+      Description: "Custom parameter group for Redis 7.1"
+      Properties:
+        maxmemory-policy: allkeys-lru
+
+  ElastiCacheCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      Engine: redis
+      EngineVersion: "7.1"
+      CacheNodeType: !Ref ElastiCacheNodeType
+      ClusterName : !Sub '${AWS::StackName}-redis'
+      NumCacheNodes: 1
+      CacheSubnetGroupName: !Ref ElastiCacheSubnetGroup
+      CacheParameterGroupName: !Ref ElastiCacheParameterGroup
+      VpcSecurityGroupIds:
+        - !GetAtt RedisSecurityGroup.GroupId
+      Port: 6379
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-redis'
+
+###########################################
+#
+#      Monitoring Instance
+#
+###########################################
+      
+  MonitoringServerEC2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "MonitoringServerAmi"]
+      InstanceType: !Ref InstanceTypeMonitoringServer
+      SecurityGroupIds:
+        - Ref: SshSecurityGroup
+        - Ref: MonitoringSecurityGroup
+      KeyName: !Ref KeyName
+      Monitoring: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash -xe
+          # restart heplify-server
+          sudo systemctl restart heplify-server.service
+          sudo systemctl restart cassandra.service        
+          sleep 60
+          sudo systemctl restart jaeger-collector.service
+          sudo systemctl restart jaeger-query.service
+      Tags:
+        -
+          Key: Name
+          Value: !Sub '${AWS::StackName}-monitoring-server'
+                    
+
+###########################################
+#      New SBC SIP instances
+#      Create a couple of EIPs for SBC SIP Servers, and tag them as such
+#      Note: devops can create more EIPs later, the Environment tag
+#      is what caused them to get associated when sip servers scale.
+#      The idea is simply to have a pre-allocated set of N EIPs
+#      for sip signaling so these can be whitelisted with carriers
+###########################################           
+  SbcSipEIP1:
+    Type: AWS::EC2::EIP
+    DeletionPolicy: Retain
+    Properties:
+      Domain: vpc
+      Tags:
+        -
+          Key: Environment
+          Value: !Sub '${AWS::StackName}-sbc-sip'
+        -
+          Key: Name
+          Value: !Sub '${AWS::StackName}-sbc-sip-1'
+
+ # --- SIP server EC2 IAM role
+  SbcSipIamRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: SBC RTP EC2 service role
+      RoleName: !Sub '${AWS::StackName}-sbc-sip-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: root 
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - 'cloudwatch:PutMetricData'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeTags'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:CompleteLifecycleAction'
+                Resource: '*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+        - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+
+  # --- SIP server EC2 Role Instance profile
+  SbcSipInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName:  !Sub '${AWS::StackName}-sbc-sip-ec2-role'
+      Path: /
+      Roles:
+        - !Ref SbcSipIamRole
+
+  MyPlacementGroup:
+    Type: AWS::EC2::PlacementGroup
+    Properties:
+      Strategy: spread
+
+  SbcSipLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "SbcSipAmi"]
+        InstanceType: !Ref InstanceTypeSbcSip
+        Placement:
+          GroupName: !Ref MyPlacementGroup
+        IamInstanceProfile:
+          Name: !Ref SbcSipInstanceProfile
+        KeyName: !Ref KeyName
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            Groups:
+              - Ref: SshSecurityGroup
+              - Ref: SbcSipSecurityGroup
+            DeviceIndex: 0
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeType: gp3
+              Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              DeleteOnTermination: true
+        UserData:
+          Fn::Base64:
+            Fn::Sub:
+              - |
+                #!/bin/bash
+                echo "running jambonz user data script"
+
+                # Detecting the Linux distribution
+                if grep -q 'ID="rhel"' /etc/os-release; then
+                    DEFAULT_USER=ec2-user
+
+                    echo disabling firewalld
+                    sudo systemctl stop firewalld
+                    sudo systemctl disable firewalld
+                else
+                    DEFAULT_USER=admin
+                fi
+
+                # Always use jambonz user for apps
+                USER=jambonz
+                HOME=/home/jambonz
+
+                # Sync SSH keys from default user to jambonz user
+                echo "Syncing SSH keys to jambonz user..."
+                if [ -f "/home/$DEFAULT_USER/.ssh/authorized_keys" ] && [ -s "/home/$DEFAULT_USER/.ssh/authorized_keys" ]; then
+                    mkdir -p /home/jambonz/.ssh
+                    cp "/home/$DEFAULT_USER/.ssh/authorized_keys" /home/jambonz/.ssh/
+                    chown -R jambonz:jambonz /home/jambonz/.ssh
+                    chmod 700 /home/jambonz/.ssh
+                    chmod 600 /home/jambonz/.ssh/authorized_keys
+                    echo "SSH keys copied from $DEFAULT_USER to jambonz"
+                else
+                    echo "Warning: No SSH keys found for $DEFAULT_USER"
+                fi
+
+                if [ -f "/usr/local/bin/auto-assign-elastic-ip.sh" ]; then
+                    PRE_PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    echo "before retrieving EIP for SIP server, public IP is $PRE_PUBLIC_IP"
+
+                    /usr/local/bin/auto-assign-elastic-ip.sh
+                    sleep 20
+
+                    PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    echo "after retrieving EIP for SIP server, public IP is $PUBLIC_IP"
+                else
+                    echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
+                fi
+
+                echo "writing $HOME/apps/ecosystem.config.js.."
+                cat << EOF > $HOME/apps/ecosystem.config.js
+                module.exports = {
+                  apps : [
+                  {
+                    name: 'sbc-sip-sidecar',
+                    cwd: '$HOME/apps/sbc-sip-sidecar',
+                    script: 'app.js',
+                    instance_var: 'INSTANCE_ID',
+                    out_file: '$HOME/.pm2/logs/sbc-sip-sidecar.log',
+                    err_file: '$HOME/.pm2/logs/sbc-sip-sidecar.log',
+                    exec_mode: 'fork',
+                    instances: 1,
+                    autorestart: true,
+                    watch: false,
+                    max_memory_restart: '2G',
+                    env: {
+                      JAMBONES_LOGLEVEL: 'info',
+                      JWT_SECRET: '${JWT_SECRET}',
+                      RTPENGINE_PING_INTERVAL: 30000,
+                      DRACHTIO_HOST: '127.0.0.1',
+                      DRACHTIO_PORT: 9022,
+                      DRACHTIO_SECRET: 'cymru',
+                      JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
+                      JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_WRITE_HOST}',
+                      JAMBONES_MYSQL_USER: '${JAMBONES_MYSQL_USER}',
+                      JAMBONES_MYSQL_PASSWORD: '${JAMBONES_MYSQL_PASSWORD}',
+                      JAMBONES_MYSQL_DATABASE: 'jambones',
+                      JAMBONES_MYSQL_CONNECTION_LIMIT: 10,
+                      JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
+                      JAMBONES_REDIS_PORT: 6379,
+                      JAMBONES_TIME_SERIES_HOST: '${JAMBONES_TIME_SERIES_HOST}',
+                      ENABLE_METRICS: 1,
+                      STATS_HOST: '127.0.0.1',
+                      STATS_PORT: 8125,
+                      STATS_PROTOCOL: 'tcp',
+                      STATS_TELEGRAF: 1,
+                      STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
+                      JAMBONES_NETWORK_CIDR: '${VPC_CIDR}'
+                    }
+                  },
+                  {
+                    name: 'sbc-call-router',
+                    cwd: '$HOME/apps/sbc-call-router',
+                    script: 'app.js',
+                    instance_var: 'INSTANCE_ID',
+                    out_file: '$HOME/.pm2/logs/sbc-call-router.log',
+                    err_file: '$HOME/.pm2/logs/sbc-call-router.log',
+                    exec_mode: 'fork',
+                    instances: 1,
+                    autorestart: true,
+                    watch: false,
+                    max_memory_restart: '1G',
+                    env: {
+                      JAMBONES_LOGLEVEL: 'info',
+                      HTTP_PORT:  4000,
+                      JAMBONES_INBOUND_ROUTE: '127.0.0.1:4002',
+                      JAMBONES_OUTBOUND_ROUTE: '127.0.0.1:4003',
+                      JAMBONZ_TAGGED_INBOUND: 1,
+                      ENABLE_METRICS: 1,
+                      STATS_HOST: '127.0.0.1',
+                      STATS_PORT: 8125,
+                      STATS_PROTOCOL: 'tcp',
+                      STATS_TELEGRAF: 1,
+                      STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
+                      JAMBONES_NETWORK_CIDR: '${VPC_CIDR}'
+                    }
+                  },
+                  {
+                    name: 'outbound',
+                    cwd: '$HOME/apps/outbound',
+                    script: 'app.js',
+                    instance_var: 'INSTANCE_ID',
+                    out_file: '$HOME/.pm2/logs/outbound.log',
+                    err_file: '$HOME/.pm2/logs/outbound.log',
+                    exec_mode: 'fork',
+                    instances: 1,
+                    autorestart: true,
+                    watch: false,
+                    max_memory_restart: '3G',
+                    env: {
+                      JAMBONES_LOGLEVEL: 'info',
+                      JWT_SECRET: '${JWT_SECRET}',
+                      JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
+                      JAMBONES_RTPENGINE_INJECT_DTMF_ALWAYS: 0,
+                      JAMBONES_RTPENGINE_UDP_PORT: 6000,
+                      MIN_CALL_LIMIT: 9999,
+                      RTPENGINE_PING_INTERVAL: 30000,
+                      DRACHTIO_HOST: '127.0.0.1',
+                      DRACHTIO_PORT: 9022,
+                      DRACHTIO_SECRET: 'cymru',
+                      JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
+                      JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_HOST}',
+                      JAMBONES_MYSQL_USER: '${JAMBONES_MYSQL_USER}',
+                      JAMBONES_MYSQL_PASSWORD: '${JAMBONES_MYSQL_PASSWORD}',
+                      JAMBONES_MYSQL_DATABASE: 'jambones',
+                      JAMBONES_MYSQL_CONNECTION_LIMIT: 10,
+                      JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
+                      JAMBONES_REDIS_PORT: 6379,
+                      JAMBONES_TIME_SERIES_HOST: '${JAMBONES_TIME_SERIES_HOST}',
+                      JAMBONES_TRACK_ACCOUNT_CALLS: 0,
+                      JAMBONES_TRACK_SP_CALLS: 0,
+                      JAMBONES_TRACK_APP_CALLS: 0,
+                      ENABLE_METRICS: 1,
+                      STATS_HOST: '127.0.0.1',
+                      STATS_PORT: 8125,
+                      STATS_PROTOCOL: 'tcp',
+                      STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
+                      STATS_TELEGRAF: 1
+                    }
+                  },
+                  {
+                    name: 'inbound',
+                    cwd: '$HOME/apps/inbound',
+                    script: 'app.js',
+                    instance_var: 'INSTANCE_ID',
+                    out_file: '$HOME/.pm2/logs/inbound.log',
+                    err_file: '$HOME/.pm2/logs/inbound.log',
+                    exec_mode: 'fork',
+                    instances: 'max',
+                    autorestart: true,
+                    watch: false,
+                    max_memory_restart: '3G',
+                    env: {
+                      JAMBONES_LOGLEVEL: 'info',
+                      JWT_SECRET: '${JWT_SECRET}',
+                      AWS_REGION: '${AWS_REGION}',
+                      JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
+                      JAMBONES_RTPENGINE_INJECT_DTMF_ALWAYS: 0,
+                      JAMBONES_RTPENGINE_UDP_PORT: 7000,
+                      DRACHTIO_HOST: '127.0.0.1',
+                      DRACHTIO_PORT: 9022,
+                      DRACHTIO_SECRET: 'cymru',
+                      AWS_SNS_TOPIC_ARN: '${AWS_SNS_TOPIC_ARN}',
+                      HTTP_PORT: 3000,
+                      HTTP_PORT_MAX: 3009,
+                      AWS_SNS_PORT: 3010,
+                      AWS_SNS_PORT_MAX: 3019,
+                      JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
+                      JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_HOST}',
+                      JAMBONES_MYSQL_USER: '${JAMBONES_MYSQL_USER}',
+                      JAMBONES_MYSQL_PASSWORD: '${JAMBONES_MYSQL_PASSWORD}',
+                      JAMBONES_MYSQL_DATABASE: 'jambones',
+                      JAMBONES_MYSQL_CONNECTION_LIMIT: 10,
+                      JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
+                      JAMBONES_REDIS_PORT: 6379,
+                      JAMBONES_TIME_SERIES_HOST: '${JAMBONES_TIME_SERIES_HOST}',
+                      ENABLE_METRICS: 1,
+                      JAMBONES_TRACK_ACCOUNT_CALLS: 0,
+                      JAMBONES_TRACK_SP_CALLS: 0,
+                      JAMBONES_TRACK_APP_CALLS: 0,
+                      STATS_HOST: '127.0.0.1',
+                      STATS_PORT: 8125,
+                      STATS_PROTOCOL: 'tcp',
+                      STATS_TELEGRAF: 1,
+                      STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
+                      MS_TEAMS_SIP_PROXY_IPS: '52.114.148.0, 52.114.132.46, 52.114.75.24, 52.114.76.76, 52.114.7.24, 52.114.14.70'
+                    }
+                  }
+                  ]
+                };
+                EOF
+                echo "finished writing config file"
+
+                echo "restarting telegraf"
+                # configure telegraph to send to the monitoring server
+                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+                sudo systemctl restart telegraf
+
+                if [[ "${EnablePcaps}" == "yes" ]]; then
+                  echo "enabling HEP and restarting drachtio server"
+                  sudo sed -i -e "s/--address 0.0.0.0 --port 9022/--address 0.0.0.0 --port 9022 --homer ${MONITORING_SERVER_IP}:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
+                fi
+                sudo systemctl daemon-reload
+                sudo systemctl restart drachtio
+
+                echo "starting jambonz apps"
+                sudo -u $USER bash -c "pm2 restart $HOME/apps/ecosystem.config.js"
+                sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+                sudo -u $USER bash -c "pm2 save"
+                sudo systemctl enable pm2-$USER.service
+
+                # enable cloudwatch
+                if [[ ${CloudwatchLogRetention} -ne 0 ]]; then
+                  echo "Enabling Cloudwatch for jambonz logs"
+                  sudo sed -i -e "s/retention_in_days\": 3/retention_in_days\": ${CloudwatchLogRetention}/g" /opt/aws/amazon-cloudwatch-agent/bin/config.json 
+                  sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
+                else
+                  echo "Cloudwatch log retention is set to 0, disabling cloudwatch setup"
+                  sudo systemctl stop amazon-cloudwatch-agent
+                  sudo systemctl disable amazon-cloudwatch-agent
+                fi
+
+                # get an apiban key
+                echo "installing apiban key"
+                INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)" 
+                APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
+                sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
+                sudo /usr/local/bin/apiban/apiban-client-nftables FULL
+
+                echo "user data script completed"
+              - VPC_CIDR: !Ref VpcCidr
+                JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
+                JAMBONES_MYSQL_WRITE_HOST: !GetAtt DatabaseCluster.Endpoint.Address
+                JAMBONES_MYSQL_USER: !Ref MySQLUsername
+                JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
+                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+                JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
+                MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
+                AWS_SNS_TOPIC_ARN: !Ref SbcSipSNSTopic
+                JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
+                JWT_SECRET: !Ref EncryptionSecret
+                AWS_REGION: !Ref AWS::Region
+                CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
+                DbCachingTTS: !Ref DbCachingTTS
+                EnablePcaps: !Ref EnablePcaps
+
+    
+  SbcSipAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+      - DatabaseInstance 
+      - ElastiCacheCluster
+      - SbcSipEIP1
+    Properties:
+      AutoScalingGroupName: !Sub '${AWS::StackName}-sbc-sip-autoscaling-group'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref SbcSipLaunchTemplate
+        Version: !GetAtt SbcSipLaunchTemplate.LatestVersionNumber
+      MinSize: 0
+      MaxSize: 4
+      DesiredCapacity: 1
+      TerminationPolicies:
+       - OldestInstance
+      VPCZoneIdentifier: 
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - 
+          Key: Name
+          Value: !Sub '${AWS::StackName}-sip-server'
+          PropagateAtLaunch: 'true'
+        - 
+          Key: Environment
+          Value: !Sub '${AWS::StackName}-sbc-sip'
+          PropagateAtLaunch: 'true'
+
+  SbcSipSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-${AWS::Region}-sip-lifecycle-events'
+  
+  SbcSipSNSPublishRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - autoscaling.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
+                
+  SbcSipLifecycleHook: 
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      LifecycleHookName: !Sub '${AWS::StackName}-sip-scale-in'
+      AutoScalingGroupName: !Ref SbcSipAutoScalingGroup
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
+      NotificationTargetARN: !Ref SbcSipSNSTopic
+      RoleARN: !GetAtt SbcSipSNSPublishRole.Arn
+
+
+###########################################
+#
+#      Feature Instance
+#
+###########################################
+  # --- Feature server EC2 IAM role
+  FeatureServerIamRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: Feature Server EC2 service role
+      RoleName: !Sub '${AWS::StackName}-feature-server-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: root 
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - 'cloudwatch:PutMetricData'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeTags'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:CompleteLifecycleAction'
+                Resource: '*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+        - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
+
+  # --- Feature server EC2 Role Instance profile
+  FeatureServerInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName:  !Sub '${AWS::StackName}-feature-server-ec2-role'
+      Path: /
+      Roles:
+        - !Ref FeatureServerIamRole
+
+  FeatureServerLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "FsAmi"]
+        InstanceType: !Ref InstanceTypeFeatureServer
+        Placement:
+          GroupName: !Ref MyPlacementGroup
+        IamInstanceProfile:
+          Name: !Ref FeatureServerInstanceProfile
+        KeyName: !Ref KeyName
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            Groups:
+              - Ref: SshSecurityGroup
+              - Ref: FeatureServerSecurityGroup
+            DeviceIndex: 0
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeType: gp3
+              Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              DeleteOnTermination: true
+        UserData:
+          Fn::Base64: 
+            Fn::Sub:
+              - |
+                #!/bin/bash -e
+                #
+                # Cache a bucket name on this host
+                echo "running jambonz user data script"
+
+                # Detecting the Linux distribution
+                if grep -q 'ID="rhel"' /etc/os-release; then
+                    DEFAULT_USER=ec2-user
+
+                    echo disabling firewalld
+                    sudo systemctl stop firewalld
+                    sudo systemctl disable firewalld
+                else
+                    DEFAULT_USER=admin
+                fi
+
+                # Always use jambonz user for apps
+                USER=jambonz
+                HOME=/home/jambonz
+
+                # Sync SSH keys from default user to jambonz user
+                echo "Syncing SSH keys to jambonz user..."
+                if [ -f "/home/$DEFAULT_USER/.ssh/authorized_keys" ] && [ -s "/home/$DEFAULT_USER/.ssh/authorized_keys" ]; then
+                    mkdir -p /home/jambonz/.ssh
+                    cp "/home/$DEFAULT_USER/.ssh/authorized_keys" /home/jambonz/.ssh/
+                    chown -R jambonz:jambonz /home/jambonz/.ssh
+                    chmod 700 /home/jambonz/.ssh
+                    chmod 600 /home/jambonz/.ssh/authorized_keys
+                    echo "SSH keys copied from $DEFAULT_USER to jambonz"
+                else
+                    echo "Warning: No SSH keys found for $DEFAULT_USER"
+                fi
+
+                echo "writing $HOME/apps/ecosystem.config.js.."
+
+                cat << EOF > $HOME/apps/ecosystem.config.js
+                module.exports = {
+                apps : [
+                {
+                    name: 'feature-server',
+                    cwd: '$HOME/apps/feature-server',
+                    script: 'app.js',
+                    instance_var: 'INSTANCE_ID',
+                    out_file: '$HOME/.pm2/logs/feature-server.log',
+                    err_file: '$HOME/.pm2/logs/feature-server.log',
+                    exec_mode: 'fork',
+                    instances: 'max',
+                    autorestart: true,
+                    watch: false,
+                    max_memory_restart: '5G',
+                    env: {
+                      JAMBONES_LOGLEVEL: 'info',
+                      JAMBONES_TTS_TRIM_SILENCE: 1,
+                      JWT_SECRET: '${JWT_SECRET}',
+                      AWS_REGION: '${AWS_REGION}',
+                      JAMBONES_API_BASE_URL: 'http://${URLPortal}/v1',
+                      ENABLE_METRICS: 1,
+                      STATS_HOST: '127.0.0.1',
+                      STATS_PORT: 8125,
+                      STATS_PROTOCOL: 'tcp',
+                      STATS_TELEGRAF: 1,
+                      STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
+                      JAMBONES_OTEL_ENABLED: 1,
+                      OTEL_EXPORTER_JAEGER_ENDPOINT: 'http://${MONITORING_SERVER_IP}:14268/api/traces',
+                      OTEL_EXPORTER_OTLP_METRICS_INSECURE: 1,
+                      OTEL_EXPORTER_JAEGER_GRPC_INSECURE: 1,
+                      AWS_SNS_TOPIC_ARN: '${AWS_SNS_TOPIC_ARN}',
+                      JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
+                      JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
+                      JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_HOST}',
+                      JAMBONES_MYSQL_USER: '${JAMBONES_MYSQL_USER}',
+                      JAMBONES_MYSQL_PASSWORD: '${JAMBONES_MYSQL_PASSWORD}',
+                      JAMBONES_MYSQL_DATABASE: 'jambones',
+                      JAMBONES_MYSQL_CONNECTION_LIMIT: 10,
+                      JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
+                      JAMBONES_REDIS_PORT: 6379,
+                      JAMBONES_TIME_SERIES_HOST: '${JAMBONES_TIME_SERIES_HOST}',
+                      HTTP_PORT: 3000,
+                      HTTP_PORT_MAX: 3009,
+                      AWS_SNS_PORT: 3010,
+                      AWS_SNS_PORT_MAX: 3019,
+                      DRACHTIO_HOST: '127.0.0.1',
+                      DRACHTIO_PORT: 9022,
+                      DRACHTIO_SECRET: 'cymru',
+                      JAMBONES_FEATURE_SERVERS: '127.0.0.1:9022:cymru',
+                      JAMBONES_FREESWITCH: '127.0.0.1:8021:JambonzR0ck$',
+                      AUTHENTICATION_KEY: '${JWT_SECRET}',
+                      JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
+                      JAMBONZ_RECORD_WS_PASSWORD: '${JWT_SECRET}',
+                      JAMBONZ_RECORD_WS_BASE_URL: '${RecordingWsBaseUrl}'
+                    }
+                  }]
+                };
+                EOF
+              
+                echo "finished writing config file"
+
+                sudo -u $USER bash -c "pm2 start $HOME/apps/ecosystem.config.js"
+                sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+                sudo -u $USER bash -c "pm2 save"
+                sudo systemctl enable pm2-$USER.service
+
+                # configure telegraph to send to the monitoring server
+                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+                sudo systemctl restart telegraf
+
+                # enable cloudwatch
+                if [[ ${CloudwatchLogRetention} -ne 0 ]]; then
+                  echo "Enabling Cloudwatch for jambonz logs"
+                  sudo sed -i -e "s/retention_in_days\": 3/retention_in_days\": ${CloudwatchLogRetention}/g" /opt/aws/amazon-cloudwatch-agent/bin/config.json 
+                  sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
+                else
+                  echo "Cloudwatch log retention is set to 0, disabling cloudwatch setup"
+                  sudo systemctl stop amazon-cloudwatch-agent
+                  sudo systemctl disable amazon-cloudwatch-agent
+                fi
+
+                echo "user data script completed"
+              - VPC_CIDR: !Ref VpcCidr
+                JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
+                JAMBONES_MYSQL_USER: !Ref MySQLUsername
+                JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
+                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+                AWS_SNS_TOPIC_ARN: !Ref FeatureServerSNSTopic
+                AWS_REGION: !Ref AWS::Region
+                JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
+                MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
+                URLPortal: !Ref URLPortal
+                JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
+                JWT_SECRET: !Ref EncryptionSecret
+                CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
+                DbCachingTTS: !Ref DbCachingTTS
+                WebServerPrivateIP: !GetAtt WebServerEC2.PrivateIp
+                RecordingWsBaseUrl: 
+                  !If [
+                    DeployRecordingClusterCondition,
+                    !Sub "ws://${RecordingApplicationLoadBalancer.DNSName}",
+                    !Sub "ws://${WebServerEC2.PrivateIp}:3017"
+                  ]
+
+  FeatureServerAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+      - DatabaseInstance 
+      - ElastiCacheCluster
+    Properties:
+      AutoScalingGroupName: !Sub '${AWS::StackName}-feature-server-autoscaling-group'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref FeatureServerLaunchTemplate
+        Version: !GetAtt FeatureServerLaunchTemplate.LatestVersionNumber
+      MinSize: 0
+      MaxSize: 8
+      DesiredCapacity: 1
+      TerminationPolicies:
+      - OldestInstance
+      VPCZoneIdentifier: 
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - 
+          Key: Name
+          Value: !Sub '${AWS::StackName}-feature-server'
+          PropagateAtLaunch: 'true'
+
+  FeatureServerSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-${AWS::Region}-fs-lifecycle-events'
+  
+  FeatureServerSNSPublishRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - autoscaling.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
+                
+  FeatureServerLifecycleHook: 
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      LifecycleHookName: !Sub '${AWS::StackName}-fs-scale-in'
+      AutoScalingGroupName: !Ref FeatureServerAutoScalingGroup
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
+      NotificationTargetARN: !Ref FeatureServerSNSTopic
+      RoleARN: !GetAtt FeatureServerSNSPublishRole.Arn
+
+
+###########################################
+#
+#      SBC RTP Instance
+#
+###########################################
+  SbcRtpEIP1:
+    Type: AWS::EC2::EIP
+    DeletionPolicy: Retain
+    Properties:
+      Domain: vpc
+      Tags:
+        -
+          Key: Environment
+          Value: !Sub '${AWS::StackName}-sbc-rtp'
+        -
+          Key: Name
+          Value: !Sub '${AWS::StackName}-sbc-rtp-1'
+
+
+ # --- Feature server EC2 IAM role
+  SbcRtpServerIamRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: SBC RTP EC2 service role
+      RoleName: !Sub '${AWS::StackName}-sbc-rtp-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: root 
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - 'cloudwatch:PutMetricData'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeTags'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:CompleteLifecycleAction'
+                Resource: '*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+        - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
+
+  # --- SBC RTP EC2 Role Instance profile
+  SbcRtpServerInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName:  !Sub '${AWS::StackName}-sbc-rtp-ec2-role'
+      Path: /
+      Roles:
+        - !Ref SbcRtpServerIamRole
+
+  SbcRtpLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "SbcRtpAmi"]
+        InstanceType: !Ref InstanceTypeSbcRtp
+        Placement:
+          GroupName: !Ref MyPlacementGroup
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            Groups:
+              - Ref: SshSecurityGroup
+              - Ref: SbcRtpSecurityGroup
+            DeviceIndex: 0
+        IamInstanceProfile:
+          Name: !Ref SbcRtpServerInstanceProfile
+        KeyName: !Ref KeyName
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeType: gp3
+              Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              DeleteOnTermination: true
+        UserData:
+          Fn::Base64: 
+            Fn::Sub:
+              - |
+                #!/bin/bash
+
+                echo "running jambonz user data script"
+
+                # Detecting the Linux distribution
+                if grep -q 'ID="rhel"' /etc/os-release; then
+                    DEFAULT_USER=ec2-user
+
+                    echo disabling firewalld
+                    sudo systemctl stop firewalld
+                    sudo systemctl disable firewalld
+                else
+                    DEFAULT_USER=admin
+                fi
+
+                # Always use jambonz user for apps
+                USER=jambonz
+                HOME=/home/jambonz
+
+                # Sync SSH keys from default user to jambonz user
+                echo "Syncing SSH keys to jambonz user..."
+                if [ -f "/home/$DEFAULT_USER/.ssh/authorized_keys" ] && [ -s "/home/$DEFAULT_USER/.ssh/authorized_keys" ]; then
+                    mkdir -p /home/jambonz/.ssh
+                    cp "/home/$DEFAULT_USER/.ssh/authorized_keys" /home/jambonz/.ssh/
+                    chown -R jambonz:jambonz /home/jambonz/.ssh
+                    chmod 700 /home/jambonz/.ssh
+                    chmod 600 /home/jambonz/.ssh/authorized_keys
+                    echo "SSH keys copied from $DEFAULT_USER to jambonz"
+                else
+                    echo "Warning: No SSH keys found for $DEFAULT_USER"
+                fi
+
+                if [ -f "/usr/local/bin/auto-assign-elastic-ip.sh" ]; then
+                    PRE_PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    echo "before retrieving EIP for RTP server, public IP is $PRE_PUBLIC_IP"
+
+                    /usr/local/bin/auto-assign-elastic-ip.sh
+                    sleep 20
+
+                    PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    echo "after retrieving EIP for RTP server, public IP is $PUBLIC_IP"
+                else
+                    echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
+                fi
+
+                echo "writing $HOME/apps/ecosystem.config.js.."
+                cat << EOF > $HOME/apps/ecosystem.config.js
+                module.exports = {
+                  apps : [
+                  {
+                    name: 'sbc-rtpengine-sidecar',
+                    cwd: '$HOME/apps/sbc-rtpengine-sidecar',
+                    script: 'app.js',
+                    instance_var: 'INSTANCE_ID',
+                    out_file: '$HOME/.pm2/logs/sbc-rtpengine-sidecar.log',
+                    err_file: '$HOME/.pm2/logs/sbc-rtpengine-sidecar.log',
+                    exec_mode: 'fork',
+                    instances: 1,
+                    autorestart: true,
+                    watch: false,
+                    max_memory_restart: '1G',
+                    env: {
+                      LOGLEVEL: 'info',
+                      RTPENGINE_DTMF_LOG_PORT: 22223,
+                      AWS_SNS_TOPIC_ARN: '${AWS_SNS_TOPIC_ARN}',
+                      AWS_REGION: '${AWS_REGION}',
+                      JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
+                      JAMBONES_REDIS_PORT: 6379,
+                      AWS_SNS_PORT: 3001,
+                      ENABLE_METRICS: 1,
+                      STATS_HOST: '127.0.0.1',
+                      STATS_PORT: 8125,
+                      STATS_PROTOCOL: 'tcp',
+                      STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
+                      STATS_TELEGRAF: 1
+                    }
+                  }
+                  ]
+                };
+                EOF
+                echo "finished writing config file"
+                sudo -u $USER bash -c "pm2 start $HOME/apps/ecosystem.config.js"
+                sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+                sudo -u $USER bash -c "pm2 save"
+                sudo systemctl enable pm2-$USER.service
+
+                # configure telegraph to send to the monitoring server
+                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+                sudo systemctl restart telegraf
+
+                # point rtpengine to the HEP endpoint on the monitoring server
+                if [[ "${EnablePcaps}" == "yes" ]]; then
+                  sudo sed -i -e "s/--delete-delay 0/--delete-delay 0 --homer=${MONITORING_SERVER_IP}:9060 --homer-protocol=udp --homer-id=11/g"  /etc/systemd/system/rtpengine.service
+                  sudo systemctl daemon-reload
+                fi
+                sudo systemctl restart rtpengine
+
+                echo "user data script completed"
+
+              - VPC_CIDR: !Ref VpcCidr
+                AWS_REGION: !Ref AWS::Region
+                JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
+                JAMBONES_MYSQL_USER: !Ref MySQLUsername
+                JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
+                JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
+                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+                AWS_SNS_TOPIC_ARN: !Ref SbcRtpServerSNSTopic
+                MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
+                CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
+                EnablePcaps: !Ref EnablePcaps
+
+    
+  SbcRtpServerAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+      - DatabaseInstance 
+      - ElastiCacheCluster
+      - SbcRtpEIP1
+    Properties:
+      AutoScalingGroupName: !Sub '${AWS::StackName}-sbc-rtp-autoscaling-group'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref SbcRtpLaunchTemplate
+        Version: !GetAtt SbcRtpLaunchTemplate.LatestVersionNumber
+      MinSize: 0
+      MaxSize: 4
+      DesiredCapacity: 1
+      TerminationPolicies:
+       - OldestInstance
+      VPCZoneIdentifier: 
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - 
+          Key: Name
+          Value: !Sub '${AWS::StackName}-rtp-server'
+          PropagateAtLaunch: 'true'
+
+  SbcRtpServerSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-${AWS::Region}-rtp-lifecycle-events'
+  
+  SbcRtpServerSNSPublishRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - autoscaling.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
+                
+  SbcRtpServerLifecycleHook: 
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      LifecycleHookName: !Sub '${AWS::StackName}-rtp-scale-in'
+      AutoScalingGroupName: !Ref SbcRtpServerAutoScalingGroup
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
+      NotificationTargetARN: !Ref SbcRtpServerSNSTopic
+      RoleARN: !GetAtt SbcRtpServerSNSPublishRole.Arn
+
+
+
+###########################################
+#
+#      WebServer Instance
+#
+###########################################
+  WebServerEIP:
+    Type: AWS::EC2::EIP
+    DeletionPolicy: Retain
+    Properties:
+      Domain: vpc
+      Tags:
+        -
+          Key: Name
+          Value: !Sub '${AWS::StackName}-webserver'
+        -
+          Key: Environment
+          Value: !Sub '${AWS::StackName}-webserver'
+
+  # --- Web server EC2 IAM role
+  WebServerIamRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      Description: Webserver EC2 service role
+      RoleName: !Sub '${AWS::StackName}-webserver-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: root 
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - 'cloudwatch:PutMetricData'
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeTags'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:CompleteLifecycleAction'
+                Resource: '*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
+
+  # --- Webserver EC2 Role Instance profile
+  WebServerInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName:  !Sub '${AWS::StackName}-webserver-ec2-role'
+      Path: /
+      Roles:
+        - !Ref WebServerIamRole
+
+  WebServerEC2:
+    DependsOn:
+      - DatabaseInstance 
+      - ElastiCacheCluster
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      IamInstanceProfile: !Ref WebServerInstanceProfile
+      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "WebserverAmi"]
+      InstanceType: !Ref InstanceTypeWebserver
+      Tags:
+        - 
+          Key: Name
+          Value: !Sub '${AWS::StackName}-webserver'
+        - 
+          Key: Environment
+          Value: !Sub '${AWS::StackName}-webserver'
+      SecurityGroupIds:
+        - Ref: SshSecurityGroup
+        - Ref: WebserverSecurityGroup
+      KeyName: !Ref KeyName
+      Monitoring: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: 
+          Fn::Sub:
+            - |
+              #!/bin/bash -xe
+
+              echo "running jambonz user data script"
+
+              # Detecting the Linux distribution
+              if grep -q 'ID="rhel"' /etc/os-release; then
+                  DEFAULT_USER=ec2-user
+                  NGINX_CONFIG=/etc/nginx/conf.d/default.conf
+
+                  echo restarting postgresql
+                  systemctl restart postgresql-12
+
+                  echo disabling firewalld
+                  sudo systemctl stop firewalld
+                  sudo systemctl disable firewalld
+              else
+                  DEFAULT_USER=admin
+                  NGINX_CONFIG=/etc/nginx/sites-available/default
+              fi
+
+              # Always use jambonz user for apps
+              USER=jambonz
+              HOME=/home/jambonz
+
+              # Sync SSH keys from default user to jambonz user
+              echo "Syncing SSH keys to jambonz user..."
+              if [ -f "/home/$DEFAULT_USER/.ssh/authorized_keys" ] && [ -s "/home/$DEFAULT_USER/.ssh/authorized_keys" ]; then
+                  mkdir -p /home/jambonz/.ssh
+                  cp "/home/$DEFAULT_USER/.ssh/authorized_keys" /home/jambonz/.ssh/
+                  chown -R jambonz:jambonz /home/jambonz/.ssh
+                  chmod 700 /home/jambonz/.ssh
+                  chmod 600 /home/jambonz/.ssh/authorized_keys
+                  echo "SSH keys copied from $DEFAULT_USER to jambonz"
+              else
+                  echo "Warning: No SSH keys found for $DEFAULT_USER"
+              fi
+
+              if [ -f "/usr/local/bin/auto-assign-elastic-ip.sh" ]; then
+                  PRE_PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                  echo "before retrieving EIP for web+monitoring server, public IP is $PRE_PUBLIC_IP"
+
+                  /usr/local/bin/auto-assign-elastic-ip.sh
+                  sleep 20
+
+                  PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                  echo "after retrieving EIP for web+monitoring server, public IP is $PUBLIC_IP"
+              else
+                  echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
+              fi
+            
+              echo "running jambonz web and monitoring server user data script"
+            
+              echo "seeding database.."
+              INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
+              DEFAULT_ACCOUNT_SID=$(uuidgen)
+              DEFAULT_TOKEN=$(uuidgen)
+              sudo sed -i "s/9351f46a-678c-43f5-b8a6-d4eb58d131af/$DEFAULT_ACCOUNT_SID/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
+              sudo sed -i "s/38700987-c7a4-4685-a5bb-af378f9734de/$DEFAULT_TOKEN/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
+              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/jambones-sql.sql
+              sudo sed -i 's/public-apps.jambonz.cloud/public-apps.${URLPortal}/g' $HOME/apps/api-server/db/seed-production-database-open-source.sql
+              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/seed-production-database-open-source.sql
+              JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
+
+              # add row to system information table 
+              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+
+              # jambonz webapp
+              echo "configuring webapp.."
+              echo "VITE_API_BASE_URL=http://${URLPortal}/api/v1" > $HOME/apps/webapp/.env
+              API_BASE_URL=http://${URLPortal}/api/v1 TAG="<script>window.JAMBONZ = { API_BASE_URL: '$API_BASE_URL'};</script>"
+              sed -i -e "\@</head>@i\ $TAG" $HOME/apps/webapp/dist/index.html
+
+              echo "writing $HOME/apps/ecosystem.config.js.."
+              cat << EOF > $HOME/apps/ecosystem.config.js
+              module.exports = {
+                apps : [
+                {
+                  name: 'api-server',
+                  cwd: '$HOME/apps/api-server',
+                  script: 'app.js',
+                  out_file: '$HOME/.pm2/logs/api-server.log',
+                  err_file: '$HOME/.pm2/logs/api-server.log',
+                  combine_logs: true,
+                  instance_var: 'INSTANCE_ID',
+                  exec_mode: 'cluster',
+                  instances: 0,
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '5G',
+                  env: {
+                    JAMBONES_LOGLEVEL: 'info',
+                    JWT_SECRET: '${JWT_SECRET}',
+                    AWS_REGION: '${AWS_REGION}',
+                    AUTHENTICATION_KEY: '${JWT_SECRET}',
+                    JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
+                    JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_HOST}',
+                    JAMBONES_MYSQL_USER: '${JAMBONES_MYSQL_USER}',
+                    JAMBONES_MYSQL_PASSWORD: '${JAMBONES_MYSQL_PASSWORD}',
+                    JAMBONES_MYSQL_DATABASE: 'jambones',
+                    JAMBONES_MYSQL_CONNECTION_LIMIT: 10,
+                    JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
+                    JAMBONES_REDIS_PORT: 6379,
+                    JAMBONE_API_VERSION: 'v1',
+                    JAMBONES_TIME_SERIES_HOST: '${JAMBONES_TIME_SERIES_HOST}',
+                    ENABLE_METRICS: 1,
+                    STATS_HOST: '127.0.0.1',
+                    STATS_PORT: 8125,
+                    STATS_PROTOCOL: 'tcp',
+                    STATS_TELEGRAF: 1,
+                    STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
+                    HTTP_PORT:  3000,
+                    JAEGER_BASE_URL: 'http://${MONITORING_SERVER_IP}:16686',
+                    HOMER_BASE_URL: 'http://${MONITORING_SERVER_IP}:9080',
+                    HOMER_USERNAME: 'admin',
+                    HOMER_PASSWORD: 'sipcapture',
+                    JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
+                    JAMBONZ_RECORD_WS_PASSWORD: '${JWT_SECRET}'
+                    },
+                },
+                {
+                  name: 'webapp',
+                  script: 'npm',
+                  cwd: '$HOME/apps/webapp',
+                  args: 'run serve'
+                },
+                {
+                  name: 'public-apps',
+                  cwd: '$HOME/apps/public-apps',
+                  script: 'app.js',
+                  out_file: '$HOME/.pm2/logs/public-apps',
+                  err_file: '$HOME/.pm2/logs/public-apps',
+                  combine_logs: true,
+                  instance_var: 'INSTANCE_ID',
+                  exec_mode: 'fork',
+                  instances: 1,
+                  autorestart: true,
+                  watch: false,
+                  max_memory_restart: '1G',
+                  env: {
+                    LOGLEVEL: 'info',
+                    NRC_TIME_SERVICE_DID: '+16137451576'
+                  }
+                }]
+              };
+              EOF
+            
+              echo "finished writing config file"
+
+              echo "building api-server"
+              sudo -u $USER bash -c "cd $HOME/apps/api-server && npm ci"
+
+              sudo -u $USER bash -c "pm2 start $HOME/apps/ecosystem.config.js"
+              sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+              sudo -u $USER bash -c "pm2 save"
+              sudo systemctl enable pm2-$USER.service
+            
+              # configure telegraph to send to the monitoring server
+              sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+              sudo systemctl restart telegraf
+                                        
+              sudo cat << EOF > /etc/nginx/sites-available/default 
+              server {
+                  listen 80;
+                  server_name ${URLPortal};
+                  location /api/ {
+                      rewrite ^/api/(.*)$ /\$1 break;
+                      proxy_pass http://localhost:3000;
+                      proxy_set_header Host \$host;
+                  }
+                  location / {
+                      proxy_pass http://localhost:3001;
+                      proxy_set_header Host \$host;
+                  }
+              }
+              server {
+                  listen 80;
+                  server_name api.${URLPortal};
+                  location / {
+                      proxy_pass http://localhost:3000;
+                      proxy_set_header Host \$host;
+                  }
+              }
+              server {
+                listen 80;
+                server_name grafana.${URLPortal}; 
+                location / {
+                  proxy_pass http://${MONITORING_SERVER_IP}:3010; 
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_cache_bypass \$http_upgrade;
+                }
+              }
+              server {
+                listen 80;
+                server_name homer.${URLPortal}; 
+                location / {
+                  proxy_pass http://${MONITORING_SERVER_IP}:9080; 
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_cache_bypass \$http_upgrade;
+                }
+              }
+              server {
+                listen 80;
+                server_name public-apps.${URLPortal}; 
+                location / {
+                  proxy_pass http://localhost:3010; 
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_cache_bypass \$http_upgrade;
+                }
+              }
+              EOF
+            
+              sudo systemctl restart nginx
+
+                # enable cloudwatch
+                if [[ ${CloudwatchLogRetention} -ne 0 ]]; then
+                  echo "Enabling Cloudwatch for jambonz logs"
+                  sudo sed -i -e "s/retention_in_days\": 3/retention_in_days\": ${CloudwatchLogRetention}/g" /opt/aws/amazon-cloudwatch-agent/bin/config.json 
+                  sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json
+                else
+                  echo "Cloudwatch log retention is set to 0, disabling cloudwatch setup"
+                  sudo systemctl stop amazon-cloudwatch-agent
+                  sudo systemctl disable amazon-cloudwatch-agent
+                fi
+
+              # configure upload_recordings service
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              
+              sudo systemctl daemon-reload
+              sudo systemctl enable upload_recordings
+              sudo systemctl start upload_recordings
+
+
+              # Check if recording cluster is deployed
+              if [[ "${DeployRecordingCluster}" == "yes" ]]; then
+                echo "DeployRecordingCluster is set to yes, disabling upload_recordings service"
+                sudo systemctl stop upload_recordings 2>/dev/null || true
+                sudo systemctl disable upload_recordings 2>/dev/null || true
+              fi
+
+              echo "webserver user data script completed"
+            - VPC_CIDR: !Ref VpcCidr
+              JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.Endpoint.Address
+              JAMBONES_MYSQL_USER: !Ref MySQLUsername
+              JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
+              JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+              JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
+              MONITORING_SERVER_IP:  !GetAtt MonitoringServerEC2.PrivateIp
+              AWS_REGION: !Ref AWS::Region
+              JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
+              JWT_SECRET: !Ref EncryptionSecret
+              URLPortal: !Ref URLPortal
+              CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
+              DbCachingTTS: !Ref DbCachingTTS
+              DeployRecordingCluster: !Ref DeployRecordingCluster
+
+Outputs: 
+  WebPortalURL:
+    Description: jambonz portal URL, log in with admin/admin and change password
+    Value: !Join [ "", [ "http://", !Ref "URLPortal" ] ]
+    Export:
+      Name: !Sub '${AWS::StackName}-webserver-url'
+  
+  WebPortalUsername:
+    Value: admin
+    Description: Login username for the jambonz portal
+
+  WebPortalPassword:
+    Value: !Ref WebServerEC2
+    Description: Initial password for jambonz portal; you will be forced to change it on first login.
+
+  GrafanaUsername:
+    Value: admin
+    Description: Login username for the grafana portal
+
+  GrafanaPassword:
+    Value: admin
+    Description: Initial password for grafana portal; you will be forced to change it on first login.
+
+  WebServerIP:
+    Value: !GetAtt 
+      - WebServerEIP
+      - PublicIp
+    Description: Webserver IP address - create a DNS record for this domain as well as subdomains grafana, homer, and jaeger
+
+  SipServerIP:
+    Value: !GetAtt
+      - SbcSipEIP1
+      - PublicIp
+    Description: SBC SIP IP address
+
+  RtpServerIP:
+    Value: !GetAtt
+      - SbcRtpEIP1
+      - PublicIp
+    Description: SBC RTP IP address
+
+  VPC: 
+    Description: "A reference to the created VPC"
+    Value: !Ref "VPC"
+    Export:
+      Name: !Sub "${AWS::StackName}-VPC"
+
+  SelfiepopVpcCidr:
+    Description: "A reference to the created VPC/CIDR"
+    Value: !Ref "VpcCidr"
+    Export:
+      Name: !Sub "${AWS::StackName}-SelfiepopVpcCidr"
+
+  PublicSubnets:
+    Description: "A list of the public subnets"
+    Value: !Join [ ",", [ !Ref "PublicSubnet1", !Ref "PublicSubnet2" ]]
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnets"
+
+  PublicSubnet1:
+    Description: "A reference to the public subnet in the 1st Availability Zone"
+    Value: !Ref "PublicSubnet1"
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1"
+
+  PublicSubnet2:
+    Description: "A reference to the public subnet in the 2nd Availability Zone"
+    Value: !Ref "PublicSubnet2"
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet2"
+
+  RecordingLoadBalancerDnsName:
+      Condition: DeployRecordingClusterCondition
+      Description: DNS name of the Recording Server Application Load Balancer
+      Value: !GetAtt RecordingApplicationLoadBalancer.DNSName
+      Export:
+        Name: !Sub "${AWS::StackName}-recording-lb-dns"

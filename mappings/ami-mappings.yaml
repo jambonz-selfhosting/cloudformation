@@ -1,0 +1,47 @@
+# AMI Mappings for jambonz CloudFormation templates
+# Update this file when publishing new AMIs - a GitHub Action will automatically
+# create a PR to update all CloudFormation templates.
+#
+# Each deployment size has different AMI requirements:
+# - mini: Single "Ami" for the all-in-one instance
+# - medium: SbcAmi, FsAmi, WebMonitoringAmi, RecordingServerAmi
+# - large: SbcSipAmi, SbcRtpAmi, FsAmi, WebserverAmi, MonitoringServerAmi, RecordingServerAmi
+
+mini:
+  us-west-2:
+    Ami: ami-018483ab84a5b0805
+  # Add more regions as AMIs are published:
+  # us-east-1:
+  #   Ami: ami-xxxxxxxxx
+  # eu-west-1:
+  #   Ami: ami-xxxxxxxxx
+
+medium:
+  us-west-2:
+    SbcAmi: ami-0b3d1e4e3cefb9d59
+    FsAmi: ami-00428d22e741d02be
+    WebMonitoringAmi: ami-00193a3e5d2e80ede
+    RecordingServerAmi: ami-00b92b53e20f7b057
+  # Add more regions as AMIs are published:
+  # us-east-1:
+  #   SbcAmi: ami-xxxxxxxxx
+  #   FsAmi: ami-xxxxxxxxx
+  #   WebMonitoringAmi: ami-xxxxxxxxx
+  #   RecordingServerAmi: ami-xxxxxxxxx
+
+large:
+  eu-central-1:
+    SbcSipAmi: ami-0d93408077175e33e
+    SbcRtpAmi: ami-07f88ca9769a0cae9
+    FsAmi: ami-00e38d4aa2af559b4
+    WebserverAmi: ami-07ac41b89d8e4fd3f
+    MonitoringServerAmi: ami-054802b728b7e2553
+    RecordingServerAmi: ami-099c6d78390720fbc
+  # Add more regions as AMIs are published:
+  # us-west-2:
+  #   SbcSipAmi: ami-xxxxxxxxx
+  #   SbcRtpAmi: ami-xxxxxxxxx
+  #   FsAmi: ami-xxxxxxxxx
+  #   WebserverAmi: ami-xxxxxxxxx
+  #   MonitoringServerAmi: ami-xxxxxxxxx
+  #   RecordingServerAmi: ami-xxxxxxxxx
