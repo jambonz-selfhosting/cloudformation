@@ -4,7 +4,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Mappings:
   AWSRegion2AMI:
     us-west-2:
-      SbcAmi: ami-WRONG
+      SbcAmi: ami-0b3d1e4e3cefb9d59
       FsAmi: ami-00428d22e741d02be
       WebMonitoringAmi: ami-00193a3e5d2e80ede
       RecordingServerAmi: ami-00b92b53e20f7b057
