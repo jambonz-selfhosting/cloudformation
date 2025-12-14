@@ -39,10 +39,16 @@ aws cloudformation create-stack \
 
 ## Monitor Stack Creation
 
+Wait for the stack to complete:
+
+```bash
+aws cloudformation wait stack-create-complete --stack-name jambonz-mini --region us-west-2
+```
+
+Or check status manually:
+
 ```bash
 aws cloudformation describe-stacks --stack-name jambonz-mini --region us-west-2
-
-aws cloudformation describe-stack-events --stack-name jambonz-mini --region us-west-2
 ```
 
 ## Get Stack Outputs

@@ -256,6 +256,7 @@ Resources:
               JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
 
               # configure webapp with DNS name
+              echo "VITE_API_BASE_URL=http://${URLPortal}/api/v1" > "$HOME/apps/webapp/.env"
               API_BASE_URL=http://${URLPortal}/api/v1 TAG="<script>window.JAMBONZ = { API_BASE_URL: '$API_BASE_URL'};</script>"
               sed -i -e "\@</head>@i\ $TAG" $HOME/apps/webapp/dist/index.html
 
