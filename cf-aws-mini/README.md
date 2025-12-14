@@ -91,7 +91,7 @@ The user is 'admin' and the password will have been listed as part of the output
 
 When you log in for the first time, you will notice a banner at the top of the portal indicating that the system is unlicensed.  Click on the link in the message to go to the Admin settings panel where you can paste in a license key.  
 
-To acquire a license key go to licensing.jambonz.org, create an account and purchase a license or request a trial license.
+To acquire a license key go to [licensing.jambonz.org](https://licensing.jambonz.org), create an account and purchase a license or request a trial license.
 
 ## Delete the Stack
 
