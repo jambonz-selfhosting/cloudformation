@@ -4,7 +4,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Mappings:
   AWSRegion2AMI:
     eu-central-1:
-      SbcSipAmi: ami-0d93408077175e33e
+      SbcSipAmi: ami-WRONG
       SbcRtpAmi: ami-07f88ca9769a0cae9
       FsAmi: ami-00e38d4aa2af559b4
       WebserverAmi: ami-07ac41b89d8e4fd3f
