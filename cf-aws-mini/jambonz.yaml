@@ -540,7 +540,7 @@ Outputs:
     Value: !GetAtt 
       - jambonzInstance
       - PublicIp
-    Description: Server IP address - create a DNS record for this domain as well as subdomains grafana, homer, and jaeger
+    Description: Server IP address - create DNS A records pointing to this IP for this domain as well as subdomains api, grafana, homer, and sip
   User:
     Value: admin
     Description: Login username for the jambonz portal
