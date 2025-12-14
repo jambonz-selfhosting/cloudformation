@@ -75,11 +75,11 @@ After the stack is created, create the following A records, all pointing to the 
 
 ssh into the ServerIP and install TLS certificates and then restart the portal under https.
 
-1. ssh jambonz@<ServerIP>
-2. sudo certbot --nginx
-3. cd ~/apps/webapp && vi .env
+1. `ssh jambonz@<ServerIP>`
+2. `sudo certbot --nginx`
+3. `cd ~/apps/webapp && vi .env`
 4. edit the http url and change it to use https, save the file
-5. npm run build && pm2 restart webapp-app
+5. `npm run build && pm2 restart webapp-app`
 
 ## First time login
 
