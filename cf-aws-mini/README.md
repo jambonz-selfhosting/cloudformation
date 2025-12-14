@@ -1,12 +1,11 @@
 # jambonz Mini CloudFormation Deployment
 
-This CloudFormation template deploys a single EC2 instance running all jambonz components for development, testing, or small-scale production use.
+This CloudFormation template deploys a "jambonz mini" - single EC2 instance running all jambonz components for development, testing, or small-scale production use.
 
 ## Prerequisites
 
-- AWS CLI installed and configured with appropriate credentials
 - An existing EC2 Key Pair in the target region
-- The jambonz AMI available in your target region (currently only us-west-2)
+- An AWS account with permissions to create VPCs, EC2 instances, IAM roles, and Elastic IPs
 
 ## Parameters
 
@@ -14,32 +13,18 @@ This CloudFormation template deploys a single EC2 instance running all jambonz c
 |-----------|-------------|---------|
 | `InstanceType` | EC2 instance type | c5n.large |
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
-| `AllowedSshCidr` | CIDR for SSH access | (required) |
-| `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | (required) |
-| `AllowedSipCidr` | CIDR for SIP access | (required) |
-| `AllowedRtpCidr` | CIDR for RTP traffic | (required) |
+| `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
+| `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
+| `AllowedSipCidr` | CIDR for SIP access | 0.0.0.0/0 |
+| `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
 | `VpcCidr` | CIDR range for the VPC | 10.0.0.0/16 |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
-| `URLPortal` | Optional DNS name for the portal | (empty) |
+| `URLPortal` | DNS name for the portal | (required) |
 
 ## Deploy the Stack
 
-```bash
-aws cloudformation create-stack \
-  --stack-name jambonz-mini \
-  --template-body file://jambonz.yaml \
-  --capabilities CAPABILITY_IAM \
-  --region us-west-2 \
-  --parameters \
-    ParameterKey=KeyName,ParameterValue=my-keypair \
-    ParameterKey=AllowedSshCidr,ParameterValue=203.0.113.10/32 \
-    ParameterKey=AllowedHttpCidr,ParameterValue=0.0.0.0/0 \
-    ParameterKey=AllowedSipCidr,ParameterValue=0.0.0.0/0 \
-    ParameterKey=AllowedRtpCidr,ParameterValue=0.0.0.0/0
-```
-
-### With Custom DNS
+Use the commands below, substituting your region, Keyname, and URLPortal.
 
 ```bash
 aws cloudformation create-stack \
@@ -49,18 +34,8 @@ aws cloudformation create-stack \
   --region us-west-2 \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
-    ParameterKey=AllowedSshCidr,ParameterValue=203.0.113.10/32 \
-    ParameterKey=AllowedHttpCidr,ParameterValue=0.0.0.0/0 \
-    ParameterKey=AllowedSipCidr,ParameterValue=0.0.0.0/0 \
-    ParameterKey=AllowedRtpCidr,ParameterValue=0.0.0.0/0 \
-    ParameterKey=URLPortal,ParameterValue=jambonz.example.com
+    ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
-
-When using a custom DNS name, create A records pointing to the server IP for:
-- `jambonz.example.com` (main portal)
-- `api.jambonz.example.com` (API)
-- `grafana.jambonz.example.com` (monitoring)
-- `homer.jambonz.example.com` (SIP tracing)
 
 ## Monitor Stack Creation
 
@@ -85,21 +60,34 @@ Outputs include:
 - **User** - Admin username (always `admin`)
 - **Password** - Initial admin password (the EC2 instance ID)
 
-## Update the Stack
+## Post-install steps
 
-```bash
-aws cloudformation update-stack \
-  --stack-name jambonz-mini \
-  --template-body file://jambonz.yaml \
-  --capabilities CAPABILITY_IAM \
-  --region us-west-2 \
-  --parameters \
-    ParameterKey=KeyName,UsePreviousValue=true \
-    ParameterKey=AllowedSshCidr,UsePreviousValue=true \
-    ParameterKey=AllowedHttpCidr,UsePreviousValue=true \
-    ParameterKey=AllowedSipCidr,UsePreviousValue=true \
-    ParameterKey=AllowedRtpCidr,UsePreviousValue=true
-```
+### Create DNS records
+
+After the stack is created, create the following A records, all pointing to the ServerIP:
+- `my-domain.example.com`
+- `api.my-domain.example.com`
+- `grafana.my-domain.example.com`
+- `homer.my-domain.example.com`
+- `sip.my-domain.example.com`
+
+### Enable HTTPS for the portal
+
+ssh into the ServerIP and install TLS certificates and then restart the portal under https.
+
+1. ssh jambonz@<ServerIP>
+2. sudo certbot --nginx
+3. cd ~/apps/webapp && vi .env
+4. edit the http url and change it to use https, save the file
+5. npm run build && pm2 restart webapp-app
+
+## First time login
+
+Now log into the portal for the first time.  The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the instance id).  You will be prompted to change the password on first login.
+
+## Acquiring and installing a license
+
+When you log in for the first time, you may notice a banner at the top of the portal indicating that the system is unlicensed.  Click on the link in the message to go to the Admin settings panel where you can paste in a license key.  To acquire a license key go to licensing.jambonz.org, create an account and purchase a license or request a trial license.
 
 ## Delete the Stack
 
@@ -107,7 +95,7 @@ aws cloudformation update-stack \
 aws cloudformation delete-stack --stack-name jambonz-mini --region us-west-2
 ```
 
-Note: The Elastic IP has a `Retain` deletion policy and will not be deleted with the stack.
+Note: The Elastic IP has a `Retain` deletion policy and will not be deleted with the stack.  You can manually deregister it after the stack is deleted if you do not wish to use it any more.
 
 ## SSH Access
 
@@ -117,23 +105,9 @@ Connect to the instance as the `jambonz` user:
 ssh -i /path/to/keypair.pem jambonz@<ServerIP>
 ```
 
-## Services
-
-The instance runs the following services managed by PM2:
-- jambonz-api-server
-- jambonz-webapp
-
-System services:
-- drachtio (SIP server)
-- rtpengine (RTP proxy)
-- MySQL
-- Redis
-- nginx
-- Cassandra, Jaeger (tracing)
-- InfluxDB, Telegraf, Grafana (metrics)
-- Homer, heplify-server (SIP capture)
-
 ## Ports
+
+The following ports will be open on the server.
 
 | Port | Protocol | Service |
 |------|----------|---------|
