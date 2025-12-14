@@ -75,19 +75,23 @@ After the stack is created, create the following A records, all pointing to the 
 
 ssh into the ServerIP and install TLS certificates and then restart the portal under https.
 
-1. `ssh jambonz@<ServerIP>`
-2. `sudo certbot --nginx`
-3. `cd ~/apps/webapp && vi .env`
+1. `ssh jambonz@<ServerIP>` - ssh into the server
+2. `sudo certbot --nginx` - generate TLS certs
+3. `cd ~/apps/webapp && vi .env` - edit the webapp url to use https
 4. edit the http url and change it to use https, save the file
-5. `npm run build && pm2 restart webapp-app`
+5. `npm run build && pm2 restart webapp-app` - restart the webapp under https
 
 ## First time login
 
-Now log into the portal for the first time.  The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the instance id).  You will be prompted to change the password on first login.
+Now log into the portal for the first time.  
 
-## Acquiring and installing a license
+The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the instance id).  You will be prompted to change the password on first login.
 
-When you log in for the first time, you may notice a banner at the top of the portal indicating that the system is unlicensed.  Click on the link in the message to go to the Admin settings panel where you can paste in a license key.  To acquire a license key go to licensing.jambonz.org, create an account and purchase a license or request a trial license.
+## Acquiring a license
+
+When you log in for the first time, you will notice a banner at the top of the portal indicating that the system is unlicensed.  Click on the link in the message to go to the Admin settings panel where you can paste in a license key.  
+
+To acquire a license key go to licensing.jambonz.org, create an account and purchase a license or request a trial license.
 
 ## Delete the Stack
 
