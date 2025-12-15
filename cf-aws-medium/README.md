@@ -115,7 +115,7 @@ After the stack is created, create the following DNS A records:
 
 SSH into the Web/Monitoring server and install TLS certificates:
 
-1. `ssh jambonz@<WebServerIP>` - ssh into the server
+1. `ssh -i <yuour-ssh-keypair> jambonz@<WebServerIP>` - ssh into the server
 2. `sudo certbot --nginx` - generate TLS certs
 3. `cd ~/apps/webapp && vi .env` - edit the webapp url to use https
 4. Edit the http url and change it to use https, save the file
