@@ -40,7 +40,7 @@ The medium deployment creates:
 | `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
-| `DeployRecordingCluster` | Deploy optional recording cluster | no |
+| `DeployRecordingCluster` | Deploy optional recording cluster | yes |
 
 ## Deploy the Stack
 
