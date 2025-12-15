@@ -19,3 +19,10 @@ medium:
     RecordingServerAmi: ami-0fcc5435b7d434a8e
 
 large:
+  us-west-1:
+    SbcSipAmi: 
+    SbcRtpAmi: 
+    FsAmi: 
+    WebserverAmi: 
+    MonitoringServerAmi: 
+    RecordingServerAmi: 
