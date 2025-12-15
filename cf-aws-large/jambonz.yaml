@@ -12,7 +12,6 @@ Parameters:
     AllowedValues:
       - "yes"
       - "no"
-    Default: "yes"
   
   KeyName:
     Description: "The keypair that you will use to access the EC2 instances via ssh"
