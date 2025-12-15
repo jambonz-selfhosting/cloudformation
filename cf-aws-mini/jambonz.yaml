@@ -94,9 +94,7 @@ Parameters:
     ConstraintDescription: "Must be a valid domain name that you control the DNS records for (e.g., jambonz.mycompany.com)"
 
 Conditions:
-  ShouldEnableCloudWatch: !Equals
-    - true
-    - !Ref Cloudwatch
+  ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
 
 Resources:
   IamCloudwatchRole:
