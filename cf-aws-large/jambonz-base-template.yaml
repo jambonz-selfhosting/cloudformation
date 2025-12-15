@@ -907,7 +907,7 @@ Resources:
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
                 JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
-                JWT_SECRET: !Ref EncryptionSecret
+                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
 
   RecordingApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -1479,7 +1479,7 @@ Resources:
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
                 AWS_SNS_TOPIC_ARN: !Ref SbcSipSNSTopic
                 JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
-                JWT_SECRET: !Ref EncryptionSecret
+                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
                 AWS_REGION: !Ref AWS::Region
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
@@ -1767,7 +1767,7 @@ Resources:
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
                 URLPortal: !Ref URLPortal
                 JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
-                JWT_SECRET: !Ref EncryptionSecret
+                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 WebServerPrivateIP: !GetAtt WebServerEC2.PrivateIp
@@ -2457,7 +2457,7 @@ Resources:
               MONITORING_SERVER_IP:  !GetAtt MonitoringServerEC2.PrivateIp
               AWS_REGION: !Ref AWS::Region
               JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
-              JWT_SECRET: !Ref EncryptionSecret
+              JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
               URLPortal: !Ref URLPortal
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS

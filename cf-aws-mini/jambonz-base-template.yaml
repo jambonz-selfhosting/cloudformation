@@ -425,7 +425,7 @@ Resources:
             - URLPortal: !Ref URLPortal
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
-              JWT_SECRET: !Ref EncryptionSecret
+              JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
 
   jambonzSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
