@@ -995,19 +995,10 @@ Resources:
                   echo "Warning: No SSH keys found for $DEFAULT_USER"
               fi
 
-              if [ -f "/usr/local/bin/auto-assign-elastic-ip.sh" ]; then
-                  PRE_PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
-                  echo "before retrieving EIP for web+monitoring server, public IP is $PRE_PUBLIC_IP"
+              # EIP is assigned via CloudFormation EIPAssociation, no need to run auto-assign script
+              PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+              echo "web+monitoring server public IP is $PUBLIC_IP"
 
-                  /usr/local/bin/auto-assign-elastic-ip.sh
-                  sleep 15
-
-                  PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
-                  echo "after retrieving EIP for web+monitoring server, public IP is $PUBLIC_IP"
-              else
-                  echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
-              fi
-            
               echo "running jambonz web and monitoring server user data script"
             
               echo "seeding database.."
