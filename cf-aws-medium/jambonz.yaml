@@ -265,9 +265,9 @@ Parameters:
     Description: "Do you want to deploy the recording server cluster?"
     Type: String
     AllowedValues:
-      - "yes"
-      - "no"
-    Default: "no"
+      - yes
+      - no
+    Default: yes
 
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "yes"]
@@ -1266,6 +1266,12 @@ Resources:
         -
           Key: Name
           Value: !Sub '${AWS::StackName}-web-monitoring-eip'
+
+  WebMonitoringServerEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt WebMonitoringServerEIP.AllocationId
+      InstanceId: !Ref WebMonitoringServerEC2
 
   SbcServerInstanceProfile:
     Type: AWS::IAM::InstanceProfile
