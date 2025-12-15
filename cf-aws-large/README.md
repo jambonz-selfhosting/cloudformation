@@ -48,7 +48,7 @@ The large deployment creates:
 | `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
-| `DeployRecordingCluster` | Deploy optional recording cluster | no |
+| `DeployRecordingCluster` | Deploy optional recording cluster | yes |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 
 ## Deploy the Stack
