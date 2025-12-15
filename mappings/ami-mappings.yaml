@@ -20,9 +20,3 @@ medium:
 
 large:
   us-west-1:
-    SbcSipAmi: 
-    SbcRtpAmi: 
-    FsAmi: 
-    WebserverAmi: 
-    MonitoringServerAmi: 
-    RecordingServerAmi: 

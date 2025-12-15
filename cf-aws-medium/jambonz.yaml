@@ -764,7 +764,7 @@ Resources:
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
                 JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
                 MONITORING_SERVER_IP: !GetAtt WebMonitoringServerEC2.PrivateIp
-                JWT_SECRET: !Ref EncryptionSecret
+                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
 
   RecordingApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -1251,7 +1251,7 @@ Resources:
               JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
               JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
               AWS_REGION: !Ref AWS::Region
-              JWT_SECRET: !Ref EncryptionSecret
+              JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
               URLPortal: !Ref URLPortal
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS
@@ -1625,7 +1625,7 @@ Resources:
                 JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
                 WebMonitoringServerPrivateIP: !GetAtt WebMonitoringServerEC2.PrivateIp
                 AWS_SNS_TOPIC_ARN: !Ref SbcServerSNSTopic
-                JWT_SECRET: !Ref EncryptionSecret
+                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 EnablePcaps: !Ref EnablePcaps
@@ -1859,7 +1859,7 @@ Resources:
                 AWS_SNS_TOPIC_ARN: !Ref FeatureServerSNSTopic
                 AWS_REGION: !Ref AWS::Region
                 URLPortal: !Ref URLPortal
-                JWT_SECRET: !Ref EncryptionSecret
+                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 WebMonitoringServerPrivateIP: !GetAtt WebMonitoringServerEC2.PrivateIp
