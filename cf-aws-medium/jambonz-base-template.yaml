@@ -241,8 +241,9 @@ Parameters:
     Default: 0
   EncryptionSecret:
     Type: String
-    Description: "secret to use for encrypting jwt and other data"
-    Default: "G=u$Dj%-97#TffYf"
+    Description: "Secret for encrypting JWT and other data (leave empty to auto-generate)"
+    Default: ""
+    NoEcho: true
   Cloudwatch:
     Description: Send jambonz logs to cloudwatch
     Type: String
@@ -270,12 +271,32 @@ Parameters:
       - true
       - false
     Default: true
+  EnableEBSEncryption:
+    Description: "Do you want to encrypt all EBS volumes?"
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: true
 
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
+  GenerateEncryptionSecret: !Equals [!Ref EncryptionSecret, ""]
+  EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
 Resources:
+  GeneratedEncryptionSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: GenerateEncryptionSecret
+    Properties:
+      Name: !Sub "${AWS::StackName}-encryption-secret"
+      Description: "Auto-generated encryption secret for jambonz"
+      GenerateSecretString:
+        PasswordLength: 10
+        ExcludeCharacters: "/?%,; "
+        IncludeSpace: false
+
   IamRole:
     Type: AWS::IAM::Role
     Properties: 
@@ -706,8 +727,13 @@ Resources:
         SecurityGroupIds:
           - !Ref RecordingInstanceSecurityGroup
           - !Ref SshSecurityGroup
-        UserData: 
-          Fn::Base64: 
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 60
+              Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+        UserData:
+          Fn::Base64:
             Fn::Sub:
               - |
                 #!/bin/bash
@@ -956,6 +982,11 @@ Resources:
         - Ref: WebMonitoringSecurityGroup
       KeyName: !Ref KeyName
       Monitoring: true
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 60
+            Encrypted: !If [EnableEBSEncryptionCondition, true, false]
       UserData:
         Fn::Base64: 
           Fn::Sub:
@@ -1287,8 +1318,13 @@ Resources:
               - Ref: SshSecurityGroup
               - Ref: SbcSecurityGroup
             DeviceIndex: 0
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 60
+              Encrypted: !If [EnableEBSEncryptionCondition, true, false]
         UserData:
-          Fn::Base64: 
+          Fn::Base64:
             Fn::Sub:
               - |
                 #!/bin/bash
@@ -1678,8 +1714,13 @@ Resources:
               - Ref: SshSecurityGroup
               - Ref: FeatureServerSecurityGroup
             DeviceIndex: 0
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 60
+              Encrypted: !If [EnableEBSEncryptionCondition, true, false]
         UserData:
-          Fn::Base64: 
+          Fn::Base64:
             Fn::Sub:
               - |
                 #!/bin/bash -e
