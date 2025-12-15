@@ -20,6 +20,7 @@ Parameters:
     AllowedValues:
       - "yes"
       - "no"
+    Default: "yes"
   
   InstanceTypeSbc:
     Description: "the EC2 instance type for the SBC SIP server"
