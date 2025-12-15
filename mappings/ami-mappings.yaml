@@ -12,17 +12,10 @@ mini:
     Ami: ami-018483ab84a5b0805
 
 medium:
-  us-west-2:
-    SbcAmi: ami-0b3d1e4e3cefb9d59
-    FsAmi: ami-00428d22e741d02be
-    WebMonitoringAmi: ami-00193a3e5d2e80ede
-    RecordingServerAmi: ami-00b92b53e20f7b057
+  us-west-1:
+    SbcAmi: ami-012f96c005e8070c4
+    FsAmi: ami-092def2d93bbda0c2
+    WebMonitoringAmi: ami-0230e85fb4437787d
+    RecordingServerAmi: ami-0fcc5435b7d434a8e
 
 large:
-  eu-central-1:
-    SbcSipAmi: ami-0d93408077175e33e
-    SbcRtpAmi: ami-07f88ca9769a0cae9
-    FsAmi: ami-00e38d4aa2af559b4
-    WebserverAmi: ami-07ac41b89d8e4fd3f
-    MonitoringServerAmi: ami-054802b728b7e2553
-    RecordingServerAmi: ami-099c6d78390720fbc
