@@ -276,6 +276,11 @@ Parameters:
       - true
       - false
     Default: true
+  WebMonitoringDiskSize:
+    Description: "Disk size in GB for the Web/Monitoring server"
+    Type: Number
+    Default: 200
+    MinValue: 100
 
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
@@ -728,7 +733,6 @@ Resources:
         BlockDeviceMappings:
           - DeviceName: /dev/xvda
             Ebs:
-              VolumeSize: 60
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
         UserData:
           Fn::Base64:
@@ -983,10 +987,10 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
-            VolumeSize: 60
+            VolumeSize: !Ref WebMonitoringDiskSize
             Encrypted: !If [EnableEBSEncryptionCondition, true, false]
       UserData:
-        Fn::Base64: 
+        Fn::Base64:
           Fn::Sub:
             - |
               #!/bin/bash -xe
@@ -1319,7 +1323,6 @@ Resources:
         BlockDeviceMappings:
           - DeviceName: /dev/xvda
             Ebs:
-              VolumeSize: 60
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
         UserData:
           Fn::Base64:
@@ -1715,7 +1718,6 @@ Resources:
         BlockDeviceMappings:
           - DeviceName: /dev/xvda
             Ebs:
-              VolumeSize: 60
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
         UserData:
           Fn::Base64:
