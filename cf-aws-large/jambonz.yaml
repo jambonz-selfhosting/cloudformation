@@ -282,8 +282,9 @@ Parameters:
     Default: 'JambonzR0ck$'  
   EncryptionSecret:
     Type: String
-    Description: "secret to use for encrypting jwt and other data"
-    Default: "G=u$Dj%-97#TffYf"
+    Description: "Secret for encrypting JWT and other data (leave empty to auto-generate)"
+    Default: ""
+    NoEcho: true
   URLPortal:
     Type: String
     Description: "DNS name you will point to the jambonz webserver(s)"
@@ -331,15 +332,27 @@ Parameters:
     AllowedValues:
       - true
       - false
-    Default: false
+    Default: true
 
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
+  GenerateEncryptionSecret: !Equals [!Ref EncryptionSecret, ""]
 
 
 Resources:
+  GeneratedEncryptionSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: GenerateEncryptionSecret
+    Properties:
+      Name: !Sub "${AWS::StackName}-encryption-secret"
+      Description: "Auto-generated encryption secret for jambonz"
+      GenerateSecretString:
+        PasswordLength: 10
+        ExcludeCharacters: "/?%,; "
+        IncludeSpace: false
+
   IamRole:
     Type: AWS::IAM::Role
     Properties: 
