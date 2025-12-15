@@ -28,7 +28,7 @@ The medium deployment creates:
 | `InstanceTypeSbc` | EC2 instance type for SBC servers | c5n.xlarge |
 | `InstanceTypeFeatureServer` | EC2 instance type for Feature servers | c5n.xlarge |
 | `InstanceTypeWebMonitoring` | EC2 instance type for Web/Monitoring server | c5n.xlarge |
-| `ElastiCacheNodeType` | ElastiCache node type | cache.t2.medium |
+| `ElastiCacheNodeType` | ElastiCache node type | cache.t3.medium |
 | `AuroraDBMinCapacity` | Aurora Serverless min ACU | 0.5 |
 | `AuroraDBMaxCapacity` | Aurora Serverless max ACU | 4 |
 | `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
@@ -48,7 +48,7 @@ The template exceeds the 51,200 byte limit for inline `--template-body`, so you 
 
 ```bash
 # Upload template to S3 (create bucket if needed)
-aws s3 mb s3://my-cf-templates-bucket --region us-west-2
+aws s3 mb s3://my-cf-templates-bucket --region us-west-1
 aws s3 cp jambonz.yaml s3://my-cf-templates-bucket/jambonz-medium.yaml
 
 # Deploy using --template-url
@@ -59,8 +59,7 @@ aws cloudformation create-stack \
   --region us-west-2 \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
-    ParameterKey=URLPortal,ParameterValue=my-domain.example.com \
-    ParameterKey=EnablePcaps,ParameterValue=no
+    ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
 
 ## Monitor Stack Creation

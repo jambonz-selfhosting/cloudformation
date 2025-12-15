@@ -35,7 +35,7 @@ The large deployment creates:
 | `InstanceTypeWebserver` | EC2 instance type for Web server | c5n.xlarge |
 | `InstanceTypeMonitoringServer` | EC2 instance type for Monitoring server | c5n.xlarge |
 | `RecordingInstanceType` | EC2 instance type for Recording servers | t2.xlarge |
-| `ElastiCacheNodeType` | ElastiCache node type | cache.t2.medium |
+| `ElastiCacheNodeType` | ElastiCache node type | cache.t3.medium |
 | `AuroraDBMinCapacity` | Aurora Serverless min ACU | 0.5 |
 | `AuroraDBMaxCapacity` | Aurora Serverless max ACU | 8 |
 | `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
