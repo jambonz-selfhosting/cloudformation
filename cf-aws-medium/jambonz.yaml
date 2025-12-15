@@ -3,11 +3,11 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Mappings:
   AWSRegion2AMI:
-    us-west-2:
-      SbcAmi: ami-0b3d1e4e3cefb9d59
-      FsAmi: ami-00428d22e741d02be
-      WebMonitoringAmi: ami-00193a3e5d2e80ede
-      RecordingServerAmi: ami-00b92b53e20f7b057
+    us-west-1:
+      SbcAmi: ami-012f96c005e8070c4
+      FsAmi: ami-092def2d93bbda0c2
+      WebMonitoringAmi: ami-0230e85fb4437787d
+      RecordingServerAmi: ami-0fcc5435b7d434a8e
 
 Parameters:
   KeyName:
