@@ -44,12 +44,17 @@ The medium deployment creates:
 
 ## Deploy the Stack
 
-Use the commands below, substituting your region, KeyName, and URLPortal.
+The template exceeds the 51,200 byte limit for inline `--template-body`, so you must upload it to S3 first.
 
 ```bash
+# Upload template to S3 (create bucket if needed)
+aws s3 mb s3://my-cf-templates-bucket --region us-west-2
+aws s3 cp jambonz.yaml s3://my-cf-templates-bucket/jambonz-medium.yaml
+
+# Deploy using --template-url
 aws cloudformation create-stack \
   --stack-name jambonz-medium \
-  --template-body file://jambonz.yaml \
+  --template-url https://my-cf-templates-bucket.s3.us-west-2.amazonaws.com/jambonz-medium.yaml \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --region us-west-2 \
   --parameters \
