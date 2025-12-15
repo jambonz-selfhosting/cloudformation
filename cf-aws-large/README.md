@@ -124,11 +124,10 @@ After the stack is created, create the following DNS A records:
 
 SSH into the Web server and install TLS certificates:
 
-1. `ssh jambonz@<WebServerIP>` - ssh into the server
+1. `ssh -i <yuour-ssh-keypair> jambonz@<WebServerIP>` - ssh into the server
 2. `sudo certbot --nginx` - generate TLS certs
-3. `cd ~/apps/webapp && vi .env` - edit the webapp url to use https
-4. Edit the http url and change it to use https, save the file
-5. `npm run build && pm2 restart webapp` - restart the webapp under https
+3. `cd ~/apps/webapp && vi .env` - edit the VITE_API_BASE_URL param to use https
+4. `npm run build && pm2 restart webapp` - restart the webapp under https
 
 ## First time login
 
@@ -147,6 +146,8 @@ To acquire a license key go to [licensing.jambonz.org](https://licensing.jambonz
 ```bash
 aws cloudformation delete-stack --stack-name jambonz-large --region us-west-2
 ```
+
+Note that the RDS cluster has delete protection enabled, so you will need to disable that or else you will need to delete the cluster manually.
 
 **Note:**
 - The Elastic IPs have a `Retain` deletion policy and will not be deleted with the stack. You can manually release them after the stack is deleted.

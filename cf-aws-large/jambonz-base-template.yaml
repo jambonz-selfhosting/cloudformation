@@ -17,9 +17,9 @@ Parameters:
     Description: "Do you want to enable PCAPs for SIP traffic?"
     Type: String
     AllowedValues:
-      - yes
-      - no
-    Default: yes
+      - true
+      - false
+    Default: true
   
   KeyName:
     Description: "The keypair that you will use to access the EC2 instances via ssh"
@@ -321,24 +321,22 @@ Parameters:
     Description: "Do you want to deploy the recording server cluster?"
     Type: String
     AllowedValues:
-      - yes
-      - no
-    Default: yes
+      - true
+      - false
+    Default: true
 
   EnableEBSEncryption:
     Description: "Do you want to encrypt all EBS volumes?"
     Type: String
     AllowedValues:
-      - "yes"
-      - "no"
-    Default: "no"
+      - true
+      - false
+    Default: false
 
 Conditions:
-  DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "yes"]
-  ShouldEnableCloudWatch: !Equals
-  - true
-  - !Ref Cloudwatch
-  EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "yes"]
+  DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
+  ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
+  EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
 
 Resources:
@@ -1243,6 +1241,14 @@ Resources:
                     echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
                 fi
 
+                # configure drachtio service
+                sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/drachtio.service
+                sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/drachtio.service
+                sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/drachtio.service
+                sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/drachtio.service
+                sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=${JAMBONES_REDIS_HOST}/g" /etc/systemd/system/drachtio.service
+                sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/drachtio.service
+
                 echo "writing $HOME/apps/ecosystem.config.js.."
                 cat << EOF > $HOME/apps/ecosystem.config.js
                 module.exports = {
@@ -1412,7 +1418,7 @@ Resources:
                 sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
                 sudo systemctl restart telegraf
 
-                if [[ "${EnablePcaps}" == "yes" ]]; then
+                if [[ "${EnablePcaps}" == "true" ]]; then
                   echo "enabling HEP and restarting drachtio server"
                   sudo sed -i -e "s/--address 0.0.0.0 --port 9022/--address 0.0.0.0 --port 9022 --homer ${MONITORING_SERVER_IP}:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
                 fi
@@ -1634,6 +1640,17 @@ Resources:
                 else
                     echo "Warning: No SSH keys found for $DEFAULT_USER"
                 fi
+
+                # configure freeswitch service
+                sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/freeswitch.service
+                sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/freeswitch.service
+                sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/freeswitch.service
+                sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/freeswitch.service
+                sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=${JAMBONES_REDIS_HOST}/g" /etc/systemd/system/freeswitch.service
+                sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/freeswitch.service
+
+                sudo systemctl daemon-reload
+                sudo systemctl restart freeswitch
 
                 echo "writing $HOME/apps/ecosystem.config.js.."
 
@@ -1983,7 +2000,7 @@ Resources:
                 sudo systemctl restart telegraf
 
                 # point rtpengine to the HEP endpoint on the monitoring server
-                if [[ "${EnablePcaps}" == "yes" ]]; then
+                if [[ "${EnablePcaps}" == "true" ]]; then
                   sudo sed -i -e "s/--delete-delay 0/--delete-delay 0 --homer=${MONITORING_SERVER_IP}:9060 --homer-protocol=udp --homer-id=11/g"  /etc/systemd/system/rtpengine.service
                   sudo systemctl daemon-reload
                 fi
@@ -2405,8 +2422,8 @@ Resources:
 
 
               # Check if recording cluster is deployed
-              if [[ "${DeployRecordingCluster}" == "yes" ]]; then
-                echo "DeployRecordingCluster is set to yes, disabling upload_recordings service"
+              if [[ "${DeployRecordingCluster}" == "true" ]]; then
+                echo "DeployRecordingCluster is set to true, disabling upload_recordings service"
                 sudo systemctl stop upload_recordings 2>/dev/null || true
                 sudo systemctl disable upload_recordings 2>/dev/null || true
               fi
