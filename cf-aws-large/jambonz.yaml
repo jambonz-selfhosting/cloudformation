@@ -3,6 +3,13 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Mappings:
   AWSRegion2AMI:
+    us-west-1:
+      SbcSipAmi: 
+      SbcRtpAmi: 
+      FsAmi: 
+      WebserverAmi: 
+      MonitoringServerAmi: 
+      RecordingServerAmi: 
 
 Parameters:
 
@@ -314,9 +321,9 @@ Parameters:
     Description: "Do you want to deploy the recording server cluster?"
     Type: String
     AllowedValues:
-      - "yes"
-      - "no"
-    Default: "no"
+      - yes
+      - no
+    Default: yes
 
   EnableEBSEncryption:
     Description: "Do you want to encrypt all EBS volumes?"
@@ -2070,6 +2077,12 @@ Resources:
         -
           Key: Environment
           Value: !Sub '${AWS::StackName}-webserver'
+
+  WebServerEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt WebServerEIP.AllocationId
+      InstanceId: !Ref WebServerEC2
 
   # --- Web server EC2 IAM role
   WebServerIamRole:

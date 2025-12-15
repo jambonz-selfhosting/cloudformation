@@ -86,7 +86,6 @@ Parameters:
       - 60
       - 90
       - 120
-      - 150
   URLPortal:
     Type: String
     Description: "The DNS name that you intend to use for the jambonz portal"
