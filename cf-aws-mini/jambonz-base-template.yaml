@@ -98,11 +98,6 @@ Parameters:
     MinLength: 1
     AllowedPattern: ^[a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,}$
     ConstraintDescription: "Must be a valid domain name that you control the DNS records for (e.g., jambonz.mycompany.com)"
-  EncryptionSecret:
-    Type: String
-    Description: "Secret for encrypting JWT and other data (leave empty to auto-generate)"
-    Default: ""
-    NoEcho: true
   EnableEBSEncryption:
     Description: "Do you want to encrypt all EBS volumes?"
     Type: String
@@ -113,13 +108,11 @@ Parameters:
 
 Conditions:
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
-  GenerateEncryptionSecret: !Equals [!Ref EncryptionSecret, ""]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
 Resources:
-  GeneratedEncryptionSecret:
+  EncryptionSecret:
     Type: AWS::SecretsManager::Secret
-    Condition: GenerateEncryptionSecret
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Auto-generated encryption secret for jambonz"
@@ -128,10 +121,9 @@ Resources:
         ExcludeCharacters: "/?%,; "
         IncludeSpace: false
 
-  IamCloudwatchRole:
+  IamRole:
     Type: AWS::IAM::Role
-    Condition: ShouldEnableCloudWatch
-    Properties: 
+    Properties:
       Description: jambonz mini IAM role
       AssumeRolePolicyDocument:
         Statement:
@@ -141,12 +133,12 @@ Resources:
           Action: ['sts:AssumeRole']
       Path: /
       Policies:
-        - PolicyName: root 
-          PolicyDocument: 
+        - PolicyName: root
+          PolicyDocument:
             Version: "2012-10-17"
-            Statement: 
+            Statement:
               - Effect: Allow
-                Action: 
+                Action:
                   - 'cloudwatch:PutMetricData'
                   - 'ec2:DescribeVolumes'
                   - 'ec2:DescribeTags'
@@ -161,6 +153,10 @@ Resources:
                 Action:
                   - 'ssm:GetParameter'
                 Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: !Ref EncryptionSecret
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -174,17 +170,15 @@ Resources:
       CidrBlock: !Ref VpcCidr
   jambonzInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
-    Condition: ShouldEnableCloudWatch
     Properties:
       Path: /
       Roles:
-        - !Ref IamCloudwatchRole
+        - !Ref IamRole
   jambonzInstance:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref InstanceType
-      IamInstanceProfile: 
-        !If [ShouldEnableCloudWatch, !Ref jambonzInstanceProfile, !Ref "AWS::NoValue"]
+      IamInstanceProfile: !Ref jambonzInstanceProfile
       ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "Ami"]
       KeyName: !Ref KeyName
       NetworkInterfaces:
@@ -200,10 +194,13 @@ Resources:
           Ebs:
             Encrypted: !If [EnableEBSEncryptionCondition, true, false]
       UserData:
-        Fn::Base64: 
+        Fn::Base64:
           Fn::Sub:
             - |
               #!/bin/bash -xe
+
+              # Fetch JWT_SECRET from Secrets Manager
+              JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
 
               echo "update /etc/hosts file to include hostname: $(hostname)"
               echo "127.0.0.1 $(hostname)" | sudo tee -a /etc/hosts > /dev/null
@@ -425,7 +422,7 @@ Resources:
             - URLPortal: !Ref URLPortal
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
-              JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
+              JWT_SECRET_ARN: !Ref EncryptionSecret
 
   jambonzSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'

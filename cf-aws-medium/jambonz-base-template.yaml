@@ -239,11 +239,6 @@ Parameters:
     Type: Number
     Description: Number of seconds to cache results from DB queries (0=no caching)
     Default: 0
-  EncryptionSecret:
-    Type: String
-    Description: "Secret for encrypting JWT and other data (leave empty to auto-generate)"
-    Default: ""
-    NoEcho: true
   Cloudwatch:
     Description: Send jambonz logs to cloudwatch
     Type: String
@@ -287,13 +282,11 @@ Parameters:
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
-  GenerateEncryptionSecret: !Equals [!Ref EncryptionSecret, ""]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
 Resources:
-  GeneratedEncryptionSecret:
+  EncryptionSecret:
     Type: AWS::SecretsManager::Secret
-    Condition: GenerateEncryptionSecret
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Auto-generated encryption secret for jambonz"
@@ -338,6 +331,10 @@ Resources:
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: !Ref EncryptionSecret
       ManagedPolicyArns:
       - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -741,6 +738,9 @@ Resources:
             Fn::Sub:
               - |
                 #!/bin/bash
+                # Fetch JWT_SECRET from Secrets Manager
+                JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+
                 # configure upload_recordings service
                 echo "Configuring upload_recordings service"
                 sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
@@ -766,7 +766,8 @@ Resources:
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
                 JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
                 MONITORING_SERVER_IP: !GetAtt WebMonitoringServerEC2.PrivateIp
-                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
+                JWT_SECRET_ARN: !Ref EncryptionSecret
+                AWS_REGION: !Ref AWS::Region
 
   RecordingApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -996,6 +997,9 @@ Resources:
           Fn::Sub:
             - |
               #!/bin/bash -xe
+
+              # Fetch JWT_SECRET from Secrets Manager
+              JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
               # Detecting the Linux distribution
               if grep -q 'ID="rhel"' /etc/os-release; then
@@ -1253,7 +1257,7 @@ Resources:
               JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
               JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
               AWS_REGION: !Ref AWS::Region
-              JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
+              JWT_SECRET_ARN: !Ref EncryptionSecret
               URLPortal: !Ref URLPortal
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS
@@ -1332,6 +1336,9 @@ Resources:
               - |
                 #!/bin/bash
                 echo "running jambonz user data script"
+
+                # Fetch JWT_SECRET from Secrets Manager
+                JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
                 # Detecting the Linux distribution
                 if grep -q 'ID="rhel"' /etc/os-release; then
@@ -1627,7 +1634,7 @@ Resources:
                 JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
                 WebMonitoringServerPrivateIP: !GetAtt WebMonitoringServerEC2.PrivateIp
                 AWS_SNS_TOPIC_ARN: !Ref SbcServerSNSTopic
-                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
+                JWT_SECRET_ARN: !Ref EncryptionSecret
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 EnablePcaps: !Ref EnablePcaps
@@ -1728,6 +1735,9 @@ Resources:
                 #!/bin/bash -e
                 #
                 echo "running jambonz user data script"
+
+                # Fetch JWT_SECRET from Secrets Manager
+                JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
                 # Detecting the Linux distribution
                 if grep -q 'ID="rhel"' /etc/os-release; then
@@ -1861,7 +1871,7 @@ Resources:
                 AWS_SNS_TOPIC_ARN: !Ref FeatureServerSNSTopic
                 AWS_REGION: !Ref AWS::Region
                 URLPortal: !Ref URLPortal
-                JWT_SECRET: !If [GenerateEncryptionSecret, !Sub '{{resolve:secretsmanager:${GeneratedEncryptionSecret}}}', !Ref EncryptionSecret]
+                JWT_SECRET_ARN: !Ref EncryptionSecret
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 WebMonitoringServerPrivateIP: !GetAtt WebMonitoringServerEC2.PrivateIp
