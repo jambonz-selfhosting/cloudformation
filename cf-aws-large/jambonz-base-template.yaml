@@ -333,6 +333,11 @@ Parameters:
       - true
       - false
     Default: true
+  WebMonitoringDiskSize:
+    Description: "Disk size in GB for the Web/Monitoring server"
+    Type: Number
+    Default: 200
+    MinValue: 100
 
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
@@ -1088,6 +1093,7 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
+            VolumeSize: !Ref WebMonitoringDiskSize
             VolumeType: gp3
             Encrypted: !If [EnableEBSEncryptionCondition, true, false]
             DeleteOnTermination: true
