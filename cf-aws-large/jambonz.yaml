@@ -10,8 +10,9 @@ Parameters:
     Description: "Do you want to enable PCAPs for SIP traffic?"
     Type: String
     AllowedValues:
-      - "yes"
-      - "no"
+      - yes
+      - no
+    Default: yes
   
   KeyName:
     Description: "The keypair that you will use to access the EC2 instances via ssh"
@@ -160,7 +161,7 @@ Parameters:
       - c5n.metal    
   ElastiCacheNodeType:
     Type: String
-    Default: 'cache.t2.medium'
+    Default: 'cache.t3.medium'
     AllowedValues:
       - cache.t3.micro
       - cache.t3.small

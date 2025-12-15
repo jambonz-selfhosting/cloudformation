@@ -119,7 +119,7 @@ Parameters:
       - c6i.32xlarge
   ElastiCacheNodeType:
     Type: String
-    Default: 'cache.t2.medium'
+    Default: 'cache.t3.medium'
     AllowedValues:
       - cache.t3.micro
       - cache.t3.small
