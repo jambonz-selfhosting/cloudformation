@@ -13,8 +13,8 @@ mini:
 
 medium:
   us-west-1:
-    SbcAmi: ami-012f96c005e8070c4
-    FsAmi: ami-092def2d93bbda0c2
+    SbcAmi: ami-0f891ec8060ed2056
+    FsAmi: ami-08a7fd14948edc61d
     WebMonitoringAmi: ami-0230e85fb4437787d
     RecordingServerAmi: ami-0fcc5435b7d434a8e
 

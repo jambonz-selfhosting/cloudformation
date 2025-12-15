@@ -92,11 +92,36 @@ Parameters:
     MinLength: 1
     AllowedPattern: ^[a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,}$
     ConstraintDescription: "Must be a valid domain name that you control the DNS records for (e.g., jambonz.mycompany.com)"
+  EncryptionSecret:
+    Type: String
+    Description: "Secret for encrypting JWT and other data (leave empty to auto-generate)"
+    Default: ""
+    NoEcho: true
+  EnableEBSEncryption:
+    Description: "Do you want to encrypt all EBS volumes?"
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: true
 
 Conditions:
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
+  GenerateEncryptionSecret: !Equals [!Ref EncryptionSecret, ""]
+  EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
 Resources:
+  GeneratedEncryptionSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: GenerateEncryptionSecret
+    Properties:
+      Name: !Sub "${AWS::StackName}-encryption-secret"
+      Description: "Auto-generated encryption secret for jambonz"
+      GenerateSecretString:
+        PasswordLength: 10
+        ExcludeCharacters: "/?%,; "
+        IncludeSpace: false
+
   IamCloudwatchRole:
     Type: AWS::IAM::Role
     Condition: ShouldEnableCloudWatch
@@ -164,6 +189,11 @@ Resources:
           DeviceIndex: '0'
           DeleteOnTermination: true
           SubnetId: !Ref PublicSubnet
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 60
+            Encrypted: !If [EnableEBSEncryptionCondition, true, false]
       UserData:
         Fn::Base64: 
           Fn::Sub:
@@ -246,8 +276,7 @@ Resources:
               sudo sed -i -e "s/\(.*\)--JAMBONES_API_BASE_URL--\(.*\)/\1http:\/\/$PUBLIC_IPV4\/v1\2/g" $HOME/apps/ecosystem.config.js 
               
               # replace JWT_SECRET
-              uuid=$(uuidgen)
-              sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1$uuid\2/g" $HOME/apps/ecosystem.config.js 
+              sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1${JWT_SECRET}\2/g" $HOME/apps/ecosystem.config.js 
 
               # reset the database
               JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
@@ -357,8 +386,8 @@ Resources:
               sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=$uuid/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=$uuid/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
               
               # configure drachtio service
               sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
@@ -391,6 +420,7 @@ Resources:
             - URLPortal: !Ref URLPortal
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
+              JWT_SECRET: !Ref EncryptionSecret
 
   jambonzSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
