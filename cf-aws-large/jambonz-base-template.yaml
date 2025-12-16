@@ -1021,6 +1021,7 @@ Resources:
       DBSubnetGroupName: !Ref DatabaseSubnetGroup
       VpcSecurityGroupIds:
         - !Ref MySQLSecurityGroup
+      DeletionProtection: true
 
   DatabaseInstance:
     Type: AWS::RDS::DBInstance
@@ -1170,6 +1171,10 @@ Resources:
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: !Ref EncryptionSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -1590,6 +1595,10 @@ Resources:
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: !Ref EncryptionSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -1894,6 +1903,10 @@ Resources:
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: !Ref EncryptionSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -2163,6 +2176,10 @@ Resources:
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: !Ref EncryptionSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2FullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
