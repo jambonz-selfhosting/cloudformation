@@ -748,8 +748,8 @@ Resources:
                 sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
                 sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
                 sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-                sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-                sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
                 sudo sed -i -e "s/--port 3017/--port 3000/g" /etc/systemd/system/upload_recordings.service
 
                 # Insert the LD_LIBRARY_PATH environment variable into the [Service] section
@@ -1079,9 +1079,9 @@ Resources:
                   max_memory_restart: '2G',
                   env: {
                     JAMBONES_LOGLEVEL: 'info',
-                    JWT_SECRET: '${JWT_SECRET}',
+                    JWT_SECRET: '${!JWT_SECRET}',
                     AWS_REGION: '${AWS_REGION}',
-                    AUTHENTICATION_KEY: '${JWT_SECRET}',
+                    AUTHENTICATION_KEY: '${!JWT_SECRET}',
                     JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
                     JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_HOST}',
                     JAMBONES_MYSQL_USER: '${JAMBONES_MYSQL_USER}',
@@ -1104,7 +1104,7 @@ Resources:
                     HOMER_USERNAME: 'admin',
                     HOMER_PASSWORD: 'sipcapture',
                     JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
-                    JAMBONZ_RECORD_WS_PASSWORD: '${JWT_SECRET}',
+                    JAMBONZ_RECORD_WS_PASSWORD: '${!JWT_SECRET}',
                     JAMBONES_DISABLE_TTS_STREAMING: true
                     },
                 },
@@ -1236,8 +1236,8 @@ Resources:
               sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
               
               sudo systemctl daemon-reload
               sudo systemctl enable upload_recordings
@@ -1410,7 +1410,7 @@ Resources:
                     max_memory_restart: '2G',
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
-                      JWT_SECRET: '${JWT_SECRET}',
+                      JWT_SECRET: '${!JWT_SECRET}',
                       RTPENGINE_PING_INTERVAL: 30000,
                       DRACHTIO_HOST: '127.0.0.1',
                       DRACHTIO_PORT: 9022,
@@ -1498,7 +1498,7 @@ Resources:
                     max_memory_restart: '3G',
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
-                      JWT_SECRET: '${JWT_SECRET}',
+                      JWT_SECRET: '${!JWT_SECRET}',
                       JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
                       JAMBONES_RTPENGINE_INJECT_DTMF_ALWAYS: 0,
                       JAMBONES_RTPENGINE_UDP_PORT: 6000,
@@ -1542,7 +1542,7 @@ Resources:
                     max_memory_restart: '3G',
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
-                      JWT_SECRET: '${JWT_SECRET}',
+                      JWT_SECRET: '${!JWT_SECRET}',
                       AWS_REGION: '${AWS_REGION}',
                       JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
                       JAMBONES_RTPENGINE_INJECT_DTMF_ALWAYS: 0,
@@ -1787,7 +1787,7 @@ Resources:
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
                       JAMBONES_TTS_TRIM_SILENCE: 1,
-                      JWT_SECRET: '${JWT_SECRET}',
+                      JWT_SECRET: '${!JWT_SECRET}',
                       AWS_REGION: '${AWS_REGION}',
                       JAMBONES_API_BASE_URL: 'http://${URLPortal}/v1',
                       ENABLE_METRICS: 1,
@@ -1820,9 +1820,9 @@ Resources:
                       DRACHTIO_SECRET: 'cymru',
                       JAMBONES_FEATURE_SERVERS: '127.0.0.1:9022:cymru',
                       JAMBONES_FREESWITCH: '127.0.0.1:8021:JambonzR0ck$',
-                      AUTHENTICATION_KEY: '${JWT_SECRET}',
+                      AUTHENTICATION_KEY: '${!JWT_SECRET}',
                       JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
-                      JAMBONZ_RECORD_WS_PASSWORD: '${JWT_SECRET}',
+                      JAMBONZ_RECORD_WS_PASSWORD: '${!JWT_SECRET}',
                       JAMBONZ_RECORD_WS_BASE_URL: '${RecordingWsBaseUrl}'
                     }
                   }]
