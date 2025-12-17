@@ -5,7 +5,7 @@ Mappings:
   AWSRegion2AMI:
     us-west-1:
       SbcSipAmi: ami-087291e1a3c8d0bf3
-      SbcRtpAmi: ami-07e64854561119837
+      SbcRtpAmi: ami-09970c54907254790
       FsAmi: ami-04ab62eeeb5158127
       WebserverAmi: ami-006d82666a4026b0e
       MonitoringServerAmi: ami-01143a3a00c0d3fce
