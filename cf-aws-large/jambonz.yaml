@@ -1910,6 +1910,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
 
   # --- SBC RTP EC2 Role Instance profile
   SbcRtpServerInstanceProfile:
