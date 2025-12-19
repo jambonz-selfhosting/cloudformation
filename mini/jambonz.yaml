@@ -3,7 +3,7 @@ AWSTemplateFormatVersion: 2010-09-09
 Mappings:
   AWSRegion2AMI:
     us-west-2:
-      Ami: ami-0d03aca6b34759261
+      Ami: ami-0800ee56202b29959
 
 Parameters:
   InstanceType:
