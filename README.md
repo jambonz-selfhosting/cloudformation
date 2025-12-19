@@ -6,9 +6,9 @@ This repository contains AWS CloudFormation templates for self-hosting jambonz. 
 
 | Deployment | Description | Concurrent Calls | Use Case |
 |------------|-------------|------------------|----------|
-| [Mini](cf-aws-mini/) | Single EC2 instance with all components | Up to 50 | Development, testing, small-scale production |
-| [Medium](cf-aws-medium/) | Multi-tier with SBC, Feature Server, and Web/Monitoring ASGs | Up to 1,500 | Production workloads requiring HA |
-| [Large](cf-aws-large/) | Fully separated SBC SIP, SBC RTP, Feature Server, Web, and Monitoring | 1,500+ | Large-scale production with maximum scalability |
+| [Mini](mini/) | Single EC2 instance with all components | Up to 50 | Development, testing, small-scale production |
+| [Medium](medium/) | Multi-tier with SBC, Feature Server, and Web/Monitoring ASGs | Up to 1,500 | Production workloads requiring HA |
+| [Large](large/) | Fully separated SBC SIP, SBC RTP, Feature Server, Web, and Monitoring | 1,500+ | Large-scale production with maximum scalability |
 
 ## Quick Start
 
@@ -21,7 +21,7 @@ Example (mini deployment):
 ```bash
 aws cloudformation create-stack \
   --stack-name jambonz-mini \
-  --template-body file://cf-aws-mini/jambonz.yaml \
+  --template-body file://mini/jambonz.yaml \
   --capabilities CAPABILITY_IAM \
   --region us-west-2 \
   --parameters \

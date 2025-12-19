@@ -107,9 +107,9 @@ merge_template() {
 echo "Merging AMI mappings into CloudFormation templates..."
 echo ""
 
-merge_template "cf-aws-mini" "mini"
-merge_template "cf-aws-medium" "medium"
-merge_template "cf-aws-large" "large"
+merge_template "mini" "mini"
+merge_template "medium" "medium"
+merge_template "large" "large"
 
 echo ""
 echo "All templates updated successfully."
