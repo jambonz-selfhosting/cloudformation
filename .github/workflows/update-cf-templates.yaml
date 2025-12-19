@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'mappings/ami-mappings.yaml'
-      - 'cf-aws-*/jambonz-base-template.yaml'
+      - '*/jambonz-base-template.yaml'
     branches:
       - main
   workflow_dispatch:  # Allow manual trigger
