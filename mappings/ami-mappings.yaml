@@ -9,7 +9,7 @@
 
 mini:
   us-west-2:
-    Ami: ami-018483ab84a5b0805
+    Ami: ami-0d03aca6b34759261
 
 medium:
   us-west-1:
