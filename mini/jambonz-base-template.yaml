@@ -117,8 +117,8 @@ Resources:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Auto-generated encryption secret for jambonz"
       GenerateSecretString:
-        PasswordLength: 10
-        ExcludeCharacters: "/?%,; "
+        PasswordLength: 16
+        ExcludeCharacters: "/?%,; \\[]&'\"$`"
         IncludeSpace: false
 
   IamRole:

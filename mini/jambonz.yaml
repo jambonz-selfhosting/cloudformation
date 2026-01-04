@@ -3,7 +3,7 @@ AWSTemplateFormatVersion: 2010-09-09
 Mappings:
   AWSRegion2AMI:
     us-east-2:
-      MiniAmi: ami-0b34056b50f9992ac
+      MiniAmi: ami-03c411f560f189074
 
 Parameters:
   InstanceType:
@@ -111,8 +111,8 @@ Resources:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Auto-generated encryption secret for jambonz"
       GenerateSecretString:
-        PasswordLength: 10
-        ExcludeCharacters: "/?%,; "
+        PasswordLength: 16
+        ExcludeCharacters: "/?%,; \\[]&'\"$`"
         IncludeSpace: false
 
   IamRole:
