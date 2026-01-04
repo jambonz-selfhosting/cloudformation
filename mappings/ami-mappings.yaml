@@ -3,12 +3,12 @@
 # create a PR to update all CloudFormation templates.
 #
 # Each deployment size has different AMI requirements:
-# - mini: Single "Ami" for the all-in-one instance
+# - mini: Single "MiniAmi" for the all-in-one instance
 # - medium: SbcAmi, FsAmi, WebMonitoringAmi, RecordingServerAmi
 # - large: SbcSipAmi, SbcRtpAmi, FsAmi, WebserverAmi, MonitoringServerAmi, RecordingServerAmi
 mini:
-  us-west-2:
-    Ami: ami-0800ee56202b29959
+  us-east-2:
+    MiniAmi: ami-0b34056b50f9992ac
 
 medium:
   us-west-1:
