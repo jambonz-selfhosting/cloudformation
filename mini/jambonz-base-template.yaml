@@ -179,7 +179,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceType
       IamInstanceProfile: !Ref jambonzInstanceProfile
-      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "Ami"]
+      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "MiniAmi"]
       KeyName: !Ref KeyName
       NetworkInterfaces:
         - GroupSet:

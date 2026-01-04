@@ -2,8 +2,8 @@ AWSTemplateFormatVersion: 2010-09-09
 
 Mappings:
   AWSRegion2AMI:
-    us-west-2:
-      Ami: ami-0800ee56202b29959
+    us-east-2:
+      MiniAmi: ami-0b34056b50f9992ac
 
 Parameters:
   InstanceType:
@@ -173,7 +173,7 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceType
       IamInstanceProfile: !Ref jambonzInstanceProfile
-      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "Ami"]
+      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "MiniAmi"]
       KeyName: !Ref KeyName
       NetworkInterfaces:
         - GroupSet:
