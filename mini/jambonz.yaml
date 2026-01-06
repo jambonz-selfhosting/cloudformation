@@ -4,6 +4,8 @@ Mappings:
   AWSRegion2AMI:
     us-east-2:
       MiniAmi: ami-01b22366c79a90197
+    us-west-1:
+      MiniAmi: ami-023ee8179e0e47384
 
 Parameters:
   InstanceType:
