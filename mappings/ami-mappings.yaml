@@ -8,7 +8,7 @@
 # - large: SbcSipAmi, SbcRtpAmi, FsAmi, WebserverAmi, MonitoringServerAmi, RecordingServerAmi
 mini:
   us-east-2:
-    MiniAmi: ami-01b22366c79a90197
+    MiniAmi: ami-0e2935c9f86990b5a
   us-west-1:
     MiniAmi: ami-017f446e79964fce4
 
