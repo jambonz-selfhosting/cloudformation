@@ -9,6 +9,8 @@
 mini:
   us-east-2:
     MiniAmi: ami-0e2935c9f86990b5a
+  us-west-2:
+    MiniAmi: ami-05cfeb0994abf6f3d
 
 medium:
   us-west-1:
