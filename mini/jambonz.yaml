@@ -2,10 +2,60 @@ AWSTemplateFormatVersion: 2010-09-09
 
 Mappings:
   AWSRegion2AMI:
+    us-east-1:
+      MiniAmi: ami-0a16202f845f06e9d
     us-east-2:
-      MiniAmi: ami-0e2935c9f86990b5a
+      MiniAmi: ami-0de3facd6bdb16e2c
+    us-west-1:
+      MiniAmi: ami-0311eb67e3329374d
     us-west-2:
-      MiniAmi: ami-05cfeb0994abf6f3d
+      MiniAmi: ami-0622e9e91532d5b9d
+    ca-central-1:
+      MiniAmi: ami-0ef796c5e84f72b96
+    ca-west-1:
+      MiniAmi: ami-0f9356e64b6c021ec
+    sa-east-1:
+      MiniAmi: ami-09c67c0853ed10e91
+    mx-central-1:
+      MiniAmi: ami-0c5ede9c498d8dad6
+    eu-central-1:
+      MiniAmi: ami-002d54dec686d78ad
+    eu-central-2:
+      MiniAmi: ami-03fc0608a50cead87
+    eu-west-1:
+      MiniAmi: ami-0e7c03a629459e5c7
+    eu-west-2:
+      MiniAmi: ami-0f87f4fb245be003d
+    eu-west-3:
+      MiniAmi: ami-0b88427ae45c9bc4b
+    eu-north-1:
+      MiniAmi: ami-031ecae8df5bb96c4
+    eu-south-1:
+      MiniAmi: ami-004f1f283aeaa5f20
+    eu-south-2:
+      MiniAmi: ami-023201130a4480508
+    ap-south-1:
+      MiniAmi: ami-00adcd6886377bcca
+    ap-east-1:
+      MiniAmi: ami-006a2fc18d81aeb93
+    ap-southeast-1:
+      MiniAmi: ami-068271bd7556a945c
+    ap-southeast-2:
+      MiniAmi: ami-0205a969960fbd639
+    ap-southeast-4:
+      MiniAmi: ami-083309883ccfe2102
+    ap-southeast-5:
+      MiniAmi: ami-03686a60ab96db136
+    ap-northeast-1:
+      MiniAmi: ami-06189beaad8fc1136
+    ap-northeast-2:
+      MiniAmi: ami-0654b25d496b24bdc
+    me-central-1:
+      MiniAmi: ami-01903812d3a08926d
+    me-south-1:
+      MiniAmi: ami-0309aea544b9a0384
+    af-south-1:
+      MiniAmi: ami-0286ff3e73bbe9e33
 
 Parameters:
   InstanceType:
