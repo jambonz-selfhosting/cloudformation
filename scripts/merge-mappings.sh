@@ -30,8 +30,8 @@ generate_mappings_section() {
             next
         }
 
-        # If we hit another top-level key (not indented), stop
-        in_section && /^[a-z]+:/ {
+        # If we hit another top-level key (mini:, medium:, large:, or instance-types-*), stop
+        in_section && /^(mini|medium|large|instance-types)/ {
             in_section = 0
         }
 
