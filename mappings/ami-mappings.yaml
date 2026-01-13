@@ -6,7 +6,6 @@
 # - mini: Single "MiniAmi" for the all-in-one instance
 # - medium: SbcAmi, FsAmi, WebMonitoringAmi, RecordingServerAmi
 # - large: SbcSipAmi, SbcRtpAmi, FsAmi, WebserverAmi, MonitoringServerAmi, RecordingServerAmi
-
 mini:
   us-east-1:
     MiniAmi: ami-0a16202f845f06e9d
