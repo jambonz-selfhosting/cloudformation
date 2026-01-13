@@ -2,6 +2,174 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Mappings:
+  RegionInstanceTypeDefaults:
+    # Regions with c5n support (majority)
+    us-east-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    us-east-2:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    us-west-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    us-west-2:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ca-central-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    sa-east-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-central-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-west-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-west-2:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-west-3:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-north-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-south-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-south-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-east-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-southeast-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-southeast-2:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-southeast-5:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-northeast-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-northeast-2:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-northeast-3:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    me-south-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    af-south-1:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+
+    # Regions WITHOUT c5n but WITH c5 (use c5.xlarge fallback)
+    me-central-1:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    il-central-1:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-south-2:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-central-2:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    eu-south-2:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-southeast-3:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    ap-southeast-4:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    ca-west-1:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+
+    # Regions WITHOUT c5 or c5n (use t3.xlarge - available everywhere)
+    ap-east-2:
+      SbcDefault: t3.xlarge
+      WebMonitoringDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    mx-central-1:
+      SbcDefault: t3.xlarge
+      WebMonitoringDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+
+Mappings:
   AWSRegion2AMI:
     us-east-1:
       SbcAmi: ami-00457cfa1e4097a97
@@ -153,100 +321,21 @@ Parameters:
     Default: true
   
   InstanceTypeSbc:
-    Description: "the EC2 instance type for the SBC SIP server"
+    Description: "EC2 instance type for SBC server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
     Type: String
-    Default: c5n.xlarge
-    AllowedValues:
-      - t2.medium
-      - t2.large
-      - t2.xlarge
-      - t3.medium
-      - t3.large
-      - t3.xlarge
-      - t3a.medium
-      - t3a.large
-      - t3a.xlarge
-      - c5.large
-      - c5.xlarge
-      - c5.2xlarge
-      - c5n.large
-      - c5n.xlarge
-      - c5n.2xlarge
-      - c5n.4xlarge
-      - c5n.18xlarge
-      - c5n.metal    
+    Default: ""    
   InstanceTypeWebMonitoring:
-    Description: "the EC2 instance type to use for the SBC Media server"
+    Description: "EC2 instance type for Web and Monitoring server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
     Type: String
-    Default: c5n.xlarge
-    AllowedValues:
-      - t2.medium
-      - t2.large
-      - t2.xlarge
-      - t3.medium
-      - t3.large
-      - t3.xlarge
-      - t3a.medium
-      - t3a.large
-      - t3a.xlarge
-      - c5.large
-      - c5.xlarge
-      - c5.2xlarge
-      - c5n.large
-      - c5n.xlarge
-      - c5n.2xlarge
-      - c5n.4xlarge
-      - c5n.18xlarge
-      - c5n.metal    
+    Default: ""    
   InstanceTypeFeatureServer:
-    Description: "the EC2 instance type to use for the Feature Server"
+    Description: "EC2 instance type for Feature Server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
     Type: String
-    Default: c5n.xlarge
-    AllowedValues:
-      - t2.medium
-      - t2.large
-      - t2.xlarge
-      - t3.medium
-      - t3.large
-      - t3.xlarge
-      - t3a.medium
-      - t3a.large
-      - t3a.xlarge
-      - c5.large
-      - c5.xlarge
-      - c5.2xlarge
-      - c5n.large
-      - c5n.xlarge
-      - c5n.2xlarge
-      - c5n.4xlarge
-      - c5n.18xlarge
-      - c5n.metal
+    Default: ""
   RecordingInstanceType:
-    Description: "EC2 instance type for the Recording Server Auto Scaling Group"
+    Description: "EC2 instance type for Recording Server Auto Scaling Group. Leave BLANK for region-optimized default (t3.xlarge - universally available), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, etc."
     Type: String
-    Default: t2.xlarge
-    AllowedValues:
-      - t2.medium
-      - t2.large
-      - t2.xlarge
-      - t3.medium
-      - t3.large
-      - t3.xlarge
-      - t3a.medium
-      - t3a.large
-      - t3a.xlarge
-      - c5.large
-      - c5.xlarge
-      - c5.2xlarge
-      - c6i.large
-      - c6i.xlarge
-      - c6i.2xlarge
-      - c6i.4xlarge
-      - c6i.8xlarge
-      - c6i.12xlarge
-      - c6i.16xlarge
-      - c6i.24xlarge
-      - c6i.32xlarge
+    Default: ""
   ElastiCacheNodeType:
     Type: String
     Default: 'cache.t3.medium'
@@ -411,6 +500,12 @@ Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
+
+  # Instance type conditions - use regional defaults when parameter is blank
+  UseDefaultSbcInstanceType: !Equals [!Ref InstanceTypeSbc, ""]
+  UseDefaultWebMonitoringInstanceType: !Equals [!Ref InstanceTypeWebMonitoring, ""]
+  UseDefaultFeatureServerInstanceType: !Equals [!Ref InstanceTypeFeatureServer, ""]
+  UseDefaultRecordingInstanceType: !Equals [!Ref RecordingInstanceType, ""]
 
 Resources:
   EncryptionSecret:
@@ -850,7 +945,10 @@ Resources:
       LaunchTemplateName: !Sub "${AWS::StackName}-recording-launch-template"
       LaunchTemplateData:
         ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "RecordingServerAmi"]
-        InstanceType: !Ref RecordingInstanceType
+        InstanceType: !If
+          - UseDefaultRecordingInstanceType
+          - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", RecordingServerDefault]
+          - !Ref RecordingInstanceType
         KeyName: !Ref KeyName
         IamInstanceProfile:
           Name: !Ref RecordingInstanceProfile
@@ -1108,7 +1206,10 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet1
       ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "WebMonitoringAmi"]
-      InstanceType: !Ref InstanceTypeWebMonitoring
+      InstanceType: !If
+        - UseDefaultWebMonitoringInstanceType
+        - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", WebMonitoringDefault]
+        - !Ref InstanceTypeWebMonitoring
       IamInstanceProfile: !Ref WebMonitoringServerIamInstanceProfile
       SecurityGroupIds:
         - Ref: SshSecurityGroup
@@ -1444,7 +1545,10 @@ Resources:
     Properties:
       LaunchTemplateData:
         ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "SbcAmi"]
-        InstanceType: !Ref InstanceTypeSbc
+        InstanceType: !If
+          - UseDefaultSbcInstanceType
+          - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", SbcDefault]
+          - !Ref InstanceTypeSbc
         IamInstanceProfile:
           Name: !Ref SbcServerInstanceProfile
         KeyName: !Ref KeyName
@@ -1842,7 +1946,10 @@ Resources:
     Properties:
       LaunchTemplateData:
         ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region, "FsAmi"]
-        InstanceType: !Ref InstanceTypeFeatureServer
+        InstanceType: !If
+          - UseDefaultFeatureServerInstanceType
+          - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", FeatureServerDefault]
+          - !Ref InstanceTypeFeatureServer
         IamInstanceProfile:
           Name: !Ref FeatureServerInstanceProfile
         KeyName: !Ref KeyName
