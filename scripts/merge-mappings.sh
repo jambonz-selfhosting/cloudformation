@@ -53,6 +53,43 @@ generate_mappings_section() {
     ' "$MAPPINGS_FILE" >> "$tmpfile"
 
     echo "" >> "$tmpfile"
+
+    # Add RegionInstanceTypeDefaults mapping
+    echo "  RegionInstanceTypeDefaults:" >> "$tmpfile"
+
+    # Extract RegionInstanceTypeDefaults for this size
+    awk -v size="$size" '
+        BEGIN { in_section = 0 }
+
+        # Match the RegionInstanceTypeDefaults size header (e.g., "instance-types-mini:")
+        $0 ~ "^instance-types-" size ":" {
+            in_section = 1
+            next
+        }
+
+        # If we hit another top-level key (not indented), stop
+        in_section && /^[a-z]/ {
+            in_section = 0
+        }
+
+        # Skip comment lines and empty lines at section level
+        in_section && /^  #/ { next }
+        in_section && /^$/ { next }
+
+        # Print region lines (2-space indent in source -> 4-space in output)
+        in_section && /^  [a-z]/ {
+            sub(/^  /, "    ")
+            print
+        }
+
+        # Print instance type default lines (4-space indent in source -> 6-space in output)
+        in_section && /^    [A-Z]/ {
+            sub(/^    /, "      ")
+            print
+        }
+    ' "$MAPPINGS_FILE" >> "$tmpfile"
+
+    echo "" >> "$tmpfile"
 }
 
 # Function to merge mappings into a template
