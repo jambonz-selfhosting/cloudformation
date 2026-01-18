@@ -230,6 +230,35 @@ Resources:
                   echo "Warning: No SSH keys found for $DEFAULT_USER"
               fi
 
+              # change the database password to a random id
+              NEW_DB_PASSWD=$(< /dev/urandom tr -dc A-Z | head -c1; < /dev/urandom tr -dc a-z | head -c1; < /dev/urandom tr -dc 0-9 | head -c1; < /dev/urandom tr -dc _ | head -c1; < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c8; echo;)
+              echo "alter user 'admin'@'%' identified by '$NEW_DB_PASSWD'" | mysql -h 127.0.0.1 -u admin -D jambones -pJambonzR0ck$
+
+              # configure upload_recordings service
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              
+              # configure drachtio service
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/drachtio.service
+              
+              # configure freeswitch service
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=127.0.0.1/g" /etc/systemd/system/freeswitch.service
+              sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/freeswitch.service
+              
               echo install rtpengine kernel module and iptables rule
               if lsmod | grep -q xt_RTPENGINE; then
                 echo "xt_RTPENGINE module is already loaded."
@@ -239,20 +268,17 @@ Resources:
                 echo 'add 42' > /proc/rtpengine/control
                 iptables -I INPUT -p udp --dport 40000:60000 -j RTPENGINE --id 42
               fi
-              echo "rtpengine module and iptables rule installed. Restarting rtpengine service."
-              systemctl restart rtpengine
+              echo "rtpengine module and iptables rule installed."
 
               # get instance metadata
               # this can take a few secs after the instance is created to attach EIP
               sleep 30
               PRIVATE_IPV4="$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)" 
               PUBLIC_IPV4="$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)" 
-              INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)" 
-              AWS_REGION_NAME="$(curl -s http://169.254.169.254/latest/meta-data/placement/region)" 
-              
-              # change the database password to a random id
-              NEW_DB_PASSWD=$(< /dev/urandom tr -dc A-Z | head -c1; < /dev/urandom tr -dc a-z | head -c1; < /dev/urandom tr -dc 0-9 | head -c1; < /dev/urandom tr -dc _ | head -c1; < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c8; echo;)
-              echo "alter user 'admin'@'%' identified by '$NEW_DB_PASSWD'" | mysql -h 127.0.0.1 -u admin -D jambones -pJambonzR0ck$ 
+              INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
+              AWS_REGION_NAME="$(curl -s http://169.254.169.254/latest/meta-data/placement/region)"
+
+              # update ecosystem.config.js with the new DB password
               sudo sed -i -e "s/\(.*\)JAMBONES_MYSQL_PASSWORD.*/\1JAMBONES_MYSQL_PASSWORD: '$NEW_DB_PASSWD',/g" $HOME/apps/ecosystem.config.js 
               
               # replace ip addresses in the ecosystem.config.js file
@@ -335,9 +361,6 @@ Resources:
               # restart heplify-server
               sudo systemctl restart heplify-server
 
-              # restart drachtio server as it may have bound to the old public IP before the EIP was attached
-              systemctl restart drachtio
-
               # enable cloudwatch
               if [[ "${Cloudwatch}" == "true" ]]; then
                 echo "Enabling Cloudwatch for jambonz logs"
@@ -365,35 +388,11 @@ Resources:
               sudo -u $USER bash -c "pm2 save"
               sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
               
-              # configure upload_recordings service
-              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              
-              # configure drachtio service
-              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
-              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/drachtio.service
-              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/drachtio.service
-              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/drachtio.service
-              sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
-              sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/drachtio.service
-              
-              # configure freeswitch service
-              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/freeswitch.service
-              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/freeswitch.service
-              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/freeswitch.service
-              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/freeswitch.service
-              sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=127.0.0.1/g" /etc/systemd/system/freeswitch.service
-              sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/freeswitch.service
-              
               sudo systemctl daemon-reload
               sudo systemctl enable upload_recordings
               sudo systemctl start upload_recordings
 
+              sudo systemctl restart rtpengine
               sudo systemctl restart drachtio
               sudo systemctl restart freeswitch
 
