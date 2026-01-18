@@ -1,9 +1,13 @@
 # jambonz Mini CloudFormation Deployment
 
-This CloudFormation template deploys a "jambonz mini" - single EC2 instance running all jambonz components for development, testing, or small-scale production use.
+This directory contains the base CloudFormation template for "jambonz mini" - a single EC2 instance running all jambonz components for development, testing, or small-scale production use.
+
+**Important:** Do not deploy `_jambonz-base-template.yaml` directly. Instead, run `../generate-cf.sh` from the project root to generate a deployable template.
 
 ## Prerequisites
 
+- AWS CLI and credentials configured
+- `yq` installed (YAML processor)
 - An existing EC2 Key Pair in the target region
 - An AWS account with permissions to create VPCs, EC2 instances, IAM roles, and Elastic IPs
 
@@ -22,14 +26,23 @@ This CloudFormation template deploys a "jambonz mini" - single EC2 instance runn
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
 | `URLPortal` | DNS name for the portal | (required) |
 
-## Deploy the Stack
+## Generate and Deploy
 
-Use the commands below, substituting your region, Keyname, and URLPortal.
+First, generate the CloudFormation template:
+
+```bash
+cd ..  # Go to project root
+./generate-cf.sh
+# Follow prompts to select 'mini' and your region
+# Wait for AMI copy to complete
+```
+
+Then deploy the generated template:
 
 ```bash
 aws cloudformation create-stack \
   --stack-name jambonz-mini \
-  --template-body file://jambonz.yaml \
+  --template-body file://jambonz-mini-us-west-2.yaml \
   --capabilities CAPABILITY_IAM \
   --region us-west-2 \
   --parameters \

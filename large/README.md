@@ -1,6 +1,8 @@
 # jambonz Large CloudFormation Deployment
 
-This CloudFormation template deploys a "jambonz large" - a highly scalable multi-tier architecture with separate SBC SIP, SBC RTP, Feature Server, Web Server, and Monitoring components, backed by Aurora Serverless MySQL and ElastiCache Redis. Suitable for large-scale production workloads requiring maximum scalability and separation of concerns.   
+This directory contains the base CloudFormation template for "jambonz large" - a highly scalable multi-tier architecture with separate SBC SIP, SBC RTP, Feature Server, Web Server, and Monitoring components, backed by Aurora Serverless MySQL and ElastiCache Redis. Suitable for large-scale production workloads requiring maximum scalability and separation of concerns.
+
+**Important:** Do not deploy `_jambonz-base-template.yaml` directly. Instead, run `../generate-cf.sh` from the project root to generate a deployable template.
 
 Use this Cloudformation deployment for production workloads requiring high availability and scalability that need to scale to over 1,500 concurrent calls.
 
@@ -19,6 +21,8 @@ The large deployment creates:
 
 ## Prerequisites
 
+- AWS CLI and credentials configured
+- `yq` installed (YAML processor)
 - An existing EC2 Key Pair in the target region
 - An AWS account with permissions to create VPCs, EC2 instances, IAM roles, RDS, ElastiCache, and Elastic IPs
 
@@ -51,14 +55,23 @@ The large deployment creates:
 | `DeployRecordingCluster` | Deploy optional recording cluster | yes |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 
-## Deploy the Stack
+## Generate and Deploy
 
-The template exceeds the 51,200 byte limit for inline `--template-body`, so you must upload it to S3 first.
+First, generate the CloudFormation template:
+
+```bash
+cd ..  # Go to project root
+./generate-cf.sh
+# Follow prompts to select 'large' and your region
+# Wait for AMI copy to complete
+```
+
+The generated template exceeds the 51,200 byte limit for inline `--template-body`, so you must upload it to S3 first:
 
 ```bash
 # Upload template to S3 (create bucket if needed)
 aws s3 mb s3://my-cf-templates-bucket --region us-west-2
-aws s3 cp jambonz.yaml s3://my-cf-templates-bucket/jambonz-large.yaml
+aws s3 cp jambonz-large-us-west-2.yaml s3://my-cf-templates-bucket/jambonz-large.yaml
 
 # Deploy using --template-url
 aws cloudformation create-stack \
