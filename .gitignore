@@ -9,5 +9,8 @@ jambonz-large-*.yaml
 # Backup files (numbered backups created by generate-cf.sh)
 *.yaml.backup.*
 
+# Utility script for making snapshots public (internal use only)
+make-snapshots-public.sh
+
 # Base templates use underscore prefix and should be committed
 # (no exclusion needed - underscore prefix makes them distinct)
