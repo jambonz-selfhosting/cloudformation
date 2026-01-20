@@ -194,7 +194,7 @@ NEW_AMI_IDS=()
 AMI_VERSIONS=()
 
 echo ""
-echo "Querying version tags from public AMIs..."
+echo "Querying version information from public AMIs..."
 echo "This will take a moment - querying ${#AMI_TYPES[@]} AMI(s)..."
 echo ""
 JAMBONZ_VERSION=""
@@ -207,24 +207,39 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
     fi
     PUBLIC_AMIS+=("$AMI_ID")
 
-    # Query JambonzVersion tag from the public AMI
-    echo "  Querying version tag for $AMI_TYPE ($AMI_ID)..."
-    VERSION_TAG=$(aws ec2 describe-images \
+    # Query Name field from the public AMI and parse version
+    echo "  Querying AMI name for $AMI_TYPE ($AMI_ID)..."
+    AMI_NAME=$(aws ec2 describe-images \
         --region "$REGION" \
         --image-ids "$AMI_ID" \
-        --query 'Images[0].Tags[?Key==`JambonzVersion`].Value' \
+        --query 'Images[0].Name' \
         --output text 2>&1)
 
-    if [ $? -ne 0 ] || [ -z "$VERSION_TAG" ] || [ "$VERSION_TAG" = "None" ]; then
-        echo "    ✗ ERROR: No JambonzVersion tag found"
+    if [ $? -ne 0 ] || [ -z "$AMI_NAME" ] || [ "$AMI_NAME" = "None" ]; then
+        echo "    ✗ ERROR: Could not retrieve AMI name"
         echo ""
-        echo "ERROR: AMI $AMI_ID ($AMI_TYPE) does not have a JambonzVersion tag"
+        echo "ERROR: AMI $AMI_ID ($AMI_TYPE) does not have a Name field"
         echo ""
-        echo "This means the required AMIs are not properly configured in region $REGION."
-        echo "All AMIs must have the JambonzVersion tag set to proceed with deployment."
+        echo "This means the AMI may not be properly configured in region $REGION."
         echo ""
-        echo "You can check AMI tags with:"
-        echo "  aws ec2 describe-images --region $REGION --image-ids $AMI_ID --query 'Images[0].Tags'"
+        echo "You can check the AMI with:"
+        echo "  aws ec2 describe-images --region $REGION --image-ids $AMI_ID --query 'Images[0].Name'"
+        echo ""
+        exit 1
+    fi
+
+    # Parse version from AMI name using sed (portable across Linux/macOS)
+    # Expected format: jambonz-{variant}-v{VERSION}-{os}-{timestamp}
+    # Example: jambonz-sip-v10.0.2-debian-12-20260116213122
+    VERSION_TAG=$(echo "$AMI_NAME" | sed -n 's/.*\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+
+    if [ -z "$VERSION_TAG" ]; then
+        echo "    ✗ ERROR: Could not parse version from AMI name"
+        echo ""
+        echo "ERROR: AMI $AMI_ID ($AMI_TYPE) has unexpected name format: $AMI_NAME"
+        echo ""
+        echo "Expected format: jambonz-{variant}-v{VERSION}-{os}-{timestamp}"
+        echo "Example: jambonz-sip-v10.0.2-debian-12-20260116213122"
         echo ""
         exit 1
     fi
@@ -236,11 +251,11 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
         JAMBONZ_VERSION=$VERSION_TAG
     fi
 
-    echo "    ✓ $AMI_TYPE: $AMI_ID (version: $VERSION_TAG)"
+    echo "    ✓ $AMI_TYPE: $AMI_ID (name: $AMI_NAME, version: $VERSION_TAG)"
 done
 
 echo ""
-echo "✓ All AMIs verified with proper JambonzVersion tags"
+echo "✓ All AMIs verified with proper version information"
 echo "Detected jambonz version: $JAMBONZ_VERSION"
 echo ""
 
