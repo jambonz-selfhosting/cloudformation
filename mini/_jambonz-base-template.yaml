@@ -348,8 +348,11 @@ Resources:
               }
               EOF
 
+              # increase server_names_hash_bucket_size to support long domain names
+              sudo sed -i '/http {/a \    server_names_hash_bucket_size 128;' /etc/nginx/nginx.conf
+
               sudo systemctl restart nginx
-              
+
               mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e 'delete from sbc_addresses'
 
               # point drachtio and rtpengine to the HEP endpoint on the localhost

@@ -2360,7 +2360,10 @@ Resources:
                 }
               }
               EOF
-            
+
+              # increase server_names_hash_bucket_size to support long domain names
+              sudo sed -i '/http {/a \    server_names_hash_bucket_size 128;' /etc/nginx/nginx.conf
+
               sudo systemctl restart nginx
 
                 # enable cloudwatch
