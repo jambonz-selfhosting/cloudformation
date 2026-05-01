@@ -14,3 +14,6 @@ make-snapshots-public.sh
 
 # Base templates use underscore prefix and should be committed
 # (no exclusion needed - underscore prefix makes them distinct)
+
+# Testing scripts - credentials file
+scripts/.env

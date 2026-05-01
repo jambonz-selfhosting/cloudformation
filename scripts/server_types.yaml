@@ -1,0 +1,146 @@
+# Server type definitions for Jambonz CloudFormation deployments
+# Defines expected systemd services and PM2 processes for each deployment type
+
+server_types:
+  # Mini deployment - All-in-one single server (CloudFormation mini)
+  mini:
+    description: "All-in-one mini deployment (all services on one EC2 instance)"
+    systemd_services:
+      - drachtio
+      - rtpengine
+      - freeswitch
+      - mysql
+      - redis
+      - grafana-server
+    pm2_processes:
+      - inbound
+      - outbound
+      - sbc-call-router
+      - feature-server
+      - webapp
+      - api-server
+
+  # Medium deployment servers
+  sbc:
+    description: "SBC server (medium deployment) - handles SIP ingress/egress and RTP"
+    systemd_services:
+      - drachtio
+      - rtpengine
+    pm2_processes:
+      - inbound
+      - outbound
+      - sbc-call-router
+
+  web-monitoring:
+    description: "Web and monitoring server (medium deployment) - webapp, API, databases, monitoring"
+    systemd_services:
+      - mysql
+      - redis
+      - grafana-server
+      - influxdb
+    pm2_processes:
+      - webapp
+      - api-server
+
+  feature-server:
+    description: "Feature server (medium/large deployment) - handles call logic and media"
+    systemd_services:
+      - drachtio
+      - freeswitch
+    pm2_processes:
+      - feature-server
+
+  # Large deployment servers
+  sip:
+    description: "SIP server (large deployment) - handles SIP signaling only"
+    systemd_services:
+      - drachtio
+    pm2_processes:
+      - inbound
+      - outbound
+      - sbc-call-router
+
+  rtp:
+    description: "RTP server (large deployment) - handles media processing"
+    systemd_services:
+      - drachtio
+      - rtpengine
+    pm2_processes: []
+
+  web:
+    description: "Web server (large deployment) - webapp and API only"
+    systemd_services: []
+    pm2_processes:
+      - webapp
+      - api-server
+
+  monitoring:
+    description: "Monitoring server (large deployment) - databases and monitoring tools"
+    systemd_services:
+      - mysql
+      - redis
+      - grafana-server
+      - influxdb
+    pm2_processes: []
+
+# Service checking behavior
+service_checks:
+  # How to check systemd services
+  systemd:
+    command: "systemctl is-active {service}"
+    expected_output: "active"
+    timeout: 10
+
+  # How to check PM2 processes
+  pm2:
+    command: "pm2 list"
+    check_online: true
+    timeout: 30
+
+  # cloud-init check for AWS
+  cloud_init:
+    command: "sudo cloud-init status"
+    success_indicator: "status: done"
+    timeout: 60
+
+# Optional services that won't cause failures if missing
+optional_services:
+  systemd:
+    - telegraf        # Metrics collection - optional for testing
+    - postgresql      # Only running if PCAPs/Homer enabled
+    - homer-app       # Only running if PCAPs/Homer enabled
+    - heplify-server  # Only running if PCAPs/Homer enabled
+    - cassandra       # Only running if OTEL tracing enabled
+    - jaeger-query    # Only running if OTEL tracing enabled
+    - jaeger-collector # Only running if OTEL tracing enabled
+  pm2: []
+
+# Service aliases - alternative names for the same service
+service_aliases:
+  systemd:
+    drachtio:
+      - drachtio-server
+      - drachtio.service
+    rtpengine:
+      - rtpengine.service
+      - ngcp-rtpengine-daemon
+    freeswitch:
+      - freeswitch.service
+    grafana-server:
+      - grafana
+      - grafana.service
+    mysql:
+      - mysqld
+      - mysql.service
+      - mysqld.service
+    redis:
+      - redis-server
+      - redis.service
+
+  pm2:
+    api-server:
+      - api
+      - jambonz-api-server
+    feature-server:
+      - fs
+      - jambonz-feature-server
