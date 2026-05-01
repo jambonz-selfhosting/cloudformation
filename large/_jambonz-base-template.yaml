@@ -211,6 +211,10 @@ Parameters:
       - true
       - false
     Default: true
+  KrispApiKey:
+    Description: "Optional Krisp API key for noise isolation and turn taking"
+    Type: String
+    Default: ""
   WebMonitoringDiskSize:
     Description: "Disk size in GB for the Web/Monitoring server"
     Type: Number
@@ -1593,6 +1597,7 @@ Resources:
                 sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/freeswitch.service
                 sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=${JAMBONES_REDIS_HOST}/g" /etc/systemd/system/freeswitch.service
                 sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/freeswitch.service
+                sudo sed -i -e "s/KRISP_LICENSE_KEY=/KRISP_LICENSE_KEY=${KrispApiKey}/g" /etc/systemd/system/freeswitch.service
 
                 sudo systemctl daemon-reload
                 sudo systemctl restart freeswitch
