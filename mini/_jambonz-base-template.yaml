@@ -553,11 +553,14 @@ Outputs:
         - !Ref URLPortal
     Description: URL for the homer portal
   ServerIP:
-    Value: !GetAtt 
+    Value: !GetAtt
       - jambonzInstance
       - PublicIp
     Description: Server IP address - create DNS A records pointing to this IP for this domain as well as subdomains api, grafana, homer, and sip
-  User:
+  SSHUser:
+    Value: jambonz
+    Description: SSH username for connecting to the instance
+  PortalUser:
     Value: admin
     Description: Login username for the jambonz portal
   Password:
