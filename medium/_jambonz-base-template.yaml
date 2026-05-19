@@ -198,6 +198,13 @@ Parameters:
     Description: "Optional Krisp API key for noise isolation and turn taking"
     Type: String
     Default: ""
+  EnableOpenTelemetry:
+    Description: "Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
   WebMonitoringDiskSize:
     Description: "Disk size in GB for the Web/Monitoring server"
     Type: Number
@@ -988,6 +995,11 @@ Resources:
               mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/seed-production-database-open-source.sql
               JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
 
+              # insert schema version from api-server package.json
+              SCHEMA_VERSION=$(node -p "require('$HOME/apps/api-server/package.json').version")
+              echo "Setting schema_version to $SCHEMA_VERSION"
+              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e "INSERT INTO schema_version (version) VALUES ('$SCHEMA_VERSION')"
+
               # add row to system information table
               mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
 
@@ -1042,7 +1054,9 @@ Resources:
                     HOMER_PASSWORD: 'sipcapture',
                     JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
                     JAMBONZ_RECORD_WS_PASSWORD: '${!JWT_SECRET}',
-                    JAMBONES_DISABLE_TTS_STREAMING: true
+                    JAMBONES_DISABLE_TTS_STREAMING: true,
+                    JAMBONZ_UPDATE_CLIENT_TOKEN: '__JAMBONZ_UPDATE_CLIENT_TOKEN__',
+                    JAMBONZ_UPDATE_CLIENT_URL: 'http://127.0.0.1:3201'
                     },
                 },
                 {
@@ -1120,18 +1134,6 @@ Resources:
               }
               server {
                 listen 80;
-                server_name homer.${URLPortal}; 
-                location / {
-                  proxy_pass http://127.0.0.1:9080; 
-                  proxy_http_version 1.1;
-                  proxy_set_header Upgrade \$http_upgrade;
-                  proxy_set_header Connection 'upgrade';
-                  proxy_set_header Host \$host;
-                  proxy_cache_bypass \$http_upgrade;
-                }
-              }
-              server {
-                listen 80;
                 server_name public-apps.${URLPortal}; 
                 location / {
                   proxy_pass http://127.0.0.1:3011; 
@@ -1159,13 +1161,22 @@ Resources:
 
               sudo systemctl restart heplify-server.service
 
-              # restart cassandra and give it time to come up
-              echo "restarting cassandra.."
-              sudo systemctl restart cassandra.service        
-              sleep 60
-              echo "restarting jaeger"
-              sudo systemctl restart jaeger-collector.service
-              sudo systemctl restart jaeger-query.service
+              # Handle OpenTelemetry services
+              if [[ "${EnableOpenTelemetry}" == "true" ]]; then
+                echo "OpenTelemetry enabled - starting Cassandra and Jaeger"
+                sudo systemctl restart cassandra.service
+                sleep 60
+                sudo systemctl restart jaeger-collector.service
+                sudo systemctl restart jaeger-query.service
+              else
+                echo "OpenTelemetry disabled - disabling Cassandra and Jaeger services"
+                sudo systemctl stop cassandra.service || true
+                sudo systemctl disable cassandra.service
+                sudo systemctl stop jaeger-collector.service || true
+                sudo systemctl disable jaeger-collector.service
+                sudo systemctl stop jaeger-query.service || true
+                sudo systemctl disable jaeger-query.service
+              fi
 
               # configure upload_recordings service
               sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
@@ -1199,6 +1210,7 @@ Resources:
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS
               DeployRecordingCluster: !Ref DeployRecordingCluster
+              EnableOpenTelemetry: !Ref EnableOpenTelemetry
 
       Tags:
         -
@@ -1719,6 +1731,13 @@ Resources:
                     echo "Warning: No SSH keys found for $DEFAULT_USER"
                 fi
 
+                # Set OTEL_ENABLED based on EnableOpenTelemetry parameter
+                if [[ "${EnableOpenTelemetry}" == "true" ]]; then
+                  OTEL_ENABLED=1
+                else
+                  OTEL_ENABLED=0
+                fi
+
                 echo "writing $HOME/apps/ecosystem.config.js.."
 
                 cat << EOF > $HOME/apps/ecosystem.config.js
@@ -1748,7 +1767,7 @@ Resources:
                       STATS_PROTOCOL: 'tcp',
                       STATS_TELEGRAF: 1,
                       STATS_SAMPLE_RATE: 1,
-                      JAMBONES_OTEL_ENABLED: 1,
+                      JAMBONES_OTEL_ENABLED: $OTEL_ENABLED,
                       OTEL_EXPORTER_JAEGER_ENDPOINT: 'http://${WebMonitoringServerPrivateIP}:14268/api/traces',
                       OTEL_EXPORTER_OTLP_METRICS_INSECURE: 1,
                       OTEL_EXPORTER_JAEGER_GRPC_INSECURE: 1,
@@ -1828,7 +1847,9 @@ Resources:
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 WebMonitoringServerPrivateIP: !GetAtt WebMonitoringServerEC2.PrivateIp
-                RecordingWsBaseUrl: 
+                KrispApiKey: !Ref KrispApiKey
+                EnableOpenTelemetry: !Ref EnableOpenTelemetry
+                RecordingWsBaseUrl:
                   !If [
                     DeployRecordingClusterCondition,
                     !Sub "ws://${RecordingApplicationLoadBalancer.DNSName}",

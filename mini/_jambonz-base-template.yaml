@@ -86,6 +86,13 @@ Parameters:
     Description: "Optional Krisp API key for noise isolation and turn taking"
     Type: String
     Default: ""
+  EnableOpenTelemetry:
+    Description: "Install OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
 
 Conditions:
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
@@ -246,7 +253,9 @@ Resources:
               sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              
+              # fix path for Debian package install
+              sudo sed -i -e "s|/usr/local/bin/upload_recordings|/usr/bin/upload_recordings|g" /etc/systemd/system/upload_recordings.service
+
               # configure drachtio service
               sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=127.0.0.1/g" /etc/systemd/system/drachtio.service
               sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=admin/g" /etc/systemd/system/drachtio.service
@@ -263,17 +272,6 @@ Resources:
               sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=127.0.0.1/g" /etc/systemd/system/freeswitch.service
               sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/freeswitch.service
               sudo sed -i -e "s/KRISP_LICENSE_KEY=/KRISP_LICENSE_KEY=${KrispApiKey}/g" /etc/systemd/system/freeswitch.service
-
-              echo install rtpengine kernel module and iptables rule
-              if lsmod | grep -q xt_RTPENGINE; then
-                echo "xt_RTPENGINE module is already loaded."
-              else
-                echo "loading xt_RTPENGINE module."
-                modprobe xt_RTPENGINE
-                echo 'add 42' > /proc/rtpengine/control
-                iptables -I INPUT -p udp --dport 40000:60000 -j RTPENGINE --id 42
-              fi
-              echo "rtpengine module and iptables rule installed."
 
               # get instance metadata
               # this can take a few secs after the instance is created to attach EIP
@@ -299,6 +297,7 @@ Resources:
 
               # configure webapp with DNS name
               echo "VITE_API_BASE_URL=http://${URLPortal}/api/v1" > "$HOME/apps/webapp/.env"
+              echo "VITE_ENABLE_SYSTEM_UPDATES=true" >> "$HOME/apps/webapp/.env"
               API_BASE_URL=http://${URLPortal}/api/v1 TAG="<script>window.JAMBONZ = { API_BASE_URL: '$API_BASE_URL'};</script>"
               sed -i -e "\@</head>@i\ $TAG" $HOME/apps/webapp/dist/index.html
 
@@ -339,18 +338,6 @@ Resources:
                   proxy_cache_bypass \$http_upgrade;
                 }
               }
-              server {
-                listen 80;
-                server_name homer.${URLPortal};
-                location / {
-                  proxy_pass http://127.0.0.1:9080;
-                  proxy_http_version 1.1;
-                  proxy_set_header Upgrade \$http_upgrade;
-                  proxy_set_header Connection 'upgrade';
-                  proxy_set_header Host \$host;
-                  proxy_cache_bypass \$http_upgrade;
-                }
-              }
               EOF
 
               sudo systemctl restart nginx
@@ -376,24 +363,42 @@ Resources:
                 sudo sed -i -e "s/combine_logs: true/combine_logs: false/g" $HOME/apps/ecosystem.config.js 
               fi
 
-              sudo systemctl restart cassandra.service        
-              echo "waiting 60 secs for cassandra to start.."
-              sleep 60
-              echo "now start jaeger"
-
-              # restart jaeger 
-              sudo systemctl restart jaeger-collector.service
-              sudo systemctl restart jaeger-query.service
+              # Handle OpenTelemetry services
+              if [[ "${EnableOpenTelemetry}" == "true" ]]; then
+                echo "OpenTelemetry enabled - starting Cassandra and Jaeger"
+                sudo systemctl restart cassandra.service
+                echo "waiting 60 secs for cassandra to start.."
+                sleep 60
+                sudo systemctl restart jaeger-collector.service
+                sudo systemctl restart jaeger-query.service
+              else
+                echo "OpenTelemetry disabled - disabling Cassandra and Jaeger services"
+                sudo systemctl stop cassandra.service || true
+                sudo systemctl disable cassandra.service
+                sudo systemctl stop jaeger-collector.service || true
+                sudo systemctl disable jaeger-collector.service
+                sudo systemctl stop jaeger-query.service || true
+                sudo systemctl disable jaeger-query.service
+                # Disable OTEL in feature-server
+                sudo sed -i -e "s/JAMBONES_OTEL_ENABLED: 1/JAMBONES_OTEL_ENABLED: 0/g" $HOME/apps/ecosystem.config.js
+              fi
 
               # configure telegraf to send to local influxdb
               sudo sed -i -e "s/influxdb:8086/127.0.0.1:8086/g"  /etc/telegraf/telegraf.conf
               sudo systemctl restart telegraf
 
-              sudo -u $USER bash -c "pm2 restart $HOME/apps/ecosystem.config.js" 
-              sudo -u $USER bash -c "pm2 save"
-              sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
-              
+              # Configure and start jambonz-updater BEFORE pm2 so api-server has correct token
+              UPDATER_TOKEN=$(openssl rand -hex 32)
+              echo "$UPDATER_TOKEN" | sudo tee /etc/jambonz-updater/local-token > /dev/null
+              sudo chmod 0640 /etc/jambonz-updater/local-token
+              sudo sed -i "s/__JAMBONZ_UPDATE_CLIENT_TOKEN__/$UPDATER_TOKEN/g" /etc/systemd/system/jambonz-updater.service
+              sudo sed -i "s/__JAMBONZ_UPDATE_CLIENT_TOKEN__/$UPDATER_TOKEN/g" $HOME/apps/ecosystem.config.js
               sudo systemctl daemon-reload
+              sudo systemctl enable --now jambonz-updater
+
+              sudo -u $USER bash -c "pm2 delete $HOME/apps/ecosystem.config.js; pm2 start $HOME/apps/ecosystem.config.js; pm2 save"
+              sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+
               sudo systemctl enable upload_recordings
               sudo systemctl start upload_recordings
 
@@ -410,6 +415,8 @@ Resources:
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
               JWT_SECRET_ARN: !Ref EncryptionSecret
+              KrispApiKey: !Ref KrispApiKey
+              EnableOpenTelemetry: !Ref EnableOpenTelemetry
 
   jambonzSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -546,17 +553,11 @@ Outputs:
       - - 'http://grafana.'
         - !Ref URLPortal
     Description: URL for the grafana portal
-  HomerURL:
-    Value: !Join
-      - ''
-      - - 'http://homer.'
-        - !Ref URLPortal
-    Description: URL for the homer portal
   ServerIP:
     Value: !GetAtt 
       - jambonzInstance
       - PublicIp
-    Description: Server IP address - create DNS A records pointing to this IP for this domain as well as subdomains api, grafana, homer, and sip
+    Description: Server IP address - create DNS A records pointing to this IP for this domain as well as subdomains api, grafana, and sip
   User:
     Value: admin
     Description: Login username for the jambonz portal
