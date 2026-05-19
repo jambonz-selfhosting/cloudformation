@@ -10,14 +10,51 @@ Use this Cloudformation deployment for production workloads requiring high avail
 
 The large deployment creates:
 
-- **SBC SIP Auto Scaling Group** - Handles SIP signaling with drachtio
-- **SBC RTP Auto Scaling Group** - Handles RTP media with rtpengine
-- **Feature Server Auto Scaling Group** - Runs jambonz application logic with FreeSWITCH
-- **Web Server** - Hosts the portal, API, and public apps
-- **Monitoring Server** - Hosts Grafana, Homer, Jaeger, InfluxDB, and Cassandra
-- **Aurora Serverless v2** - MySQL database cluster
-- **ElastiCache** - Redis cluster for caching and pub/sub
-- **Optional Recording Cluster** - Auto-scaling recording servers behind an ALB
+- **SBC SIP Auto Scaling Group** - Handles SIP signaling with drachtio (public subnets)
+- **SBC RTP Auto Scaling Group** - Handles RTP media with rtpengine (public subnets)
+- **Feature Server Auto Scaling Group** - Runs jambonz application logic with FreeSWITCH (private subnets)
+- **Web Server** - Hosts the portal, API, and public apps (private subnet)
+- **Monitoring Server** - Hosts Grafana, Homer, Jaeger, InfluxDB, and Cassandra (private subnet)
+- **Aurora Serverless v2** - MySQL database cluster (private subnets)
+- **ElastiCache** - Redis cluster for caching and pub/sub (private subnets)
+- **Application Load Balancer** - Internet-facing ALB for web server access (public subnets)
+- **NAT Gateways** - Outbound internet access for private subnet resources
+- **Optional Recording Cluster** - Auto-scaling recording servers behind an internal ALB (private subnets)
+
+### Network Topology
+
+```
+                    Internet
+                       │
+              ┌────────┴────────┐
+              │   Internet GW   │
+              └────────┬────────┘
+                       │
+         ┌─────────────┼─────────────┐
+         │ Public Subnets             │
+         │  ┌──────────┐ ┌─────────┐ │
+         │  │ SBC SIP  │ │ SBC RTP │ │
+         │  │ servers  │ │ servers │ │
+         │  └──────────┘ └─────────┘ │
+         │  ┌──────────┐ ┌─────────┐ │
+         │  │ Web ALB  │ │ NAT GWs │ │
+         │  └──────────┘ └────┬────┘ │
+         └────────────────────┼──────┘
+                              │
+         ┌────────────────────┼──────┐
+         │ Private Subnets           │
+         │  ┌──────────────────────┐ │
+         │  │  Web Server EC2      │ │
+         │  │  Monitoring Server   │ │
+         │  │  Feature Servers     │ │
+         │  │  Recording Servers   │ │
+         │  │  Aurora MySQL        │ │
+         │  │  ElastiCache Redis   │ │
+         │  └──────────────────────┘ │
+         └───────────────────────────┘
+```
+
+Only SBC SIP and SBC RTP servers have public IP addresses. All other resources run in private subnets and reach the internet through NAT gateways. The web portal is accessed via an internet-facing Application Load Balancer.
 
 ## Prerequisites
 
@@ -42,12 +79,17 @@ The large deployment creates:
 | `ElastiCacheNodeType` | ElastiCache node type | cache.t3.medium |
 | `AuroraDBMinCapacity` | Aurora Serverless min ACU | 0.5 |
 | `AuroraDBMaxCapacity` | Aurora Serverless max ACU | 8 |
-| `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
-| `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
+| `AllowedSshCidr` | CIDR for SSH access to SBC servers | 0.0.0.0/0 |
+| `AllowedHttpCidr` | CIDR for HTTP/HTTPS access via ALB | 0.0.0.0/0 |
 | `AllowedSipCidr` | CIDR for SIP access | 0.0.0.0/0 |
 | `AllowedSmppCidr` | CIDR for SMPP access | 0.0.0.0/0 |
 | `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
 | `VpcCidr` | CIDR range for the VPC | 172.20.0.0/16 |
+| `PublicSubnetCIDR` | CIDR for the first public subnet | 172.20.0.0/24 |
+| `PublicSubnetCIDR2` | CIDR for the second public subnet | 172.20.10.0/24 |
+| `PrivateSubnetCIDR` | CIDR for the first private subnet | 172.20.20.0/24 |
+| `PrivateSubnetCIDR2` | CIDR for the second private subnet | 172.20.21.0/24 |
+| `SSLCertificateArn` | ACM Certificate ARN for HTTPS on the ALB (optional) | (empty) |
 | `MySQLUsername` | Database username | admin |
 | `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
@@ -84,6 +126,12 @@ aws cloudformation create-stack \
     ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
 
+To enable HTTPS on the ALB, provide an ACM certificate ARN:
+
+```bash
+    ParameterKey=SSLCertificateArn,ParameterValue=arn:aws:acm:us-west-2:123456789:certificate/abc-123
+```
+
 ## Monitor Stack Creation
 
 Wait for the stack to complete (this may take 15-20 minutes due to Aurora and ElastiCache):
@@ -109,7 +157,8 @@ aws cloudformation describe-stacks \
 
 Outputs include:
 - **WebPortalURL** - URL to access the jambonz web portal
-- **WebServerIP** - Public IP address of the Web server (for DNS records)
+- **WebserverALBDnsName** - ALB DNS name for the web server (for DNS records)
+- **WebServerPrivateIP** - Private IP of the web server
 - **SipServerIP** - Public IP address of the SBC SIP server (for SIP traffic)
 - **RtpServerIP** - Public IP address of the SBC RTP server (for RTP traffic)
 - **WebPortalUsername** - Admin username (always `admin`)
@@ -121,26 +170,29 @@ Outputs include:
 
 ### Create DNS records
 
-After the stack is created, create the following DNS A records:
+After the stack is created, create DNS records pointing to the **ALB DNS name** (CNAME or A-alias):
 
-**Pointing to WebServerIP:**
 - `my-domain.example.com`
 - `api.my-domain.example.com`
-- `grafana.my-domain.example.com`
-- `homer.my-domain.example.com`
 - `public-apps.my-domain.example.com`
 
-**Pointing to SipServerIP:**
+Create DNS records pointing to the **Monitoring server** (via ALB or internal access):
+
+- `grafana.my-domain.example.com`
+- `homer.my-domain.example.com`
+
+Create DNS A records pointing to **SipServerIP**:
+
 - `sip.my-domain.example.com`
 
 ### Enable HTTPS for the portal
 
-SSH into the Web server and install TLS certificates:
+If you provided an `SSLCertificateArn` parameter, the ALB will handle HTTPS termination automatically (port 80 redirects to 443).
 
-1. `ssh -i <yuour-ssh-keypair> jambonz@<WebServerIP>` - ssh into the server
-2. `sudo certbot --nginx` - generate TLS certs
-3. `cd ~/apps/webapp && vi .env` - edit the VITE_API_BASE_URL param to use https
-4. `npm run build && pm2 restart webapp` - restart the webapp under https
+If you did not provide a certificate, you can either:
+
+1. Create an ACM certificate and update the stack with the `SSLCertificateArn` parameter, or
+2. SSH into the Web server (see below) and configure certbot on nginx directly
 
 ## First time login
 
@@ -160,20 +212,23 @@ To acquire a license key go to [licensing.jambonz.org](https://licensing.jambonz
 aws cloudformation delete-stack --stack-name jambonz-large --region us-west-2
 ```
 
-Note that the RDS cluster has delete protection enabled, so you will need to disable that or else you will need to delete the cluster manually.
-
 **Note:**
-- The Elastic IPs have a `Retain` deletion policy and will not be deleted with the stack. You can manually release them after the stack is deleted.
-- The Aurora database has deletion protection enabled. You must disable it before deleting the stack.
+- The Aurora database has deletion protection enabled. You must disable it before deleting the stack:
+  ```bash
+  aws rds modify-db-cluster \
+    --db-cluster-identifier <cluster-id> \
+    --no-deletion-protection \
+    --region us-west-2
+  ```
+- The Elastic IPs have a `Retain` deletion policy and will not be released with the stack. Manually release them after the stack is deleted.
 
 ## SSH Access
 
-Connect to any instance as the `jambonz` user:
+Only the SBC servers (SIP and RTP) have public IP addresses. To reach servers in private subnets, use an SBC server as a bastion host with SSH agent forwarding.
+
+### Direct access to SBC servers
 
 ```bash
-# Web server
-ssh -i /path/to/keypair.pem jambonz@<WebServerIP>
-
 # SBC SIP server
 ssh -i /path/to/keypair.pem jambonz@<SipServerIP>
 
@@ -181,9 +236,31 @@ ssh -i /path/to/keypair.pem jambonz@<SipServerIP>
 ssh -i /path/to/keypair.pem jambonz@<RtpServerIP>
 ```
 
+### Bastion access to private subnet servers
+
+Use SSH agent forwarding (`-A`) to hop through an SBC server:
+
+```bash
+# First, add your key to the SSH agent
+ssh-add /path/to/keypair.pem
+
+# SSH to the Web server via the SBC SIP bastion
+ssh -A jambonz@<SipServerIP>
+# Then from the SBC:
+ssh jambonz@<WebServerPrivateIP>
+```
+
+Or use ProxyJump (`-J`) for a single command:
+
+```bash
+ssh -J jambonz@<SipServerIP> jambonz@<WebServerPrivateIP>
+```
+
+Feature servers, monitoring server, and recording servers can be reached the same way using their private IPs (visible in the EC2 console).
+
 ## Ports
 
-### SBC SIP Server
+### SBC SIP Server (public subnet)
 
 | Port | Protocol | Service |
 |------|----------|---------|
@@ -194,31 +271,38 @@ ssh -i /path/to/keypair.pem jambonz@<RtpServerIP>
 | 2775 | TCP | SMPP |
 | 3550 | TCP | SMPP TLS |
 
-### SBC RTP Server
+### SBC RTP Server (public subnet)
 
 | Port | Protocol | Service |
 |------|----------|---------|
 | 22 | TCP | SSH |
 | 40000-60000 | UDP | RTP |
 
-### Web Server
+### Web Server (private subnet)
 
 | Port | Protocol | Service |
 |------|----------|---------|
-| 22 | TCP | SSH |
+| 22 | TCP | SSH (via bastion) |
 | 80 | TCP | HTTP (nginx) |
 | 443 | TCP | HTTPS (nginx) |
 | 3000 | TCP | API Server |
 
-### Monitoring Server
+### Monitoring Server (private subnet)
 
 | Port | Protocol | Service |
 |------|----------|---------|
-| 22 | TCP | SSH |
+| 22 | TCP | SSH (via bastion) |
 | 3010 | TCP | Grafana |
 | 9080 | TCP | Homer |
 | 8086 | TCP | InfluxDB |
 | 16686 | TCP | Jaeger |
+
+### Web Server ALB (public)
+
+| Port | Protocol | Service |
+|------|----------|---------|
+| 80 | TCP | HTTP (forwards to nginx, or redirects to 443 if SSL configured) |
+| 443 | TCP | HTTPS (if SSLCertificateArn provided) |
 
 ## Scaling
 

@@ -154,6 +154,20 @@ Parameters:
     Description: "Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone"
     Type: "String"
     Default: '172.20.11.0/24'
+  PrivateSubnetCIDR:
+    Description: CIDR for the first private subnet
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Type: String
+    Default: 172.20.20.0/24
+  PrivateSubnetCIDR2:
+    Description: CIDR for the second private subnet
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    Type: String
+    Default: 172.20.21.0/24
+  SSLCertificateArn:
+    Description: "ACM Certificate ARN for HTTPS on the Application Load Balancer (leave empty for HTTP only)"
+    Type: String
+    Default: ""
   MySQLUsername:
     Description: 'the database username'
     Type: String
@@ -232,6 +246,7 @@ Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
+  HasSSLCertificate: !Not [!Equals [!Ref SSLCertificateArn, ""]]
 
   # Instance type conditions - use regional defaults when parameter is blank
   UseDefaultSbcSipInstanceType: !Equals [!Ref InstanceTypeSbcSip, ""]
@@ -393,6 +408,103 @@ Resources:
       SubnetId: !Ref "PublicSubnet2"
       RouteTableId: !Ref "PublicRouteTable2"
 
+  # Create Private Subnets
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnetCIDR
+      AvailabilityZone: !Select [ '0', !GetAZs ]
+      MapPublicIpOnLaunch: false
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnetCIDR2
+      AvailabilityZone: !Select [ '1', !GetAZs ]
+      MapPublicIpOnLaunch: false
+
+  # NAT Gateways for private subnet internet access
+  NatGatewayEIP1:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayToInternet
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat-eip-1'
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP1.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat-gw-1'
+
+  NatGatewayEIP2:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayToInternet
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat-eip-2'
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP2.AllocationId
+      SubnetId: !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat-gw-2'
+
+  # Private Route Tables
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-private-rt-1'
+
+  PrivateRouteNAT1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-private-rt-2'
+
+  PrivateRouteNAT2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  PrivateSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable1
+
+  PrivateSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable2
+
 
 ###########################################
 #
@@ -411,6 +523,22 @@ Resources:
           ToPort: 22
           CidrIp: !Ref AllowedSshCidr
           Description: Allow SSH access
+
+  PrivateInstanceSshSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-private-ssh-sg'
+      GroupDescription: Security group for SSH access to private instances via bastion
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref SshSecurityGroup
+          Description: Allow SSH from bastion (SBC) instances
+      Tags:
+       - Key: Name
+         Value: jambonz-private-ssh-sg
 
   RedisSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -495,11 +623,11 @@ Resources:
        - Key: Name
          Value: !Sub '${AWS::StackName}-feature-server-sg' 
  
-  WebserverSecurityGroup:
+  WebserverALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub '${AWS::StackName}-webserver-sg'
-      GroupDescription: !Sub 'Security group for ${AWS::StackName} WebServer'
+      GroupName: !Sub '${AWS::StackName}-webserver-alb-sg'
+      GroupDescription: Security group for the Webserver ALB
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -512,6 +640,32 @@ Resources:
           ToPort: 443
           CidrIp: !Ref AllowedHttpCidr
           Description: Allow HTTPS access
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-webserver-alb-sg'
+
+  WebserverSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-webserver-sg'
+      GroupDescription: !Sub 'Security group for ${AWS::StackName} WebServer'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref WebserverALBSecurityGroup
+          Description: Allow HTTP access from ALB
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref WebserverALBSecurityGroup
+          Description: Allow HTTPS access from ALB
         - IpProtocol: tcp
           FromPort: 3000
           ToPort: 3000
@@ -593,11 +747,26 @@ Resources:
           ToPort: 3001
           CidrIp:   !Ref AllowedHttpCidr
           Description: Allow http access from AWS SNS
+        - IpProtocol: tcp
+          FromPort: 2775
+          ToPort: 2775
+          CidrIp: !Ref AllowedSmppCidr
+          Description: Allow SMPP access
+        - IpProtocol: tcp
+          FromPort: 3550
+          ToPort: 3550
+          CidrIp: !Ref AllowedSmppCidr
+          Description: Allow SMPP over TLS access
+        - IpProtocol: tcp
+          FromPort: 3020
+          ToPort: 3020
+          SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
+          Description: Allow HTTP access to jambonz-smpp-esme from feature servers
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
           ToPort: 0
-          CidrIp: 0.0.0.0/0    
+          CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
           Value: !Sub '${AWS::StackName}-sbc-sip-sg'
@@ -770,7 +939,7 @@ Resources:
           Name: !Ref RecordingInstanceProfile
         SecurityGroupIds:
           - !Ref RecordingInstanceSecurityGroup
-          - !Ref SshSecurityGroup
+          - !Ref PrivateInstanceSshSecurityGroup
         BlockDeviceMappings:
           - DeviceName: /dev/xvda
             Ebs:
@@ -818,11 +987,11 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Condition: DeployRecordingClusterCondition
     Properties:
-      Name: !Sub "${AWS::StackName}-recording-alb"
-      Scheme: internet-facing
-      Subnets: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+      Name: !Sub "${AWS::StackName}-rec-alb"
+      Scheme: internal
+      Subnets:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
       SecurityGroups:
         - !Ref RecordingALBSecurityGroup
       LoadBalancerAttributes:
@@ -864,9 +1033,9 @@ Resources:
     Condition: DeployRecordingClusterCondition
     Properties:
       AutoScalingGroupName: !Sub "${AWS::StackName}-recording-asg"
-      VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
       LaunchTemplate:
         LaunchTemplateId: !Ref RecordingLaunchTemplate
         Version: !GetAtt RecordingLaunchTemplate.LatestVersionNumber
@@ -906,8 +1075,8 @@ Resources:
       DBSubnetGroupName: !Sub '${AWS::StackName}-aurora-mysql-subnetgroup'
       DBSubnetGroupDescription: CloudFormation managed DB subnet group.
       SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
 
   DatabaseCluster:
     Type: AWS::RDS::DBCluster
@@ -951,8 +1120,8 @@ Resources:
       CacheSubnetGroupName: !Sub '${AWS::StackName}-cache-subnetgroup'
       Description: !Sub '${AWS::StackName} Subnet Group'
       SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
 
   ElastiCacheParameterGroup:
     Type: AWS::ElastiCache::ParameterGroup
@@ -988,14 +1157,14 @@ Resources:
   MonitoringServerEC2:
     Type: 'AWS::EC2::Instance'
     Properties:
-      SubnetId: !Ref PublicSubnet1
+      SubnetId: !Ref PrivateSubnet1
       ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "MonitoringServerAmi"]
       InstanceType: !If
         - UseDefaultMonitoringServerInstanceType
         - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", MonitoringServerDefault]
         - !Ref InstanceTypeMonitoringServer
       SecurityGroupIds:
-        - Ref: SshSecurityGroup
+        - Ref: PrivateInstanceSshSecurityGroup
         - Ref: MonitoringSecurityGroup
       KeyName: !Ref KeyName
       Monitoring: true
@@ -1207,6 +1376,31 @@ Resources:
                 cat << EOF > $HOME/apps/ecosystem.config.js
                 module.exports = {
                   apps : [
+                  {
+                    name: 'jambonz-smpp-esme',
+                    cwd: '$HOME/apps/jambonz-smpp-esme',
+                    script: 'app.js',
+                    instance_var: 'INSTANCE_ID',
+                    out_file: '$HOME/.pm2/logs/jambonz-smpp-esme.log',
+                    err_file: '$HOME/.pm2/logs/jambonz-smpp-esme.log',
+                    exec_mode: 'fork',
+                    instances: 1,
+                    autorestart: true,
+                    watch: false,
+                    max_memory_restart: '1G',
+                    env: {
+                      JAMBONES_LOGLEVEL: 'info',
+                      JWT_SECRET: '${!JWT_SECRET}',
+                      JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_WRITE_HOST}',
+                      JAMBONES_MYSQL_USER: '${JAMBONES_MYSQL_USER}',
+                      JAMBONES_MYSQL_PASSWORD: '${JAMBONES_MYSQL_PASSWORD}',
+                      JAMBONES_MYSQL_DATABASE: 'jambones',
+                      JAMBONES_MYSQL_CONNECTION_LIMIT: 5,
+                      JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
+                      JAMBONES_REDIS_PORT: 6379,
+                      HTTP_PORT: 3020
+                    }
+                  },
                   {
                     name: 'sbc-sip-sidecar',
                     cwd: '$HOME/apps/sbc-sip-sidecar',
@@ -1562,9 +1756,9 @@ Resources:
           Name: !Ref FeatureServerInstanceProfile
         KeyName: !Ref KeyName
         NetworkInterfaces:
-          - AssociatePublicIpAddress: true
+          - AssociatePublicIpAddress: false
             Groups:
-              - Ref: SshSecurityGroup
+              - Ref: PrivateInstanceSshSecurityGroup
               - Ref: FeatureServerSecurityGroup
             DeviceIndex: 0
         BlockDeviceMappings:
@@ -1744,7 +1938,7 @@ Resources:
   FeatureServerAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     DependsOn:
-      - DatabaseInstance 
+      - DatabaseInstance
       - ElastiCacheCluster
     Properties:
       AutoScalingGroupName: !Sub '${AWS::StackName}-feature-server-autoscaling-group'
@@ -1756,9 +1950,9 @@ Resources:
       DesiredCapacity: 1
       TerminationPolicies:
       - OldestInstance
-      VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
       Tags:
         - 
           Key: Name
@@ -2076,25 +2270,6 @@ Resources:
 #      WebServer Instance
 #
 ###########################################
-  WebServerEIP:
-    Type: AWS::EC2::EIP
-    DeletionPolicy: Retain
-    Properties:
-      Domain: vpc
-      Tags:
-        -
-          Key: Name
-          Value: !Sub '${AWS::StackName}-webserver'
-        -
-          Key: Environment
-          Value: !Sub '${AWS::StackName}-webserver'
-
-  WebServerEIPAssociation:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      AllocationId: !GetAtt WebServerEIP.AllocationId
-      InstanceId: !Ref WebServerEC2
-
   # --- Web server EC2 IAM role
   WebServerIamRole:
     Type: AWS::IAM::Role
@@ -2151,11 +2326,11 @@ Resources:
 
   WebServerEC2:
     DependsOn:
-      - DatabaseInstance 
+      - DatabaseInstance
       - ElastiCacheCluster
     Type: 'AWS::EC2::Instance'
     Properties:
-      SubnetId: !Ref PublicSubnet1
+      SubnetId: !Ref PrivateSubnet1
       IamInstanceProfile: !Ref WebServerInstanceProfile
       ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "WebserverAmi"]
       InstanceType: !If
@@ -2163,14 +2338,14 @@ Resources:
         - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", WebserverDefault]
         - !Ref InstanceTypeWebserver
       Tags:
-        - 
+        -
           Key: Name
           Value: !Sub '${AWS::StackName}-webserver'
-        - 
+        -
           Key: Environment
           Value: !Sub '${AWS::StackName}-webserver'
       SecurityGroupIds:
-        - Ref: SshSecurityGroup
+        - Ref: PrivateInstanceSshSecurityGroup
         - Ref: WebserverSecurityGroup
       KeyName: !Ref KeyName
       Monitoring: true
@@ -2224,30 +2399,41 @@ Resources:
                   echo "Warning: No SSH keys found for $DEFAULT_USER"
               fi
 
-              # EIP is assigned via CloudFormation EIPAssociation, no need to run auto-assign script
-              PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
-              echo "webserver public IP is $PUBLIC_IP"
+              # Server is in private subnet behind ALB
+              PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+              echo "webserver private IP is $PRIVATE_IP"
 
-              echo "running jambonz web and monitoring server user data script"
-            
-              echo "seeding database.."
+              echo "running jambonz web server user data script"
+
+              # Check if database has been seeded (idempotent for stack updates)
               INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
-              DEFAULT_ACCOUNT_SID=$(uuidgen)
-              DEFAULT_TOKEN=$(uuidgen)
-              sudo sed -i "s/9351f46a-678c-43f5-b8a6-d4eb58d131af/$DEFAULT_ACCOUNT_SID/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              sudo sed -i "s/38700987-c7a4-4685-a5bb-af378f9734de/$DEFAULT_TOKEN/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/jambones-sql.sql
-              sudo sed -i 's/public-apps.jambonz.cloud/public-apps.${URLPortal}/g' $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
+              TABLE_COUNT=$(mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'jambones';" 2>/dev/null || echo "0")
 
-              # insert schema version from api-server package.json
-              SCHEMA_VERSION=$(node -p "require('$HOME/apps/api-server/package.json').version")
-              echo "Setting schema_version to $SCHEMA_VERSION"
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e "INSERT INTO schema_version (version) VALUES ('$SCHEMA_VERSION')"
+              if [ "$TABLE_COUNT" -eq "0" ] 2>/dev/null; then
+                echo "seeding database (first-time deployment).."
+                DEFAULT_ACCOUNT_SID=$(uuidgen)
+                DEFAULT_TOKEN=$(uuidgen)
+                sudo sed -i "s/9351f46a-678c-43f5-b8a6-d4eb58d131af/$DEFAULT_ACCOUNT_SID/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                sudo sed -i "s/38700987-c7a4-4685-a5bb-af378f9734de/$DEFAULT_TOKEN/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/jambones-sql.sql
+                sudo sed -i 's/public-apps.jambonz.cloud/public-apps.${URLPortal}/g' $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
 
-              # add row to system information table 
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+                # insert schema version from api-server package.json
+                SCHEMA_VERSION=$(node -p "require('$HOME/apps/api-server/package.json').version")
+                echo "Setting schema_version to $SCHEMA_VERSION"
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e "INSERT INTO schema_version (version) VALUES ('$SCHEMA_VERSION')"
+
+                # add row to system information table
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+
+                echo "Database seeded with schema version: $SCHEMA_VERSION"
+              else
+                echo "Database already has $TABLE_COUNT tables, running migrations.."
+                JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones node $HOME/apps/api-server/db/upgrade-jambonz-db.js || true
+                echo "Database migration complete"
+              fi
 
               # jambonz webapp
               echo "configuring webapp.."
@@ -2443,6 +2629,68 @@ Resources:
               DbCachingTTS: !Ref DbCachingTTS
               DeployRecordingCluster: !Ref DeployRecordingCluster
 
+  WebserverApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${AWS::StackName}-web-alb"
+      Scheme: internet-facing
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref WebserverALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-webserver-alb"
+
+  WebserverTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AWS::StackName}-web-tg"
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "80"
+      HealthCheckPath: "/"
+      TargetType: instance
+      Targets:
+        - Id: !Ref WebServerEC2
+          Port: 80
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-webserver-tg"
+
+  WebserverALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref WebserverApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - !If
+          - HasSSLCertificate
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: "443"
+              StatusCode: HTTP_301
+          - Type: forward
+            TargetGroupArn: !Ref WebserverTargetGroup
+
+  WebserverALBListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasSSLCertificate
+    Properties:
+      LoadBalancerArn: !Ref WebserverApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebserverTargetGroup
+
 Outputs: 
   WebPortalURL:
     Description: jambonz portal URL, log in with admin/admin and change password
@@ -2466,11 +2714,12 @@ Outputs:
     Value: admin
     Description: Initial password for grafana portal; you will be forced to change it on first login.
 
-  WebServerIP:
-    Value: !GetAtt 
-      - WebServerEIP
-      - PublicIp
-    Description: Webserver IP address - create a DNS record for this domain as well as subdomains grafana, homer, and jaeger
+  WebserverALBDnsName:
+    Value: !GetAtt WebserverApplicationLoadBalancer.DNSName
+    Description: ALB DNS name for the web server - create a CNAME or A-alias DNS record pointing your domain to this address
+  WebServerPrivateIP:
+    Value: !GetAtt WebServerEC2.PrivateIp
+    Description: Private IP of the web server (for reference)
 
   SipServerIP:
     Value: !GetAtt
