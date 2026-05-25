@@ -972,7 +972,7 @@ Resources:
                 sudo systemctl enable upload_recordings
                 sudo systemctl start upload_recordings
 
-                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g" /etc/telegraf/telegraf.conf
+                echo "JAMBONES_INFLUX_URL=http://${MONITORING_SERVER_IP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
                 sudo systemctl restart telegraf
 
 
@@ -1570,8 +1570,8 @@ Resources:
                 echo "finished writing config file"
 
                 echo "restarting telegraf"
-                # configure telegraph to send to the monitoring server
-                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+                # point telegraf at the monitoring server's InfluxDB
+                echo "JAMBONES_INFLUX_URL=http://${MONITORING_SERVER_IP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
                 sudo systemctl restart telegraf
 
                 if [[ "${EnablePcaps}" == "true" ]]; then
@@ -1895,8 +1895,8 @@ Resources:
                 sudo -u $USER bash -c "pm2 save"
                 sudo systemctl enable pm2-$USER.service
 
-                # configure telegraph to send to the monitoring server
-                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+                # point telegraf at the monitoring server's InfluxDB
+                echo "JAMBONES_INFLUX_URL=http://${MONITORING_SERVER_IP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
                 sudo systemctl restart telegraf
 
                 # enable cloudwatch
@@ -2179,8 +2179,8 @@ Resources:
                 sudo -u $USER bash -c "pm2 save"
                 sudo systemctl enable pm2-$USER.service
 
-                # configure telegraph to send to the monitoring server
-                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+                # point telegraf at the monitoring server's InfluxDB
+                echo "JAMBONES_INFLUX_URL=http://${MONITORING_SERVER_IP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
                 sudo systemctl restart telegraf
 
                 # point rtpengine to the HEP endpoint on the monitoring server
@@ -2527,8 +2527,8 @@ Resources:
               sudo -u $USER bash -c "pm2 save"
               sudo systemctl enable pm2-$USER.service
             
-              # configure telegraph to send to the monitoring server
-              sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g"  /etc/telegraf/telegraf.conf
+              # point telegraf at the monitoring server's InfluxDB
+              echo "JAMBONES_INFLUX_URL=http://${MONITORING_SERVER_IP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
               sudo systemctl restart telegraf
                                         
               sudo cat << EOF > /etc/nginx/sites-available/default 
