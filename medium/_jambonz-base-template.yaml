@@ -700,7 +700,7 @@ Resources:
                 sudo systemctl enable upload_recordings
                 sudo systemctl start upload_recordings
 
-                sudo sed -i -e "s/influxdb:8086/${MONITORING_SERVER_IP}:8086/g" /etc/telegraf/telegraf.conf
+                echo "JAMBONES_INFLUX_URL=http://${MONITORING_SERVER_IP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
                 sudo systemctl restart telegraf
 
               - JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
@@ -1093,12 +1093,8 @@ Resources:
               sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
               sudo -u $USER bash -c "pm2 save"
               sudo systemctl enable pm2-$USER.service
-            
-              # configure telegraph to send to the monitoring server (which is local)
-              sudo sed -i -e "s/influxdb:8086/127.0.0.1:8086/g"  /etc/telegraf/telegraf.conf
-              sudo systemctl restart telegraf
-                                        
-              sudo cat << EOF > $NGINX_CONFIG 
+
+              sudo cat << EOF > $NGINX_CONFIG
               server {
                   listen 80;
                   server_name ${URLPortal};
@@ -1543,8 +1539,8 @@ Resources:
                 echo "finished writing config file"
 
                 echo "restarting telegraf"
-                # configure telegraph to send to the monitoring server
-                sudo sed -i -e "s/influxdb:8086/${WebMonitoringServerPrivateIP}:8086/g"  /etc/telegraf/telegraf.conf
+                # point telegraf at the monitoring server's InfluxDB
+                echo "JAMBONES_INFLUX_URL=http://${WebMonitoringServerPrivateIP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
                 sudo systemctl restart telegraf
 
                 # point rtpengine to the HEP endpoint on the monitoring server
@@ -1814,8 +1810,8 @@ Resources:
                 sudo systemctl daemon-reload
                 sudo systemctl restart freeswitch
 
-                # configure telegraph to send to the monitoring server
-                sudo sed -i -e "s/influxdb:8086/${WebMonitoringServerPrivateIP}:8086/g"  /etc/telegraf/telegraf.conf
+                # point telegraf at the monitoring server's InfluxDB
+                echo "JAMBONES_INFLUX_URL=http://${WebMonitoringServerPrivateIP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
                 sudo systemctl restart telegraf
 
                 sudo -u $USER bash -c "pm2 start $HOME/apps/ecosystem.config.js"
