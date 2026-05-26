@@ -951,6 +951,26 @@ Resources:
             Fn::Sub:
               - |
                 #!/bin/bash
+                # Set default user based on OS
+                if grep -q 'ID="rhel"' /etc/os-release; then
+                    DEFAULT_USER=ec2-user
+                else
+                    DEFAULT_USER=admin
+                fi
+
+                # Sync SSH keys from default user to jambonz user
+                echo "Syncing SSH keys to jambonz user..."
+                if [ -f "/home/$DEFAULT_USER/.ssh/authorized_keys" ] && [ -s "/home/$DEFAULT_USER/.ssh/authorized_keys" ]; then
+                    mkdir -p /home/jambonz/.ssh
+                    cp "/home/$DEFAULT_USER/.ssh/authorized_keys" /home/jambonz/.ssh/
+                    chown -R jambonz:jambonz /home/jambonz/.ssh
+                    chmod 700 /home/jambonz/.ssh
+                    chmod 600 /home/jambonz/.ssh/authorized_keys
+                    echo "SSH keys copied from $DEFAULT_USER to jambonz"
+                else
+                    echo "Warning: No SSH keys found for $DEFAULT_USER"
+                fi
+
                 # Fetch JWT_SECRET from Secrets Manager
                 JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
