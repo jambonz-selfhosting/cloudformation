@@ -383,10 +383,6 @@ Resources:
                 sudo sed -i -e "s/JAMBONES_OTEL_ENABLED: 1/JAMBONES_OTEL_ENABLED: 0/g" $HOME/apps/ecosystem.config.js
               fi
 
-              # configure telegraf to send to local influxdb
-              sudo sed -i -e "s/influxdb:8086/127.0.0.1:8086/g"  /etc/telegraf/telegraf.conf
-              sudo systemctl restart telegraf
-
               # Configure and start jambonz-updater BEFORE pm2 so api-server has correct token
               UPDATER_TOKEN=$(openssl rand -hex 32)
               echo "$UPDATER_TOKEN" | sudo tee /etc/jambonz-updater/local-token > /dev/null
