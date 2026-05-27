@@ -1003,25 +1003,34 @@ Resources:
               echo "web+monitoring server public IP is $PUBLIC_IP"
 
               echo "running jambonz web and monitoring server user data script"
-            
-              echo "seeding database.."
+
               INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
-              DEFAULT_ACCOUNT_SID=$(uuidgen)
-              DEFAULT_TOKEN=$(uuidgen)
-              sudo sed -i "s/9351f46a-678c-43f5-b8a6-d4eb58d131af/$DEFAULT_ACCOUNT_SID/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              sudo sed -i "s/38700987-c7a4-4685-a5bb-af378f9734de/$DEFAULT_TOKEN/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/jambones-sql.sql
-              sudo sed -i 's/public-apps.jambonz.cloud/public-apps.${URLPortal}/g' $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/seed-production-database-open-source.sql
-              JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
 
-              # insert schema version from api-server package.json
-              SCHEMA_VERSION=$(node -p "require('$HOME/apps/api-server/package.json').version")
-              echo "Setting schema_version to $SCHEMA_VERSION"
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e "INSERT INTO schema_version (version) VALUES ('$SCHEMA_VERSION')"
+              # check if database already has tables (i.e. not a fresh deployment)
+              TABLE_COUNT=$(mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='jambones'")
 
-              # add row to system information table
-              mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+              if [ "$TABLE_COUNT" -eq 0 ]; then
+                echo "seeding database (first-time deployment).."
+                DEFAULT_ACCOUNT_SID=$(uuidgen)
+                DEFAULT_TOKEN=$(uuidgen)
+                sudo sed -i "s/9351f46a-678c-43f5-b8a6-d4eb58d131af/$DEFAULT_ACCOUNT_SID/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                sudo sed -i "s/38700987-c7a4-4685-a5bb-af378f9734de/$DEFAULT_TOKEN/g" $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/jambones-sql.sql
+                sudo sed -i 's/public-apps.jambonz.cloud/public-apps.${URLPortal}/g' $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} < $HOME/apps/api-server/db/seed-production-database-open-source.sql
+                JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
+
+                # add row to system information table
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+
+                # record the schema version so upgrade-jambonz-db.js knows the DB is initialized
+                SCHEMA_VERSION=$(node -p "require('$HOME/apps/api-server/package.json').version")
+                echo "Setting schema_version to $SCHEMA_VERSION"
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e "INSERT INTO schema_version (version) VALUES ('$SCHEMA_VERSION')"
+              else
+                echo "database already exists, running migrations.."
+                JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones node $HOME/apps/api-server/db/upgrade-jambonz-db.js
+              fi
 
               # jambonz webapp
               echo "configuring webapp.."
