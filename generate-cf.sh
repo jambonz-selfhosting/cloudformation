@@ -347,6 +347,9 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
 
     echo "  Starting copy: $AMI_TYPE ($PUBLIC_AMI_ID) version $VERSION..."
 
+    # Temporarily disable set -e for copy command to capture error details
+    set +e
+
     # Copy the AMI
     COPY_RESULT=$(aws ec2 copy-image \
         --region "$REGION" \
@@ -375,6 +378,9 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
 
         exit 1
     fi
+
+    # Re-enable set -e
+    set -e
 
     NEW_AMI_ID=$(echo "$COPY_RESULT" | yq -p json '.ImageId')
     NEW_AMI_IDS+=("$NEW_AMI_ID")
