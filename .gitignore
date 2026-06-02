@@ -1,6 +1,7 @@
 CLAUDE.md
 .vscode
 OTEL-PLAN.md
+scripts
 
 # Generated CloudFormation templates (user-specific, not committed)
 jambonz-mini-*.yaml
