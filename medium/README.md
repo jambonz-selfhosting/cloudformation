@@ -45,6 +45,12 @@ The medium deployment creates:
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
 | `DeployRecordingCluster` | Deploy optional recording cluster | yes |
+| `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
+| `EnableEBSEncryption` | Encrypt all EBS volumes | no |
+| `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
+| `DbCachingTTS` | Seconds to cache DB query results (0=no caching) | 0 |
+| `RecordingInstanceType` | EC2 instance type for Recording servers | (region default) |
+| `WebMonitoringDiskSize` | Disk size in GB for Web/Monitoring server | 200 |
 
 ## Generate and Deploy
 

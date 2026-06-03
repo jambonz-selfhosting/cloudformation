@@ -25,6 +25,9 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
 | `URLPortal` | DNS name for the portal | (required) |
+| `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
+| `EnableEBSEncryption` | Encrypt all EBS volumes | true |
+| `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
 
 ## Generate and Deploy
 
