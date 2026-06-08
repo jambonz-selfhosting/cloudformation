@@ -385,6 +385,7 @@ Resources:
 
               # Configure and start jambonz-updater BEFORE pm2 so api-server has correct token
               UPDATER_TOKEN=$(openssl rand -hex 32)
+              sudo mkdir -p /etc/jambonz-updater
               echo "$UPDATER_TOKEN" | sudo tee /etc/jambonz-updater/local-token > /dev/null
               sudo chmod 0640 /etc/jambonz-updater/local-token
               sudo sed -i "s/__JAMBONZ_UPDATE_CLIENT_TOKEN__/$UPDATER_TOKEN/g" /etc/systemd/system/jambonz-updater.service
