@@ -1815,7 +1815,7 @@ Resources:
                       DRACHTIO_PORT: 9022,
                       DRACHTIO_SECRET: 'cymru',
                       JAMBONES_FEATURE_SERVERS: '127.0.0.1:9022:cymru',
-                      JAMBONES_FREESWITCH: '127.0.0.1:8021:JambonzR0ck$',
+                      JAMBONES_MEDIAJAM: '127.0.0.1:8021',
                       AUTHENTICATION_KEY: '${!JWT_SECRET}',
                       JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
                       JAMBONZ_RECORD_WS_PASSWORD: '${!JWT_SECRET}',
@@ -1827,17 +1827,14 @@ Resources:
 
                 echo "finished writing config file"
 
-                # configure freeswitch service
-                sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/freeswitch.service
-                sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/freeswitch.service
-                sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/freeswitch.service
-                sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/freeswitch.service
-                sudo sed -i -e "s/JAMBONES_REDIS_HOST=/JAMBONES_REDIS_HOST=${JAMBONES_REDIS_HOST}/g" /etc/systemd/system/freeswitch.service
-                sudo sed -i -e "s/JAMBONES_REDIS_PORT=/JAMBONES_REDIS_PORT=6379/g" /etc/systemd/system/freeswitch.service
-                sudo sed -i -e "s/KRISP_LICENSE_KEY=/KRISP_LICENSE_KEY=${KrispApiKey}/g" /etc/systemd/system/freeswitch.service
+                # configure mediajam media server (replaces freeswitch)
+                # mediajam doesn't use MySQL; redis is for the license loader.
+                sudo sed -i -e "s|^KRISP_API_KEY=.*|KRISP_API_KEY=${KrispApiKey}|" /etc/default/mediajam
+                sudo sed -i -e "s|^#\?JAMBONES_REDIS_HOST=.*|JAMBONES_REDIS_HOST=${JAMBONES_REDIS_HOST}|" /etc/default/mediajam
+                sudo sed -i -e "s|^#\?JAMBONES_REDIS_PORT=.*|JAMBONES_REDIS_PORT=6379|" /etc/default/mediajam
 
                 sudo systemctl daemon-reload
-                sudo systemctl restart freeswitch
+                sudo systemctl restart mediajam
 
                 # point telegraf at the monitoring server's InfluxDB
                 echo "JAMBONES_INFLUX_URL=http://${WebMonitoringServerPrivateIP}:8086" | sudo tee -a /etc/default/telegraf > /dev/null
