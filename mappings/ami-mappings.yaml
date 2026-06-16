@@ -25,7 +25,7 @@ mini:
   mx-central-1:
     MiniAmi: ami-012186d42a77a6db7
   eu-central-1:
-    MiniAmi: ami-00722cf0a042dcaa6
+    MiniAmi: ami-0fed319be63c1075f
   eu-central-2:
     MiniAmi: ami-017d5fd1c7aca1cb3
   eu-west-1:
