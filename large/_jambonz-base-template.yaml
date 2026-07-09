@@ -482,8 +482,8 @@ Resources:
           CidrIp: !Ref VpcCidr
           Description: Allow sip from VPC
         - IpProtocol: udp
-          FromPort: 25000
-          ToPort: 40000
+          FromPort: 16000
+          ToPort: 32000
           CidrIp: !Ref VpcCidr
           Description: rtp
       SecurityGroupEgress:

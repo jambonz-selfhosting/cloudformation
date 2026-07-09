@@ -29,6 +29,12 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `EnableEBSEncryption` | Encrypt all EBS volumes | true |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
 
+> **Instance type / architecture:** leave `InstanceType` blank to use the region-optimized
+> default for the architecture you select in `generate-cf.sh`. For amd64 that is `c5n.large`
+> (or `c5`/`t3` where `c5n` is unavailable); for arm64 (Graviton) it is `c7gn`/`c7g`/`t4g`/`c6g`
+> depending on regional availability. If you set `InstanceType` explicitly, match it to the
+> selected architecture. arm64 availability is region-dependent — see the top-level README.
+
 ## Generate and Deploy
 
 First, generate the CloudFormation template:
@@ -36,7 +42,7 @@ First, generate the CloudFormation template:
 ```bash
 cd ..  # Go to project root
 ./generate-cf.sh
-# Follow prompts to select 'mini' and your region
+# Follow prompts to select 'mini', the CPU architecture (amd64/arm64), and your region
 # Wait for AMI copy to complete
 ```
 
@@ -45,7 +51,7 @@ Then deploy the generated template:
 ```bash
 aws cloudformation create-stack \
   --stack-name jambonz-mini \
-  --template-body file://jambonz-mini-us-west-2.yaml \
+  --template-body file://jambonz-mini-us-west-2-amd64.yaml \
   --capabilities CAPABILITY_IAM \
   --region us-west-2 \
   --parameters \
