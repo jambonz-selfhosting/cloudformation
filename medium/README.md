@@ -52,6 +52,12 @@ The medium deployment creates:
 | `RecordingInstanceType` | EC2 instance type for Recording servers | (region default) |
 | `WebMonitoringDiskSize` | Disk size in GB for Web/Monitoring server | 200 |
 
+> **Instance type / architecture:** the `InstanceType*` defaults shown above (`c5n.xlarge`)
+> are the amd64 region defaults; leave them blank to use the region-optimized default for the
+> architecture you select in `generate-cf.sh`. arm64 (Graviton) uses `c7gn`/`c7g`/`t4g`/`c6g`
+> depending on regional availability. If you set an instance type explicitly, match it to the
+> selected architecture. arm64 availability is region-dependent — see the top-level README.
+
 ## Generate and Deploy
 
 First, generate the CloudFormation template:
@@ -59,7 +65,7 @@ First, generate the CloudFormation template:
 ```bash
 cd ..  # Go to project root
 ./generate-cf.sh
-# Follow prompts to select 'medium' and your region
+# Follow prompts to select 'medium', the CPU architecture (amd64/arm64), and your region
 # Wait for AMI copy to complete
 ```
 
@@ -68,7 +74,7 @@ The generated template exceeds the 51,200 byte limit for inline `--template-body
 ```bash
 # Upload template to S3 (create bucket if needed)
 aws s3 mb s3://my-cf-templates-bucket --region us-west-2
-aws s3 cp jambonz-medium-us-west-2.yaml s3://my-cf-templates-bucket/jambonz-medium.yaml
+aws s3 cp jambonz-medium-us-west-2-amd64.yaml s3://my-cf-templates-bucket/jambonz-medium.yaml
 
 # Deploy using --template-url
 aws cloudformation create-stack \

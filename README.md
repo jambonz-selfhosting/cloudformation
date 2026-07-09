@@ -52,25 +52,36 @@ The script will:
 1. Verify AWS CLI is installed and credentials are configured
 2. Prompt you to select:
    - Deployment size (mini/medium/large)
-   - AWS region
+   - CPU architecture (amd64/x86_64 or arm64/Graviton; default amd64)
+   - AWS region (only regions that have an AMI for the chosen architecture are listed)
 3. Copy the required public jambonz AMIs to your AWS account (typically takes 5-15 minutes)
 4. Show progress updates every 30 seconds
-5. Generate a CloudFormation template in the project root (e.g., `jambonz-mini-us-east-1.yaml`)
+5. Generate a CloudFormation template in the project root (e.g., `jambonz-mini-us-east-1-amd64.yaml`)
 
 **Why copy AMIs?**
 - You own the AMIs in your account (no dependency on public AMIs)
 - You can customize AMIs if needed
 - Protection against public AMI lifecycle changes
 
+**Note on architecture (arm64 / Graviton):**
+- arm64 (Graviton) instances are typically cheaper than the equivalent x86_64 instances.
+- arm64 availability is **region-dependent**: not every region has arm64 AMIs published,
+  and the region-optimized instance-type default varies by region (network-optimized
+  `c7gn` where available, otherwise `c7g`, `t4g`, or `c6g`). The script only offers
+  regions that have an AMI for the architecture you pick.
+- If you override the instance type manually (via the `InstanceType*` parameters), make
+  sure the type you choose matches the architecture you selected (e.g. don't pass an
+  x86_64 `c5.xlarge` to an arm64 stack).
+
 ### Step 2: Deploy CloudFormation Stack
 
 After the script completes, deploy using the generated template:
 
 ```bash
-# Example for mini deployment in us-east-1
+# Example for mini deployment in us-east-1 (amd64)
 aws cloudformation create-stack \
   --stack-name jambonz-mini \
-  --template-body file://jambonz-mini-us-east-1.yaml \
+  --template-body file://jambonz-mini-us-east-1-amd64.yaml \
   --capabilities CAPABILITY_IAM \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
@@ -81,7 +92,7 @@ aws cloudformation create-stack \
 Or deploy via AWS Console:
 1. Navigate to CloudFormation service
 2. Click "Create stack"
-3. Upload the generated template (e.g., `jambonz-mini-us-east-1.yaml`)
+3. Upload the generated template (e.g., `jambonz-mini-us-east-1-amd64.yaml`)
 4. Follow the wizard to configure parameters
 
 ## Architecture Comparison
@@ -126,14 +137,14 @@ Copying AMIs to your AWS account gives you ownership and control:
 
 ### Can I generate templates for multiple regions?
 
-Yes! The generated templates are named `jambonz-{size}-{region}.yaml`, so you can have multiple regions simultaneously:
+Yes! The generated templates are named `jambonz-{size}-{region}-{arch}.yaml`, so you can have multiple regions (and architectures) simultaneously:
 
 ```bash
-./generate-cf.sh  # Generate for us-east-1
-# Creates: jambonz-mini-us-east-1.yaml
+./generate-cf.sh  # Generate for us-east-1, amd64
+# Creates: jambonz-mini-us-east-1-amd64.yaml
 
-./generate-cf.sh  # Generate for eu-west-1
-# Creates: jambonz-mini-eu-west-1.yaml
+./generate-cf.sh  # Generate for eu-west-1, arm64
+# Creates: jambonz-mini-eu-west-1-arm64.yaml
 
 # Both files coexist in the project root
 ```

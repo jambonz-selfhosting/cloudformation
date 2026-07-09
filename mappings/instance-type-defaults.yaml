@@ -1,468 +1,1071 @@
 # Instance type defaults per region for jambonz CloudFormation templates
 # These defaults are based on AWS instance type availability per region
 #
+# Structure: instance-types-<size>.<region>.<arch>.<RoleDefault>
+#   amd64: x86_64 tiering  c5n -> c5 -> t3
+#   arm64: Graviton tiering c7gn -> c7g -> t4g, with c6g (Graviton2)
+#          fallback where none of those exist (e.g. me-central-1).
+#          Recording role uses the burstable tier (t4g, or c6g fallback).
+#          arm64 values are resolved against live instance-type availability.
+#
 # For AMI mappings, see ami-mappings.yaml
 
-# Instance type defaults per region
 instance-types-mini:
-  # Regions with c5n support (majority)
   us-east-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7gn.large
   us-east-2:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7gn.large
   us-west-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   us-west-2:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7gn.large
   ca-central-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   sa-east-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   eu-central-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   eu-west-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7gn.large
   eu-west-2:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   eu-west-3:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   eu-north-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   eu-south-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   ap-south-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   ap-east-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   ap-southeast-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   ap-southeast-2:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   ap-southeast-5:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   ap-northeast-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7gn.large
   ap-northeast-2:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   ap-northeast-3:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   me-south-1:
-    MiniDefault: c5n.large
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   af-south-1:
-    MiniDefault: c5n.large
-  # Regions WITHOUT c5n but WITH c5
+    amd64:
+      MiniDefault: c5n.large
+    arm64:
+      MiniDefault: c7g.large
   me-central-1:
-    MiniDefault: c5.large
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: c6g.large
   il-central-1:
-    MiniDefault: c5.large
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: c7g.large
   ap-south-2:
-    MiniDefault: c5.large
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: c7g.large
   eu-central-2:
-    MiniDefault: c5.large
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: c7g.large
   eu-south-2:
-    MiniDefault: c5.large
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: c7g.large
   ap-southeast-3:
-    MiniDefault: c5.large
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: c7g.large
   ap-southeast-4:
-    MiniDefault: c5.large
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: t4g.large
   ca-west-1:
-    MiniDefault: c5.large
-  # Regions WITHOUT c5 or c5n
+    amd64:
+      MiniDefault: c5.large
+    arm64:
+      MiniDefault: c7g.large
   ap-east-2:
-    MiniDefault: t3.large
+    amd64:
+      MiniDefault: t3.large
+    arm64:
+      MiniDefault: t4g.large
   mx-central-1:
-    MiniDefault: t3.large
+    amd64:
+      MiniDefault: t3.large
+    arm64:
+      MiniDefault: t4g.large
+  ap-southeast-6:
+    amd64:
+      MiniDefault: t3.large
+    arm64:
+      MiniDefault: t4g.large
+  ap-southeast-7:
+    amd64:
+      MiniDefault: t3.large
+    arm64:
+      MiniDefault: t4g.large
 
 instance-types-medium:
-  # Regions with c5n support (majority)
   us-east-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7gn.xlarge
+      WebMonitoringDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   us-east-2:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7gn.xlarge
+      WebMonitoringDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   us-west-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   us-west-2:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7gn.xlarge
+      WebMonitoringDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   ca-central-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   sa-east-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-central-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-west-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7gn.xlarge
+      WebMonitoringDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-west-2:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-west-3:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-north-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-south-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-south-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-east-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-2:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-5:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-northeast-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7gn.xlarge
+      WebMonitoringDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-northeast-2:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-northeast-3:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   me-south-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   af-south-1:
-    SbcDefault: c5n.xlarge
-    WebMonitoringDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
-  # Regions WITHOUT c5n but WITH c5
+    amd64:
+      SbcDefault: c5n.xlarge
+      WebMonitoringDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   me-central-1:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c6g.xlarge
+      WebMonitoringDefault: c6g.xlarge
+      FeatureServerDefault: c6g.xlarge
+      RecordingServerDefault: c6g.xlarge
   il-central-1:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-south-2:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-central-2:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-south-2:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-3:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-4:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: t4g.xlarge
+      WebMonitoringDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ca-west-1:
-    SbcDefault: c5.xlarge
-    WebMonitoringDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
-  # Regions WITHOUT c5 or c5n
+    amd64:
+      SbcDefault: c5.xlarge
+      WebMonitoringDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-east-2:
-    SbcDefault: t3.xlarge
-    WebMonitoringDefault: t3.xlarge
-    FeatureServerDefault: t3.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: t3.xlarge
+      WebMonitoringDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: t4g.xlarge
+      WebMonitoringDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
   mx-central-1:
-    SbcDefault: t3.xlarge
-    WebMonitoringDefault: t3.xlarge
-    FeatureServerDefault: t3.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcDefault: t3.xlarge
+      WebMonitoringDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: t4g.xlarge
+      WebMonitoringDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
+  ap-southeast-6:
+    amd64:
+      SbcDefault: t3.xlarge
+      WebMonitoringDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: t4g.xlarge
+      WebMonitoringDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
+  ap-southeast-7:
+    amd64:
+      SbcDefault: t3.xlarge
+      WebMonitoringDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcDefault: t4g.xlarge
+      WebMonitoringDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
 
 instance-types-large:
-  # Regions with c5n support (majority)
   us-east-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7gn.xlarge
+      SbcRtpDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      WebserverDefault: c7gn.xlarge
+      MonitoringServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   us-east-2:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7gn.xlarge
+      SbcRtpDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      WebserverDefault: c7gn.xlarge
+      MonitoringServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   us-west-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   us-west-2:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7gn.xlarge
+      SbcRtpDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      WebserverDefault: c7gn.xlarge
+      MonitoringServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   ca-central-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   sa-east-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-central-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-west-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7gn.xlarge
+      SbcRtpDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      WebserverDefault: c7gn.xlarge
+      MonitoringServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-west-2:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-west-3:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-north-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-south-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-south-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-east-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-2:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-5:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-northeast-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7gn.xlarge
+      SbcRtpDefault: c7gn.xlarge
+      FeatureServerDefault: c7gn.xlarge
+      WebserverDefault: c7gn.xlarge
+      MonitoringServerDefault: c7gn.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-northeast-2:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-northeast-3:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   me-south-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   af-south-1:
-    SbcSipDefault: c5n.xlarge
-    SbcRtpDefault: c5n.xlarge
-    FeatureServerDefault: c5n.xlarge
-    WebserverDefault: c5n.xlarge
-    MonitoringServerDefault: c5n.xlarge
-    RecordingServerDefault: t3.xlarge
-  # Regions WITHOUT c5n but WITH c5
+    amd64:
+      SbcSipDefault: c5n.xlarge
+      SbcRtpDefault: c5n.xlarge
+      FeatureServerDefault: c5n.xlarge
+      WebserverDefault: c5n.xlarge
+      MonitoringServerDefault: c5n.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   me-central-1:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c6g.xlarge
+      SbcRtpDefault: c6g.xlarge
+      FeatureServerDefault: c6g.xlarge
+      WebserverDefault: c6g.xlarge
+      MonitoringServerDefault: c6g.xlarge
+      RecordingServerDefault: c6g.xlarge
   il-central-1:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-south-2:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-central-2:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   eu-south-2:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-3:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-southeast-4:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: t4g.xlarge
+      SbcRtpDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      WebserverDefault: t4g.xlarge
+      MonitoringServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ca-west-1:
-    SbcSipDefault: c5.xlarge
-    SbcRtpDefault: c5.xlarge
-    FeatureServerDefault: c5.xlarge
-    WebserverDefault: c5.xlarge
-    MonitoringServerDefault: c5.xlarge
-    RecordingServerDefault: t3.xlarge
-  # Regions WITHOUT c5 or c5n
+    amd64:
+      SbcSipDefault: c5.xlarge
+      SbcRtpDefault: c5.xlarge
+      FeatureServerDefault: c5.xlarge
+      WebserverDefault: c5.xlarge
+      MonitoringServerDefault: c5.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
+      RecordingServerDefault: t4g.xlarge
   ap-east-2:
-    SbcSipDefault: t3.xlarge
-    SbcRtpDefault: t3.xlarge
-    FeatureServerDefault: t3.xlarge
-    WebserverDefault: t3.xlarge
-    MonitoringServerDefault: t3.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: t3.xlarge
+      SbcRtpDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      WebserverDefault: t3.xlarge
+      MonitoringServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: t4g.xlarge
+      SbcRtpDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      WebserverDefault: t4g.xlarge
+      MonitoringServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
   mx-central-1:
-    SbcSipDefault: t3.xlarge
-    SbcRtpDefault: t3.xlarge
-    FeatureServerDefault: t3.xlarge
-    WebserverDefault: t3.xlarge
-    MonitoringServerDefault: t3.xlarge
-    RecordingServerDefault: t3.xlarge
+    amd64:
+      SbcSipDefault: t3.xlarge
+      SbcRtpDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      WebserverDefault: t3.xlarge
+      MonitoringServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: t4g.xlarge
+      SbcRtpDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      WebserverDefault: t4g.xlarge
+      MonitoringServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
+  ap-southeast-6:
+    amd64:
+      SbcSipDefault: t3.xlarge
+      SbcRtpDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      WebserverDefault: t3.xlarge
+      MonitoringServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: t4g.xlarge
+      SbcRtpDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      WebserverDefault: t4g.xlarge
+      MonitoringServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge
+  ap-southeast-7:
+    amd64:
+      SbcSipDefault: t3.xlarge
+      SbcRtpDefault: t3.xlarge
+      FeatureServerDefault: t3.xlarge
+      WebserverDefault: t3.xlarge
+      MonitoringServerDefault: t3.xlarge
+      RecordingServerDefault: t3.xlarge
+    arm64:
+      SbcSipDefault: t4g.xlarge
+      SbcRtpDefault: t4g.xlarge
+      FeatureServerDefault: t4g.xlarge
+      WebserverDefault: t4g.xlarge
+      MonitoringServerDefault: t4g.xlarge
+      RecordingServerDefault: t4g.xlarge

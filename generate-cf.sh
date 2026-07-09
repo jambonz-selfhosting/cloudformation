@@ -131,6 +131,25 @@ esac
 echo "Selected: $SIZE"
 echo ""
 
+# Architecture
+echo "Select architecture:"
+echo "  1) amd64 (x86_64)   [default]"
+echo "  2) arm64 (Graviton)"
+echo ""
+read -p "Enter choice [1-2] (default 1): " ARCH_CHOICE
+
+case $ARCH_CHOICE in
+    ""|1) ARCH="amd64" ;;
+    2) ARCH="arm64" ;;
+    *)
+        echo "Invalid choice. Please run the script again."
+        exit 1
+        ;;
+esac
+
+echo "Selected architecture: $ARCH"
+echo ""
+
 # Read available regions from mapping files
 AMI_MAPPINGS_FILE="$SCRIPT_DIR/mappings/ami-mappings.yaml"
 INSTANCE_TYPE_MAPPINGS_FILE="$SCRIPT_DIR/mappings/instance-type-defaults.yaml"
@@ -145,7 +164,14 @@ if [ ! -f "$INSTANCE_TYPE_MAPPINGS_FILE" ]; then
     exit 1
 fi
 
-AVAILABLE_REGIONS=$(yq eval ".${SIZE} | keys | .[]" "$AMI_MAPPINGS_FILE")
+# Only list regions that actually have an AMI for the selected architecture
+AVAILABLE_REGIONS=$(yq eval ".${SIZE} | to_entries | map(select(.value | has(\"${ARCH}\"))) | .[].key" "$AMI_MAPPINGS_FILE")
+
+if [ -z "$AVAILABLE_REGIONS" ]; then
+    echo "ERROR: No regions currently have ${ARCH} AMIs published for the ${SIZE} deployment."
+    echo "       (arm64 AMIs may not yet be published for all regions - try amd64.)"
+    exit 1
+fi
 
 # AWS Region
 echo "Select AWS region:"
@@ -200,7 +226,7 @@ echo ""
 JAMBONZ_VERSION=""
 
 for AMI_TYPE in "${AMI_TYPES[@]}"; do
-    AMI_ID=$(yq eval ".${SIZE}.${REGION}.${AMI_TYPE}" "$AMI_MAPPINGS_FILE")
+    AMI_ID=$(yq eval ".${SIZE}.${REGION}.${ARCH}.${AMI_TYPE}" "$AMI_MAPPINGS_FILE")
     if [ "$AMI_ID" = "null" ] || [ -z "$AMI_ID" ]; then
         echo "ERROR: Cannot find $AMI_TYPE for $SIZE in region $REGION"
         exit 1
@@ -343,7 +369,7 @@ INDEX=0
 for AMI_TYPE in "${AMI_TYPES[@]}"; do
     PUBLIC_AMI_ID="${PUBLIC_AMIS[$INDEX]}"
     VERSION="${AMI_VERSIONS[$INDEX]}"
-    AMI_NAME="jambonz-${SIZE}-${AMI_TYPE}-${VERSION}"
+    AMI_NAME="jambonz-${SIZE}-${ARCH}-${AMI_TYPE}-${VERSION}"
 
     echo "  Starting copy: $AMI_TYPE ($PUBLIC_AMI_ID) version $VERSION..."
 
@@ -403,6 +429,7 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
             Key=ManagedBy,Value=jambonz-cloudformation \
             Key=SourceAMI,Value="$PUBLIC_AMI_ID" \
             Key=DeploymentSize,Value="$SIZE" \
+            Key=Architecture,Value="$ARCH" \
             Key=JambonzVersion,Value="$VERSION" \
             Key=CreatedAt,Value="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         2>&1)
@@ -516,7 +543,7 @@ echo "================================================"
 echo ""
 
 BASE_TEMPLATE="$SCRIPT_DIR/$SIZE/_jambonz-base-template.yaml"
-OUTPUT_TEMPLATE="$SCRIPT_DIR/jambonz-${SIZE}-${REGION}.yaml"
+OUTPUT_TEMPLATE="$SCRIPT_DIR/jambonz-${SIZE}-${REGION}-${ARCH}.yaml"
 
 if [ ! -f "$BASE_TEMPLATE" ]; then
     echo "ERROR: Cannot find base template at $BASE_TEMPLATE"
@@ -540,7 +567,7 @@ MAPPINGS+="    ${REGION}:\n"
 
 # Read instance type defaults based on size
 INSTANCE_TYPE_SECTION="instance-types-${SIZE}"
-INSTANCE_TYPES=$(yq eval ".${INSTANCE_TYPE_SECTION}.${REGION}" "$INSTANCE_TYPE_MAPPINGS_FILE" -o json)
+INSTANCE_TYPES=$(yq eval ".${INSTANCE_TYPE_SECTION}.${REGION}.${ARCH}" "$INSTANCE_TYPE_MAPPINGS_FILE" -o json)
 
 if [ "$INSTANCE_TYPES" = "null" ] || [ -z "$INSTANCE_TYPES" ]; then
     echo "ERROR: Cannot find instance type defaults for $SIZE in region $REGION"
@@ -616,13 +643,13 @@ if [ "$TEMPLATE_SIZE" -gt 51200 ]; then
     echo "Note: This template is ${TEMPLATE_SIZE} bytes (CloudFormation has a 51,200 byte limit for direct usage)."
     echo ""
     echo "1. Upload template to S3 bucket:"
-    echo "   aws s3 cp $OUTPUT_TEMPLATE s3://<your-bucket>/jambonz-${SIZE}-${REGION}.yaml"
+    echo "   aws s3 cp $OUTPUT_TEMPLATE s3://<your-bucket>/jambonz-${SIZE}-${REGION}-${ARCH}.yaml"
     echo ""
     echo "2. Deploy using S3 URL:"
     echo "   aws cloudformation create-stack \\"
     echo "     --region $REGION \\"
     echo "     --stack-name jambonz-${SIZE} \\"
-    echo "     --template-url https://<your-bucket>.s3.amazonaws.com/jambonz-${SIZE}-${REGION}.yaml \\"
+    echo "     --template-url https://<your-bucket>.s3.amazonaws.com/jambonz-${SIZE}-${REGION}-${ARCH}.yaml \\"
     echo "     --capabilities CAPABILITY_IAM \\"
     echo "     --parameters \\"
     echo "       ParameterKey=KeyName,ParameterValue=<your-key-name> \\"
