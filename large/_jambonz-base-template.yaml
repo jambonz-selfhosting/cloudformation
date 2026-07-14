@@ -215,6 +215,10 @@ Parameters:
     Description: "Optional Krisp API key for noise isolation and turn taking"
     Type: String
     Default: ""
+  AicApiKey:
+    Description: "Optional ai-coustics API key for the aicoustics noise isolation and VAD vendors"
+    Type: String
+    Default: ""
   EnableOpenTelemetry:
     Description: "Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage."
     Type: String
@@ -1636,6 +1640,7 @@ Resources:
                 # configure mediajam media server (replaces freeswitch)
                 # mediajam doesn't use MySQL; redis is for the license loader.
                 sudo sed -i -e "s|^KRISP_API_KEY=.*|KRISP_API_KEY=${KrispApiKey}|" /etc/default/mediajam
+              sudo sed -i -e "s|^AIC_SDK_LICENSE=.*|AIC_SDK_LICENSE=${AicApiKey}|" /etc/default/mediajam
                 sudo sed -i -e "s|^#\?JAMBONES_REDIS_HOST=.*|JAMBONES_REDIS_HOST=${JAMBONES_REDIS_HOST}|" /etc/default/mediajam
                 sudo sed -i -e "s|^#\?JAMBONES_REDIS_PORT=.*|JAMBONES_REDIS_PORT=6379|" /etc/default/mediajam
 
@@ -1750,6 +1755,7 @@ Resources:
                 DbCachingTTS: !Ref DbCachingTTS
                 WebServerPrivateIP: !GetAtt WebServerEC2.PrivateIp
                 KrispApiKey: !Ref KrispApiKey
+              AicApiKey: !Ref AicApiKey
                 EnableOpenTelemetry: !Ref EnableOpenTelemetry
                 RecordingWsBaseUrl:
                   !If [
