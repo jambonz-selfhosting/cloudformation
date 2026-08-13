@@ -12,8 +12,13 @@
 AWSTemplateFormatVersion: 2010-09-09
 
 Parameters:
+  Architecture:
+    Description: "CPU architecture to deploy. amd64 is Intel/AMD x86_64; arm64 is AWS Graviton (lower cost per vCPU). Only architectures whose AMIs were copied by generate-cf.sh are offered. Any InstanceType you specify below must match this architecture."
+    Type: String
+    Default: amd64
+    AllowedValues: [amd64, arm64]
   InstanceType:
-    Description: "EC2 instance type for jambonz Mini (all-in-one). Leave BLANK for region-optimized default (c5n.large in most regions, c5.large or t3.large in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.large, etc."
+    Description: "EC2 instance type for jambonz Mini (all-in-one). Leave BLANK for an architecture- and region-optimized default (amd64: c5n.large in most regions, c5.large or t3.large where c5n is unavailable; arm64: c7g.large, falling back to t4g.large or c6g.large where c7g is unavailable). Must match the selected Architecture."
     Type: String
     Default: ""
   KeyName:
@@ -174,10 +179,10 @@ Resources:
     Properties:
       InstanceType: !If
         - UseDefaultInstanceType
-        - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", MiniDefault]
+        - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, MiniDefault]
         - !Ref InstanceType
       IamInstanceProfile: !Ref jambonzInstanceProfile
-      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "MiniAmi"]
+      ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "MiniAmi"]
       KeyName: !Ref KeyName
       NetworkInterfaces:
         - GroupSet:
