@@ -3,8 +3,9 @@
 #
 # Structure: instance-types-<size>.<region>.<arch>.<RoleDefault>
 #   amd64: x86_64 tiering  c5n -> c5 -> t3
-#   arm64: Graviton tiering c7gn -> c7g -> t4g, with c6g (Graviton2)
-#          fallback where none of those exist (e.g. me-central-1).
+#   arm64: Graviton tiering c7g -> t4g, with c6g (Graviton2)
+#          fallback where neither exists (e.g. me-central-1).
+#          c7g matches what jambonz.cloud runs in production.
 #          Recording role uses the burstable tier (t4g, or c6g fallback).
 #          arm64 values are resolved against live instance-type availability.
 #
@@ -15,12 +16,12 @@ instance-types-mini:
     amd64:
       MiniDefault: c5n.large
     arm64:
-      MiniDefault: c7gn.large
+      MiniDefault: c7g.large
   us-east-2:
     amd64:
       MiniDefault: c5n.large
     arm64:
-      MiniDefault: c7gn.large
+      MiniDefault: c7g.large
   us-west-1:
     amd64:
       MiniDefault: c5n.large
@@ -30,7 +31,7 @@ instance-types-mini:
     amd64:
       MiniDefault: c5n.large
     arm64:
-      MiniDefault: c7gn.large
+      MiniDefault: c7g.large
   ca-central-1:
     amd64:
       MiniDefault: c5n.large
@@ -50,7 +51,7 @@ instance-types-mini:
     amd64:
       MiniDefault: c5n.large
     arm64:
-      MiniDefault: c7gn.large
+      MiniDefault: c7g.large
   eu-west-2:
     amd64:
       MiniDefault: c5n.large
@@ -100,7 +101,7 @@ instance-types-mini:
     amd64:
       MiniDefault: c5n.large
     arm64:
-      MiniDefault: c7gn.large
+      MiniDefault: c7g.large
   ap-northeast-2:
     amd64:
       MiniDefault: c5n.large
@@ -190,9 +191,9 @@ instance-types-medium:
       FeatureServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcDefault: c7gn.xlarge
-      WebMonitoringDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   us-east-2:
     amd64:
@@ -201,9 +202,9 @@ instance-types-medium:
       FeatureServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcDefault: c7gn.xlarge
-      WebMonitoringDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   us-west-1:
     amd64:
@@ -223,9 +224,9 @@ instance-types-medium:
       FeatureServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcDefault: c7gn.xlarge
-      WebMonitoringDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   ca-central-1:
     amd64:
@@ -267,9 +268,9 @@ instance-types-medium:
       FeatureServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcDefault: c7gn.xlarge
-      WebMonitoringDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   eu-west-2:
     amd64:
@@ -377,9 +378,9 @@ instance-types-medium:
       FeatureServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcDefault: c7gn.xlarge
-      WebMonitoringDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
+      SbcDefault: c7g.xlarge
+      WebMonitoringDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   ap-northeast-2:
     amd64:
@@ -568,11 +569,11 @@ instance-types-large:
       MonitoringServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcSipDefault: c7gn.xlarge
-      SbcRtpDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
-      WebserverDefault: c7gn.xlarge
-      MonitoringServerDefault: c7gn.xlarge
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   us-east-2:
     amd64:
@@ -583,11 +584,11 @@ instance-types-large:
       MonitoringServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcSipDefault: c7gn.xlarge
-      SbcRtpDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
-      WebserverDefault: c7gn.xlarge
-      MonitoringServerDefault: c7gn.xlarge
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   us-west-1:
     amd64:
@@ -613,11 +614,11 @@ instance-types-large:
       MonitoringServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcSipDefault: c7gn.xlarge
-      SbcRtpDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
-      WebserverDefault: c7gn.xlarge
-      MonitoringServerDefault: c7gn.xlarge
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   ca-central-1:
     amd64:
@@ -673,11 +674,11 @@ instance-types-large:
       MonitoringServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcSipDefault: c7gn.xlarge
-      SbcRtpDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
-      WebserverDefault: c7gn.xlarge
-      MonitoringServerDefault: c7gn.xlarge
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   eu-west-2:
     amd64:
@@ -823,11 +824,11 @@ instance-types-large:
       MonitoringServerDefault: c5n.xlarge
       RecordingServerDefault: t3.xlarge
     arm64:
-      SbcSipDefault: c7gn.xlarge
-      SbcRtpDefault: c7gn.xlarge
-      FeatureServerDefault: c7gn.xlarge
-      WebserverDefault: c7gn.xlarge
-      MonitoringServerDefault: c7gn.xlarge
+      SbcSipDefault: c7g.xlarge
+      SbcRtpDefault: c7g.xlarge
+      FeatureServerDefault: c7g.xlarge
+      WebserverDefault: c7g.xlarge
+      MonitoringServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
   ap-northeast-2:
     amd64:

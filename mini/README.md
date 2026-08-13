@@ -15,6 +15,7 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| `Architecture` | CPU architecture: `amd64` (x86_64) or `arm64` (Graviton). Allowed values are limited to the architectures whose AMIs were copied | amd64 |
 | `InstanceType` | EC2 instance type | c5n.large |
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
 | `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
@@ -29,11 +30,14 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `EnableEBSEncryption` | Encrypt all EBS volumes | true |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
 
-> **Instance type / architecture:** leave `InstanceType` blank to use the region-optimized
-> default for the architecture you select in `generate-cf.sh`. For amd64 that is `c5n.large`
-> (or `c5`/`t3` where `c5n` is unavailable); for arm64 (Graviton) it is `c7gn`/`c7g`/`t4g`/`c6g`
-> depending on regional availability. If you set `InstanceType` explicitly, match it to the
-> selected architecture. arm64 availability is region-dependent — see the top-level README.
+> **Instance type / architecture:** the `Architecture` parameter (dropdown, default `amd64`)
+> selects both the AMI and the instance-type default. Its allowed values are the
+> architectures whose AMIs `generate-cf.sh` copied — pick "both" there to make it selectable
+> at deploy time. Leave `InstanceType` blank to use the architecture- and region-optimized
+> default: amd64 is `c5n.large` (or `c5`/`t3` where `c5n` is unavailable), arm64 (Graviton) is
+> `c7g.large` (or `t4g`/`c6g` where `c7g` is unavailable). If you set `InstanceType`
+> explicitly, match it to the selected architecture. arm64 availability is region-dependent —
+> see the top-level README.
 
 ## Generate and Deploy
 
@@ -42,7 +46,7 @@ First, generate the CloudFormation template:
 ```bash
 cd ..  # Go to project root
 ./generate-cf.sh
-# Follow prompts to select 'mini', the CPU architecture (amd64/arm64), and your region
+# Follow prompts to select 'mini', the CPU architecture (amd64/arm64/both), and your region
 # Wait for AMI copy to complete
 ```
 
