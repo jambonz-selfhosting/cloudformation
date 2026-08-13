@@ -52,8 +52,8 @@ The script will:
 1. Verify AWS CLI is installed and credentials are configured
 2. Prompt you to select:
    - Deployment size (mini/medium/large)
-   - CPU architecture (amd64/x86_64 or arm64/Graviton; default amd64)
-   - AWS region (only regions that have an AMI for the chosen architecture are listed)
+   - CPU architecture: amd64/x86_64, arm64/Graviton, or **both** (default amd64)
+   - AWS region (only regions that have AMIs for every chosen architecture are listed)
 3. Copy the required public jambonz AMIs to your AWS account (typically takes 5-15 minutes)
 4. Show progress updates every 30 seconds
 5. Generate a CloudFormation template in the project root (e.g., `jambonz-mini-us-east-1-amd64.yaml`)
@@ -65,10 +65,17 @@ The script will:
 
 **Note on architecture (arm64 / Graviton):**
 - arm64 (Graviton) instances are typically cheaper than the equivalent x86_64 instances.
-- arm64 availability is **region-dependent**: not every region has arm64 AMIs published,
-  and the region-optimized instance-type default varies by region (network-optimized
-  `c7gn` where available, otherwise `c7g`, `t4g`, or `c6g`). The script only offers
-  regions that have an AMI for the architecture you pick.
+  The arm64 defaults are `c7g` (matching what jambonz.cloud runs in production), falling
+  back to `t4g` or `c6g` in regions where `c7g` is unavailable; recording servers use the
+  burstable `t4g` tier.
+- arm64 availability is **region-dependent**: not every region has arm64 AMIs published.
+  The script only offers regions that have AMIs for the architecture(s) you pick.
+- The generated template carries an **`Architecture` parameter** (a dropdown, defaulting to
+  `amd64`) which selects both the AMI and the instance-type defaults at deploy time. Its
+  allowed values are exactly the architectures whose AMIs were copied:
+  - Pick a single architecture and the parameter is pinned to it.
+  - Pick **both** and you can choose per-stack at deploy time — at the cost of copying
+    twice as many AMIs (roughly double the wait and the snapshot storage).
 - If you override the instance type manually (via the `InstanceType*` parameters), make
   sure the type you choose matches the architecture you selected (e.g. don't pass an
   x86_64 `c5.xlarge` to an arm64 stack).
@@ -146,7 +153,10 @@ Yes! The generated templates are named `jambonz-{size}-{region}-{arch}.yaml`, so
 ./generate-cf.sh  # Generate for eu-west-1, arm64
 # Creates: jambonz-mini-eu-west-1-arm64.yaml
 
-# Both files coexist in the project root
+./generate-cf.sh  # Generate for us-west-2, both architectures
+# Creates: jambonz-mini-us-west-2-multiarch.yaml
+
+# All files coexist in the project root
 ```
 
 ### Can I delete the copied AMIs?

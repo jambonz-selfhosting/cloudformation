@@ -13,6 +13,12 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Parameters:
 
+  Architecture:
+    Description: "CPU architecture to deploy. amd64 is Intel/AMD x86_64; arm64 is AWS Graviton (lower cost per vCPU). Only architectures whose AMIs were copied by generate-cf.sh are offered. Any instance type you specify below must match this architecture."
+    Type: String
+    Default: amd64
+    AllowedValues: [amd64, arm64]
+
   EnablePcaps:
     Description: "Do you want to enable PCAPs for SIP traffic?"
     Type: String
@@ -26,27 +32,27 @@ Parameters:
     Type: "AWS::EC2::KeyPair::KeyName"
 
   InstanceTypeSbcSip:
-    Description: "EC2 instance type for SBC SIP server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
+    Description: "EC2 instance type for SBC SIP server. Leave BLANK for an architecture- and region-optimized default (amd64: c5n.xlarge, or c5.xlarge/t3.xlarge where c5n is unavailable; arm64: c7g.xlarge, falling back to t4g.xlarge or c6g.xlarge where c7g is unavailable). If specified, must match the selected Architecture."
     Type: String
     Default: ""    
   InstanceTypeSbcRtp:
-    Description: "EC2 instance type for SBC Media (RTP) server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
+    Description: "EC2 instance type for SBC Media (RTP) server. Leave BLANK for an architecture- and region-optimized default (amd64: c5n.xlarge, or c5.xlarge/t3.xlarge where c5n is unavailable; arm64: c7g.xlarge, falling back to t4g.xlarge or c6g.xlarge where c7g is unavailable). If specified, must match the selected Architecture."
     Type: String
     Default: ""    
   InstanceTypeFeatureServer:
-    Description: "EC2 instance type for Feature Server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
+    Description: "EC2 instance type for Feature Server. Leave BLANK for an architecture- and region-optimized default (amd64: c5n.xlarge, or c5.xlarge/t3.xlarge where c5n is unavailable; arm64: c7g.xlarge, falling back to t4g.xlarge or c6g.xlarge where c7g is unavailable). If specified, must match the selected Architecture."
     Type: String
     Default: ""    
   RecordingInstanceType:
-    Description: "EC2 instance type for Recording Server Auto Scaling Group. Leave BLANK for region-optimized default (t3.xlarge - universally available), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, etc."
+    Description: "EC2 instance type for Recording Server Auto Scaling Group. Leave BLANK for an architecture-optimized default (amd64: t3.xlarge; arm64: t4g.xlarge, or c6g.xlarge where t4g is unavailable). If specified, must match the selected Architecture."
     Type: String
     Default: ""
   InstanceTypeWebserver:
-    Description: "EC2 instance type for Web Server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
+    Description: "EC2 instance type for Web Server. Leave BLANK for an architecture- and region-optimized default (amd64: c5n.xlarge, or c5.xlarge/t3.xlarge where c5n is unavailable; arm64: c7g.xlarge, falling back to t4g.xlarge or c6g.xlarge where c7g is unavailable). If specified, must match the selected Architecture."
     Type: String
     Default: ""    
   InstanceTypeMonitoringServer:
-    Description: "EC2 instance type for Monitoring Server. Leave BLANK for region-optimized default (c5n.xlarge in most regions, c5.xlarge or t3.xlarge in regions without c5n support), or specify: t3.medium, t3.large, t3.xlarge, c5.large, c5.xlarge, c5n.xlarge, etc."
+    Description: "EC2 instance type for Monitoring Server. Leave BLANK for an architecture- and region-optimized default (amd64: c5n.xlarge, or c5.xlarge/t3.xlarge where c5n is unavailable; arm64: c7g.xlarge, falling back to t4g.xlarge or c6g.xlarge where c7g is unavailable). If specified, must match the selected Architecture."
     Type: String
     Default: ""    
   ElastiCacheNodeType:
@@ -764,10 +770,10 @@ Resources:
     Properties:
       LaunchTemplateName: !Sub "${AWS::StackName}-recording-launch-template"
       LaunchTemplateData:
-        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "RecordingServerAmi"]
+        ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "RecordingServerAmi"]
         InstanceType: !If
           - UseDefaultRecordingInstanceType
-          - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", RecordingServerDefault]
+          - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, RecordingServerDefault]
           - !Ref RecordingInstanceType
         KeyName: !Ref KeyName
         IamInstanceProfile:
@@ -1013,10 +1019,10 @@ Resources:
     Type: 'AWS::EC2::Instance'
     Properties:
       SubnetId: !Ref PublicSubnet1
-      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "MonitoringServerAmi"]
+      ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "MonitoringServerAmi"]
       InstanceType: !If
         - UseDefaultMonitoringServerInstanceType
-        - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", MonitoringServerDefault]
+        - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, MonitoringServerDefault]
         - !Ref InstanceTypeMonitoringServer
       SecurityGroupIds:
         - Ref: SshSecurityGroup
@@ -1146,10 +1152,10 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
-        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "SbcSipAmi"]
+        ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "SbcSipAmi"]
         InstanceType: !If
           - UseDefaultSbcSipInstanceType
-          - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", SbcSipDefault]
+          - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, SbcSipDefault]
           - !Ref InstanceTypeSbcSip
         Placement:
           GroupName: !Ref MyPlacementGroup
@@ -1575,10 +1581,10 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
-        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "FsAmi"]
+        ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "FsAmi"]
         InstanceType: !If
           - UseDefaultFeatureServerInstanceType
-          - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", FeatureServerDefault]
+          - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, FeatureServerDefault]
           - !Ref InstanceTypeFeatureServer
         Placement:
           GroupName: !Ref MyPlacementGroup
@@ -1896,10 +1902,10 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
-        ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "SbcRtpAmi"]
+        ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "SbcRtpAmi"]
         InstanceType: !If
           - UseDefaultSbcRtpInstanceType
-          - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", SbcRtpDefault]
+          - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, SbcRtpDefault]
           - !Ref InstanceTypeSbcRtp
         Placement:
           GroupName: !Ref MyPlacementGroup
@@ -2180,10 +2186,10 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet1
       IamInstanceProfile: !Ref WebServerInstanceProfile
-      ImageId: !FindInMap [ "AWSRegion2AMI", !Ref AWS::Region,  "WebserverAmi"]
+      ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "WebserverAmi"]
       InstanceType: !If
         - UseDefaultWebserverInstanceType
-        - !FindInMap [RegionInstanceTypeDefaults, !Ref "AWS::Region", WebserverDefault]
+        - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, WebserverDefault]
         - !Ref InstanceTypeWebserver
       Tags:
         - 

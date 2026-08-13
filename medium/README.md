@@ -26,6 +26,7 @@ The medium deployment creates:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| `Architecture` | CPU architecture: `amd64` (x86_64) or `arm64` (Graviton). Allowed values are limited to the architectures whose AMIs were copied | amd64 |
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
 | `URLPortal` | DNS name for the portal | (required) |
 | `EnablePcaps` | Enable PCAPs for SIP traffic | (required) |
@@ -52,11 +53,15 @@ The medium deployment creates:
 | `RecordingInstanceType` | EC2 instance type for Recording servers | (region default) |
 | `WebMonitoringDiskSize` | Disk size in GB for Web/Monitoring server | 200 |
 
-> **Instance type / architecture:** the `InstanceType*` defaults shown above (`c5n.xlarge`)
-> are the amd64 region defaults; leave them blank to use the region-optimized default for the
-> architecture you select in `generate-cf.sh`. arm64 (Graviton) uses `c7gn`/`c7g`/`t4g`/`c6g`
-> depending on regional availability. If you set an instance type explicitly, match it to the
-> selected architecture. arm64 availability is region-dependent — see the top-level README.
+> **Instance type / architecture:** the `Architecture` parameter (dropdown, default `amd64`)
+> selects both the AMIs and the instance-type defaults for every role. Its allowed values are
+> the architectures whose AMIs `generate-cf.sh` copied — pick "both" there to make it
+> selectable at deploy time. The `InstanceType*` defaults shown above (`c5n.xlarge`) are the
+> amd64 defaults; leave them blank to use the architecture- and region-optimized default.
+> arm64 (Graviton) uses `c7g.xlarge` (or `t4g`/`c6g` where `c7g` is unavailable), with
+> recording servers on the burstable `t4g` tier. If you set an instance type explicitly, match
+> it to the selected architecture. arm64 availability is region-dependent — see the top-level
+> README.
 
 ## Generate and Deploy
 
@@ -65,7 +70,7 @@ First, generate the CloudFormation template:
 ```bash
 cd ..  # Go to project root
 ./generate-cf.sh
-# Follow prompts to select 'medium', the CPU architecture (amd64/arm64), and your region
+# Follow prompts to select 'medium', the CPU architecture (amd64/arm64/both), and your region
 # Wait for AMI copy to complete
 ```
 

@@ -132,22 +132,39 @@ echo "Selected: $SIZE"
 echo ""
 
 # Architecture
+# ARCHES holds every architecture whose AMIs will be copied. The generated
+# template exposes exactly these as the AllowedValues of its Architecture
+# parameter, so a stack can never be launched on an arch we did not copy.
 echo "Select architecture:"
 echo "  1) amd64 (x86_64)   [default]"
 echo "  2) arm64 (Graviton)"
+echo "  3) both             - copy AMIs for both, choose at deploy time"
 echo ""
-read -p "Enter choice [1-2] (default 1): " ARCH_CHOICE
+echo "Note: 'both' doubles the number of AMIs copied (time and snapshot storage)."
+echo ""
+read -p "Enter choice [1-3] (default 1): " ARCH_CHOICE
 
 case $ARCH_CHOICE in
-    ""|1) ARCH="amd64" ;;
-    2) ARCH="arm64" ;;
+    ""|1) ARCHES="amd64" ;;
+    2) ARCHES="arm64" ;;
+    3) ARCHES="amd64 arm64" ;;
     *)
         echo "Invalid choice. Please run the script again."
         exit 1
         ;;
 esac
 
-echo "Selected architecture: $ARCH"
+# Default value for the template's Architecture parameter, and the suffix used
+# in the generated filename.
+if [ "$ARCHES" = "amd64 arm64" ]; then
+    DEFAULT_ARCH="amd64"
+    ARCH_LABEL="multiarch"
+else
+    DEFAULT_ARCH="$ARCHES"
+    ARCH_LABEL="$ARCHES"
+fi
+
+echo "Selected architecture: $ARCHES"
 echo ""
 
 # Read available regions from mapping files
@@ -164,12 +181,16 @@ if [ ! -f "$INSTANCE_TYPE_MAPPINGS_FILE" ]; then
     exit 1
 fi
 
-# Only list regions that actually have an AMI for the selected architecture
-AVAILABLE_REGIONS=$(yq eval ".${SIZE} | to_entries | map(select(.value | has(\"${ARCH}\"))) | .[].key" "$AMI_MAPPINGS_FILE")
+# Only list regions that have AMIs published for every selected architecture
+AVAILABLE_REGIONS=$(yq eval ".${SIZE} | to_entries | .[].key" "$AMI_MAPPINGS_FILE")
+for A in $ARCHES; do
+    ARCH_REGIONS=$(yq eval ".${SIZE} | to_entries | map(select(.value | has(\"${A}\"))) | .[].key" "$AMI_MAPPINGS_FILE")
+    AVAILABLE_REGIONS=$(comm -12 <(echo "$AVAILABLE_REGIONS" | sort) <(echo "$ARCH_REGIONS" | sort))
+done
 
 if [ -z "$AVAILABLE_REGIONS" ]; then
-    echo "ERROR: No regions currently have ${ARCH} AMIs published for the ${SIZE} deployment."
-    echo "       (arm64 AMIs may not yet be published for all regions - try amd64.)"
+    echo "ERROR: No regions currently have AMIs published for all of '${ARCHES}' for the ${SIZE} deployment."
+    echo "       (arm64 AMIs may not yet be published for all regions - try amd64 only.)"
     exit 1
 fi
 
@@ -214,27 +235,44 @@ case $SIZE in
 esac
 
 # Read public AMI IDs and query JambonzVersion tag
-# Using indexed arrays for bash 3.2 compatibility
+# Using indexed arrays for bash 3.2 compatibility.
+# The work list is the cross product of the selected architectures and the
+# AMI types for this deployment size; WORK_ARCH/WORK_TYPE and the AMI arrays
+# are all indexed in lockstep.
+WORK_ARCH=()
+WORK_TYPE=()
 PUBLIC_AMIS=()
 NEW_AMI_IDS=()
 AMI_VERSIONS=()
 
+for A in $ARCHES; do
+    for AMI_TYPE in "${AMI_TYPES[@]}"; do
+        WORK_ARCH+=("$A")
+        WORK_TYPE+=("$AMI_TYPE")
+    done
+done
+WORK_COUNT=${#WORK_TYPE[@]}
+
 echo ""
 echo "Querying version information from public AMIs..."
-echo "This will take a moment - querying ${#AMI_TYPES[@]} AMI(s)..."
+echo "This will take a moment - querying ${WORK_COUNT} AMI(s)..."
 echo ""
 JAMBONZ_VERSION=""
 
-for AMI_TYPE in "${AMI_TYPES[@]}"; do
-    AMI_ID=$(yq eval ".${SIZE}.${REGION}.${ARCH}.${AMI_TYPE}" "$AMI_MAPPINGS_FILE")
+INDEX=0
+while [ $INDEX -lt $WORK_COUNT ]; do
+    A="${WORK_ARCH[$INDEX]}"
+    AMI_TYPE="${WORK_TYPE[$INDEX]}"
+
+    AMI_ID=$(yq eval ".${SIZE}.${REGION}.${A}.${AMI_TYPE}" "$AMI_MAPPINGS_FILE")
     if [ "$AMI_ID" = "null" ] || [ -z "$AMI_ID" ]; then
-        echo "ERROR: Cannot find $AMI_TYPE for $SIZE in region $REGION"
+        echo "ERROR: Cannot find $AMI_TYPE ($A) for $SIZE in region $REGION"
         exit 1
     fi
     PUBLIC_AMIS+=("$AMI_ID")
 
     # Query Name field from the public AMI and parse version
-    echo "  Querying AMI name for $AMI_TYPE ($AMI_ID)..."
+    echo "  Querying AMI name for $AMI_TYPE ($A) ($AMI_ID)..."
     AMI_NAME=$(aws ec2 describe-images \
         --region "$REGION" \
         --image-ids "$AMI_ID" \
@@ -244,7 +282,7 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
     if [ $? -ne 0 ] || [ -z "$AMI_NAME" ] || [ "$AMI_NAME" = "None" ]; then
         echo "    ✗ ERROR: Could not retrieve AMI name"
         echo ""
-        echo "ERROR: AMI $AMI_ID ($AMI_TYPE) does not have a Name field"
+        echo "ERROR: AMI $AMI_ID ($AMI_TYPE, $A) does not have a Name field"
         echo ""
         echo "This means the AMI may not be properly configured in region $REGION."
         echo ""
@@ -262,7 +300,7 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
     if [ -z "$VERSION_TAG" ]; then
         echo "    ✗ ERROR: Could not parse version from AMI name"
         echo ""
-        echo "ERROR: AMI $AMI_ID ($AMI_TYPE) has unexpected name format: $AMI_NAME"
+        echo "ERROR: AMI $AMI_ID ($AMI_TYPE, $A) has unexpected name format: $AMI_NAME"
         echo ""
         echo "Expected format: jambonz-{variant}-v{VERSION}-{os}-{timestamp}"
         echo "Example: jambonz-sip-v10.0.2-debian-12-20260116213122"
@@ -277,7 +315,8 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
         JAMBONZ_VERSION=$VERSION_TAG
     fi
 
-    echo "    ✓ $AMI_TYPE: $AMI_ID (name: $AMI_NAME, version: $VERSION_TAG)"
+    echo "    ✓ $AMI_TYPE ($A): $AMI_ID (name: $AMI_NAME, version: $VERSION_TAG)"
+    INDEX=$((INDEX + 1))
 done
 
 echo ""
@@ -298,10 +337,12 @@ echo ""
 
 ALL_AVAILABLE=true
 INDEX=0
-for AMI_TYPE in "${AMI_TYPES[@]}"; do
+while [ $INDEX -lt $WORK_COUNT ]; do
+    AMI_TYPE="${WORK_TYPE[$INDEX]}"
+    A="${WORK_ARCH[$INDEX]}"
     PUBLIC_AMI_ID="${PUBLIC_AMIS[$INDEX]}"
 
-    echo "  Checking $AMI_TYPE ($PUBLIC_AMI_ID)..."
+    echo "  Checking $AMI_TYPE ($A) ($PUBLIC_AMI_ID)..."
 
     STATE=$(aws ec2 describe-images \
         --region "$REGION" \
@@ -362,16 +403,18 @@ echo ""
 START_TIME=$(date +%s)
 
 # Initiate all AMI copies in parallel
-echo "Initiating ${#AMI_TYPES[@]} AMI copy operation(s) in parallel..."
+echo "Initiating ${WORK_COUNT} AMI copy operation(s) in parallel..."
 echo ""
 
 INDEX=0
-for AMI_TYPE in "${AMI_TYPES[@]}"; do
+while [ $INDEX -lt $WORK_COUNT ]; do
+    AMI_TYPE="${WORK_TYPE[$INDEX]}"
+    A="${WORK_ARCH[$INDEX]}"
     PUBLIC_AMI_ID="${PUBLIC_AMIS[$INDEX]}"
     VERSION="${AMI_VERSIONS[$INDEX]}"
-    AMI_NAME="jambonz-${SIZE}-${ARCH}-${AMI_TYPE}-${VERSION}"
+    AMI_NAME="jambonz-${SIZE}-${A}-${AMI_TYPE}-${VERSION}"
 
-    echo "  Starting copy: $AMI_TYPE ($PUBLIC_AMI_ID) version $VERSION..."
+    echo "  Starting copy: $AMI_TYPE ($A) ($PUBLIC_AMI_ID) version $VERSION..."
 
     # Temporarily disable set -e for copy command to capture error details
     set +e
@@ -429,7 +472,7 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
             Key=ManagedBy,Value=jambonz-cloudformation \
             Key=SourceAMI,Value="$PUBLIC_AMI_ID" \
             Key=DeploymentSize,Value="$SIZE" \
-            Key=Architecture,Value="$ARCH" \
+            Key=Architecture,Value="$A" \
             Key=JambonzVersion,Value="$VERSION" \
             Key=CreatedAt,Value="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         2>&1)
@@ -447,7 +490,7 @@ for AMI_TYPE in "${AMI_TYPES[@]}"; do
 done
 
 echo ""
-echo "✓ All ${#AMI_TYPES[@]} AMI copy operation(s) started in parallel"
+echo "✓ All ${WORK_COUNT} AMI copy operation(s) started in parallel"
 echo ""
 
 # Build the AMI IDs list for the check command
@@ -473,7 +516,7 @@ echo ""
 POLL_COUNT=0
 MAX_WAIT_TIME=3600  # 1 hour max
 COMPLETED_COUNT=0
-TOTAL_AMIS=${#AMI_TYPES[@]}
+TOTAL_AMIS=$WORK_COUNT
 
 while true; do
     ALL_AVAILABLE=true
@@ -497,7 +540,9 @@ while true; do
     echo "[Check #${POLL_COUNT}] Elapsed: ${ELAPSED_MIN}m ${ELAPSED_SEC}s"
 
     INDEX=0
-    for AMI_TYPE in "${AMI_TYPES[@]}"; do
+    while [ $INDEX -lt $WORK_COUNT ]; do
+        AMI_TYPE="${WORK_TYPE[$INDEX]}"
+        A="${WORK_ARCH[$INDEX]}"
         NEW_AMI_ID="${NEW_AMI_IDS[$INDEX]}"
         STATE=$(aws ec2 describe-images \
             --region "$REGION" \
@@ -507,10 +552,10 @@ while true; do
 
         if [ "$STATE" != "available" ]; then
             ALL_AVAILABLE=false
-            echo "  $AMI_TYPE ($NEW_AMI_ID): $STATE"
+            echo "  $AMI_TYPE ($A) ($NEW_AMI_ID): $STATE"
         else
             COMPLETED_COUNT=$((COMPLETED_COUNT + 1))
-            echo "  ✓ $AMI_TYPE ($NEW_AMI_ID): available"
+            echo "  ✓ $AMI_TYPE ($A) ($NEW_AMI_ID): available"
         fi
         INDEX=$((INDEX + 1))
     done
@@ -543,42 +588,51 @@ echo "================================================"
 echo ""
 
 BASE_TEMPLATE="$SCRIPT_DIR/$SIZE/_jambonz-base-template.yaml"
-OUTPUT_TEMPLATE="$SCRIPT_DIR/jambonz-${SIZE}-${REGION}-${ARCH}.yaml"
+OUTPUT_TEMPLATE="$SCRIPT_DIR/jambonz-${SIZE}-${REGION}-${ARCH_LABEL}.yaml"
 
 if [ ! -f "$BASE_TEMPLATE" ]; then
     echo "ERROR: Cannot find base template at $BASE_TEMPLATE"
     exit 1
 fi
 
-# Create Mappings section
-MAPPINGS="Mappings:\n"
-MAPPINGS+="  AWSRegion2AMI:\n"
-MAPPINGS+="    ${REGION}:\n"
+# Create Mappings section.
+# Both maps are keyed by architecture - a generated template targets a single
+# region, so the Architecture parameter is what selects between entries.
+MAPPINGS="# Generated for region ${REGION} - deploy this stack only in ${REGION}.\n"
+MAPPINGS+="Mappings:\n"
+MAPPINGS+="  Arch2AMI:\n"
 
-INDEX=0
-for AMI_TYPE in "${AMI_TYPES[@]}"; do
-    NEW_AMI_ID="${NEW_AMI_IDS[$INDEX]}"
-    MAPPINGS+="      ${AMI_TYPE}: ${NEW_AMI_ID}\n"
-    INDEX=$((INDEX + 1))
+for A in $ARCHES; do
+    MAPPINGS+="    ${A}:\n"
+    INDEX=0
+    while [ $INDEX -lt $WORK_COUNT ]; do
+        if [ "${WORK_ARCH[$INDEX]}" = "$A" ]; then
+            MAPPINGS+="      ${WORK_TYPE[$INDEX]}: ${NEW_AMI_IDS[$INDEX]}\n"
+        fi
+        INDEX=$((INDEX + 1))
+    done
 done
 
-MAPPINGS+="\n  RegionInstanceTypeDefaults:\n"
-MAPPINGS+="    ${REGION}:\n"
+MAPPINGS+="\n  ArchInstanceTypeDefaults:\n"
 
 # Read instance type defaults based on size
 INSTANCE_TYPE_SECTION="instance-types-${SIZE}"
-INSTANCE_TYPES=$(yq eval ".${INSTANCE_TYPE_SECTION}.${REGION}.${ARCH}" "$INSTANCE_TYPE_MAPPINGS_FILE" -o json)
+for A in $ARCHES; do
+    INSTANCE_TYPES=$(yq eval ".${INSTANCE_TYPE_SECTION}.${REGION}.${A}" "$INSTANCE_TYPE_MAPPINGS_FILE" -o json)
 
-if [ "$INSTANCE_TYPES" = "null" ] || [ -z "$INSTANCE_TYPES" ]; then
-    echo "ERROR: Cannot find instance type defaults for $SIZE in region $REGION"
-    exit 1
-fi
+    if [ "$INSTANCE_TYPES" = "null" ] || [ -z "$INSTANCE_TYPES" ]; then
+        echo "ERROR: Cannot find ${A} instance type defaults for $SIZE in region $REGION"
+        exit 1
+    fi
 
-# Convert instance types to YAML format and append to MAPPINGS
-# Use process substitution to avoid subshell issue with pipes
-while IFS= read -r line; do
-    MAPPINGS+="$line\n"
-done < <(echo "$INSTANCE_TYPES" | yq -p json -o yaml | sed 's/^/      /')
+    MAPPINGS+="    ${A}:\n"
+
+    # Convert instance types to YAML format and append to MAPPINGS
+    # Use process substitution to avoid subshell issue with pipes
+    while IFS= read -r line; do
+        MAPPINGS+="$line\n"
+    done < <(echo "$INSTANCE_TYPES" | yq -p json -o yaml | sed 's/^/      /')
+done
 
 # Create backup if template already exists
 backup_file_if_exists "$OUTPUT_TEMPLATE"
@@ -594,8 +648,16 @@ backup_file_if_exists "$OUTPUT_TEMPLATE"
     # Insert Mappings section
     echo -e "$MAPPINGS"
 
-    # Append the rest of the template (from line 13 onwards)
-    tail -n +13 "$BASE_TEMPLATE"
+    # Append the rest of the template (from line 13 onwards), narrowing the
+    # Architecture parameter to the architectures we actually copied AMIs for.
+    tail -n +13 "$BASE_TEMPLATE" | awk \
+        -v allowed="$(echo "$ARCHES" | tr ' ' ',' | sed 's/,/, /g')" \
+        -v def="$DEFAULT_ARCH" '
+        $0 == "  Architecture:" { inarch = 1; print; next }
+        inarch && /^    Default: / { print "    Default: " def; next }
+        inarch && /^    AllowedValues: / { print "    AllowedValues: [" allowed "]"; inarch = 0; next }
+        { print }
+    '
 } > "$OUTPUT_TEMPLATE"
 
 echo "✓ CloudFormation template generated: $OUTPUT_TEMPLATE"
@@ -623,10 +685,18 @@ echo "================================================"
 echo ""
 echo "Copied AMI IDs (for your records):"
 INDEX=0
-for AMI_TYPE in "${AMI_TYPES[@]}"; do
-    echo "  $AMI_TYPE: ${NEW_AMI_IDS[$INDEX]}"
+while [ $INDEX -lt $WORK_COUNT ]; do
+    echo "  ${WORK_TYPE[$INDEX]} (${WORK_ARCH[$INDEX]}): ${NEW_AMI_IDS[$INDEX]}"
     INDEX=$((INDEX + 1))
 done
+echo ""
+
+if [ "$ARCHES" = "amd64 arm64" ]; then
+    echo "This template supports both architectures - set the Architecture parameter"
+    echo "(amd64 or arm64) at deploy time. It defaults to amd64."
+else
+    echo "This template is pinned to the ${ARCHES} architecture."
+fi
 echo ""
 
 echo "Generated CloudFormation template:"
@@ -643,13 +713,13 @@ if [ "$TEMPLATE_SIZE" -gt 51200 ]; then
     echo "Note: This template is ${TEMPLATE_SIZE} bytes (CloudFormation has a 51,200 byte limit for direct usage)."
     echo ""
     echo "1. Upload template to S3 bucket:"
-    echo "   aws s3 cp $OUTPUT_TEMPLATE s3://<your-bucket>/jambonz-${SIZE}-${REGION}-${ARCH}.yaml"
+    echo "   aws s3 cp $OUTPUT_TEMPLATE s3://<your-bucket>/jambonz-${SIZE}-${REGION}-${ARCH_LABEL}.yaml"
     echo ""
     echo "2. Deploy using S3 URL:"
     echo "   aws cloudformation create-stack \\"
     echo "     --region $REGION \\"
     echo "     --stack-name jambonz-${SIZE} \\"
-    echo "     --template-url https://<your-bucket>.s3.amazonaws.com/jambonz-${SIZE}-${REGION}-${ARCH}.yaml \\"
+    echo "     --template-url https://<your-bucket>.s3.amazonaws.com/jambonz-${SIZE}-${REGION}-${ARCH_LABEL}.yaml \\"
     echo "     --capabilities CAPABILITY_IAM \\"
     echo "     --parameters \\"
     echo "       ParameterKey=KeyName,ParameterValue=<your-key-name> \\"
