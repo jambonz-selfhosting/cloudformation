@@ -4,7 +4,7 @@
 # Structure: instance-types-<size>.<region>.<arch>.<RoleDefault>
 #   amd64: x86_64 tiering  c5n -> c5 -> t3
 #   arm64: Graviton tiering c7gn -> c7g -> t4g, with c6g (Graviton2)
-#          fallback where none of those exist (e.g. me-central-1).
+#          fallback where none of those exist.
 #          Recording role uses the burstable tier (t4g, or c6g fallback).
 #          arm64 values are resolved against live instance-type availability.
 #
@@ -121,11 +121,6 @@ instance-types-mini:
       MiniDefault: c5n.large
     arm64:
       MiniDefault: c7g.large
-  me-central-1:
-    amd64:
-      MiniDefault: c5.large
-    arm64:
-      MiniDefault: c6g.large
   il-central-1:
     amd64:
       MiniDefault: c5.large
@@ -425,17 +420,6 @@ instance-types-medium:
       WebMonitoringDefault: c7g.xlarge
       FeatureServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
-  me-central-1:
-    amd64:
-      SbcDefault: c5.xlarge
-      WebMonitoringDefault: c5.xlarge
-      FeatureServerDefault: c5.xlarge
-      RecordingServerDefault: t3.xlarge
-    arm64:
-      SbcDefault: c6g.xlarge
-      WebMonitoringDefault: c6g.xlarge
-      FeatureServerDefault: c6g.xlarge
-      RecordingServerDefault: c6g.xlarge
   il-central-1:
     amd64:
       SbcDefault: c5.xlarge
@@ -889,21 +873,6 @@ instance-types-large:
       WebserverDefault: c7g.xlarge
       MonitoringServerDefault: c7g.xlarge
       RecordingServerDefault: t4g.xlarge
-  me-central-1:
-    amd64:
-      SbcSipDefault: c5.xlarge
-      SbcRtpDefault: c5.xlarge
-      FeatureServerDefault: c5.xlarge
-      WebserverDefault: c5.xlarge
-      MonitoringServerDefault: c5.xlarge
-      RecordingServerDefault: t3.xlarge
-    arm64:
-      SbcSipDefault: c6g.xlarge
-      SbcRtpDefault: c6g.xlarge
-      FeatureServerDefault: c6g.xlarge
-      WebserverDefault: c6g.xlarge
-      MonitoringServerDefault: c6g.xlarge
-      RecordingServerDefault: c6g.xlarge
   il-central-1:
     amd64:
       SbcSipDefault: c5.xlarge
