@@ -22,7 +22,9 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
 | `AllowedSipCidr` | CIDR for SIP access | 0.0.0.0/0 |
 | `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
-| `VpcCidr` | CIDR range for the VPC | 10.0.0.0/16 |
+| `VpcCidr` | CIDR range of the VPC. When using an existing VPC, set this to that VPC's CIDR | 10.0.0.0/16 |
+| `ExistingVpcId` | Optional. Blank creates a new VPC; set to a `vpc-...` id to deploy into a VPC you already have | (blank) |
+| `ExistingSubnetIds` | Optional. Required when `ExistingVpcId` is set: the id of one public subnet in that VPC | (blank) |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
 | `URLPortal` | DNS name for the portal | (required) |
@@ -38,6 +40,83 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 > `c7g.large` (or `t4g`/`c6g` where `c7g` is unavailable). If you set `InstanceType`
 > explicitly, match it to the selected architecture. arm64 availability is region-dependent —
 > see the top-level README.
+
+## Deploying into an existing VPC
+
+By default the stack creates its own VPC, subnet, internet gateway and route table, and
+nothing else is required. To deploy into a VPC you already have, set these parameters:
+
+| Parameter | Example |
+|-----------|---------|
+| `ExistingVpcId` | `vpc-0abc123def456789` |
+| `ExistingSubnetIds` | `subnet-0abc123def456789` — exactly one public subnet id |
+| `VpcCidr` | `10.0.0.0/16` — the CIDR of that VPC, **not** a new range |
+
+Leave `ExistingVpcId` blank and the stack behaves exactly as it always has.
+
+Both new parameters are validated before any resource is created, so a typo, a stray space,
+or setting one without the other is rejected in seconds instead of failing part-way through
+a create and rolling back.
+
+### `ExistingVpcId` cannot be changed after the stack is created
+
+Treat it as a create-time-only decision. Switching a live stack from its own VPC to an
+existing one (or back) cannot succeed: the security groups, DB subnet group and cache
+subnet group all carry fixed physical names, so the required replacement collides with
+itself, and the old VPC cannot be deleted while its ENIs remain. The stack ends in
+`UPDATE_ROLLBACK_FAILED`.
+
+The dangerous direction is accidental. **CloudFormation substitutes the template default
+for any parameter you omit on an update — it does not keep the previous value.** So an
+update that forgets `ExistingVpcId` silently flips back to "create a new VPC", and because
+`SubnetId` is a replacement property, the single instance — which holds MySQL and Redis,
+and therefore every account, application and CDR — is **replaced and its data lost**,
+while the stack reports `UPDATE_COMPLETE`. Always pass
+it explicitly, or use `--parameters ParameterKey=ExistingVpcId,UsePreviousValue=true`, on
+every update. `aws cloudformation deploy` and console updates that start from the existing
+parameter set are not affected.
+
+### Requirements for the VPC and subnet you supply
+
+- **The subnet must be public.** It needs a default route (`0.0.0.0/0`) to an internet
+  gateway. jambonz needs a public IP for SIP, RTP and the portal, and the instance
+  downloads packages from the internet on first boot. A private subnet behind a NAT
+  gateway will not work.
+- **`VpcCidr` must match the existing VPC's CIDR.** CloudFormation cannot look up the CIDR
+  of an existing VPC, so you have to tell it. It drives the security group rules that allow
+  internal RTP and SMPP traffic. Nothing checks it, and nothing fails at deploy time if it
+  is wrong — the stack reaches `CREATE_COMPLETE` and traffic is silently misrouted.
+- **The subnet needs free addresses** and must be in the region the template was generated
+  for.
+- **Check the subnet's Network ACL.** A fresh VPC gets an allow-all NACL, so this never
+  mattered before. A locked-down enterprise subnet that only permits 80/443 will
+  statelessly drop SIP (5060/5061/8443) and RTP (UDP 40000-60000) while every security
+  group still looks correct — calls connect with no audio.
+- **DNS resolution and DNS hostnames should be enabled** on the VPC. The stack enables both
+  on the VPC it creates. Note that `enableDnsHostnames` is **off** by default for a VPC you
+  created yourself, so check rather than assume.
+
+### Security: what `VpcCidr` opens up in a shared VPC
+
+Two of mini's ingress rules are written against `VpcCidr` rather than against a specific
+source: RTP (UDP 40000-60000) and SMPP (TCP 3020). When the stack created its own VPC, that
+CIDR meant "jambonz only". In a VPC you share with other workloads it means any instance,
+VPC-attached Lambda or container in that VPC can reach those two ports.
+
+Mini is all-in-one, so this is milder than it is for the medium and large deployments —
+MySQL and Redis run on the instance itself and are never exposed to the network at all. But
+if the two rules above are not acceptable in your VPC, narrow `AllowedRtpCidr` and deploy
+into a VPC dedicated to jambonz.
+
+### What the stack does and does not touch
+
+It still creates its own security groups and Elastic IP, inside your VPC. It does not add,
+remove or modify any subnet, route table, route or gateway in your VPC.
+
+One exception on teardown: the Elastic IP carries `DeletionPolicy: Retain`, so
+`delete-stack` reaches `DELETE_COMPLETE` and leaves it allocated and billed — and mini's
+Elastic IP is untagged, so months later it is an unattached address with nothing to say
+which stack created it. Release it by hand after deleting the stack.
 
 ## Generate and Deploy
 

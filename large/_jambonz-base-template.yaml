@@ -149,15 +149,29 @@ Parameters:
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
     Default: 0.0.0.0/0
   VpcCidr:
-    Description: "The CIDR block for the whole VPC"
+    Description: "The CIDR block of the VPC. When creating a new VPC (ExistingVpcId left blank) this is the CIDR that gets created. When deploying into an existing VPC, set this to that VPC's own CIDR - it is used in security group rules that allow internal traffic between jambonz components."
     Type: "String"
     Default: '172.20.0.0/16'
+    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
+    ConstraintDescription: must be a valid network CIDR
+  ExistingVpcId:
+    Description: "Optional. Leave BLANK (the default) to create a new VPC, subnets, internet gateway and route tables. To deploy into a VPC you already have, enter its id (e.g. vpc-0abc123def456789). You must then also set ExistingSubnetIds, and set VpcCidr above to that VPC's CIDR."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^vpc-[0-9a-f]{8,17}$
+    ConstraintDescription: must be blank, or a VPC id of the form vpc-0abc123def456789
+  ExistingSubnetIds:
+    Description: "Optional. Required only when ExistingVpcId is set: exactly TWO PUBLIC subnet ids in that VPC, in different availability zones, comma separated with no spaces (e.g. subnet-0aaa...,subnet-0bbb...). Both subnets need a default route to an internet gateway and auto-assign public IPv4 enabled; two AZs are required by the database, cache and load balancer. Ignored when creating a new VPC."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^subnet-[0-9a-f]{8,17},subnet-[0-9a-f]{8,17}$
+    ConstraintDescription: must be blank, or exactly two comma-separated subnet ids with no spaces (subnet-0aaa...,subnet-0bbb...)
   PublicSubnet1CIDR:
-    Description: "Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone"
+    Description: "Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone. Ignored when ExistingVpcId is set."
     Type: "String"
     Default: '172.20.10.0/24'
   PublicSubnet2CIDR:
-    Description: "Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone"
+    Description: "Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone. Ignored when ExistingVpcId is set."
     Type: "String"
     Default: '172.20.11.0/24'
   MySQLUsername:
@@ -238,6 +252,27 @@ Parameters:
     Default: 200
     MinValue: 100
 
+Rules:
+  # ExistingVpcId and ExistingSubnetIds are only meaningful together. Rules are evaluated
+  # before any resource is touched, so a mismatch is rejected in seconds instead of failing
+  # 20 minutes into a create and rolling back - or worse, silently building a new VPC.
+  SubnetsRequireExistingVpcId:
+    RuleCondition:
+      Fn::Equals: [{Ref: ExistingVpcId}, ""]
+    Assertions:
+      - Assert:
+          Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
+        AssertDescription: "ExistingSubnetIds must be left blank when ExistingVpcId is blank. Supplying subnets without a VPC id would silently create a brand new VPC and ignore them."
+  ExistingVpcIdRequiresSubnets:
+    RuleCondition:
+      Fn::Not:
+        - Fn::Equals: [{Ref: ExistingVpcId}, ""]
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
+        AssertDescription: "ExistingSubnetIds is required when ExistingVpcId is set: exactly two public subnet ids in that VPC, in different availability zones."
+
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
@@ -250,6 +285,9 @@ Conditions:
   UseDefaultWebserverInstanceType: !Equals [!Ref InstanceTypeWebserver, ""]
   UseDefaultMonitoringServerInstanceType: !Equals [!Ref InstanceTypeMonitoringServer, ""]
   UseDefaultRecordingInstanceType: !Equals [!Ref RecordingInstanceType, ""]
+
+  # Networking - create a new VPC unless the user pointed us at an existing one
+  CreateVpc: !Equals [!Ref ExistingVpcId, ""]
 
 Resources:
   EncryptionSecret:
@@ -310,8 +348,11 @@ Resources:
 ###########################################
   VPC:
     Type: "AWS::EC2::VPC"
+    Condition: CreateVpc
     Properties:
       CidrBlock: !Ref "VpcCidr"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
       Tags:
       - Key: "Name"
         Value: !Sub "${AWS::StackName}-VPC"
@@ -319,6 +360,7 @@ Resources:
   # Create Internet Gateway
   InternetGateway:
     Type: "AWS::EC2::InternetGateway"
+    Condition: CreateVpc
     Properties:
       Tags:
       - Key: "Name"
@@ -327,6 +369,7 @@ Resources:
   # Attach Internet Gateway to VPC 
   GatewayToInternet:
     Type: "AWS::EC2::VPCGatewayAttachment"
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref "VPC"
       InternetGatewayId: !Ref "InternetGateway"
@@ -335,6 +378,7 @@ Resources:
   # Create Public Subnet
   PublicSubnet1:
     Type: "AWS::EC2::Subnet"
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref "VPC"
       CidrBlock: !Ref "PublicSubnet1CIDR"
@@ -346,6 +390,7 @@ Resources:
 
   PublicSubnet2:
     Type: "AWS::EC2::Subnet"
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref "VPC"
       CidrBlock: !Ref "PublicSubnet2CIDR"
@@ -358,6 +403,7 @@ Resources:
   # Create Public Route Table 1
   PublicRouteTable1:
     Type: "AWS::EC2::RouteTable"
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref "VPC"
       Tags:
@@ -367,6 +413,7 @@ Resources:
   # Create Public Route Table 2
   PublicRouteTable2:
     Type: "AWS::EC2::RouteTable"
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref "VPC"
       Tags:
@@ -376,6 +423,7 @@ Resources:
   # Route-out Public Route Table to Internet Gateway (Internet connection)
   PublicRouteIGW1:
     Type: "AWS::EC2::Route"
+    Condition: CreateVpc
     DependsOn: "GatewayToInternet"
     Properties:
       RouteTableId: !Ref "PublicRouteTable1"
@@ -384,6 +432,7 @@ Resources:
 
   PublicRouteIGW2:
     Type: "AWS::EC2::Route"
+    Condition: CreateVpc
     DependsOn: "GatewayToInternet"
     Properties:
       RouteTableId: !Ref "PublicRouteTable2"
@@ -393,12 +442,14 @@ Resources:
   # Associate Public Route Table with Public Subnet1 & Subnet2
   PublicSubnet1RouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Condition: CreateVpc
     Properties:
       SubnetId: !Ref "PublicSubnet1"
       RouteTableId: !Ref "PublicRouteTable1"
 
   PublicSubnet2RouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Condition: CreateVpc
     Properties:
       SubnetId: !Ref "PublicSubnet2"
       RouteTableId: !Ref "PublicRouteTable2"
@@ -414,7 +465,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-jambonz-ssh-sg'
       GroupDescription: !Sub 'Security group for ssh to ${AWS::StackName} jambonz cluster'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -427,7 +478,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-redis-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Redis'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 6379
@@ -448,7 +499,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-mysql-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} MySQL'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3306
@@ -469,7 +520,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-feature-server-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Feature Server'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3000
@@ -510,7 +561,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-webserver-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} WebServer'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -546,7 +597,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-sbc-sip-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Sbc Sip Server'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3000
@@ -617,7 +668,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-spc-rtp-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} sbc RTP'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: udp
           FromPort: 40000
@@ -663,7 +714,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-monitoring-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Monitoring'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3010
@@ -720,7 +771,7 @@ Resources:
       Properties:
         GroupName: !Sub '${AWS::StackName}-recording-alb-sg'
         GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server ALB'
-        VpcId: !Ref VPC
+        VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
         SecurityGroupIngress:
           - IpProtocol: tcp
             FromPort: 80
@@ -742,7 +793,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-recording-instance-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server instances'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3000
@@ -851,8 +902,8 @@ Resources:
       Name: !Sub "${AWS::StackName}-recording-alb"
       Scheme: internet-facing
       Subnets: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       SecurityGroups:
         - !Ref RecordingALBSecurityGroup
       LoadBalancerAttributes:
@@ -869,7 +920,7 @@ Resources:
       Name: !Sub "${AWS::StackName}-recording-tg"
       Port: 3000
       Protocol: HTTP
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       HealthCheckProtocol: HTTP
       HealthCheckPort: "3000"
       HealthCheckPath: "/health"
@@ -895,8 +946,8 @@ Resources:
     Properties:
       AutoScalingGroupName: !Sub "${AWS::StackName}-recording-asg"
       VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       LaunchTemplate:
         LaunchTemplateId: !Ref RecordingLaunchTemplate
         Version: !GetAtt RecordingLaunchTemplate.LatestVersionNumber
@@ -936,8 +987,8 @@ Resources:
       DBSubnetGroupName: !Sub '${AWS::StackName}-aurora-mysql-subnetgroup'
       DBSubnetGroupDescription: CloudFormation managed DB subnet group.
       SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
 
   DatabaseCluster:
     Type: AWS::RDS::DBCluster
@@ -981,8 +1032,8 @@ Resources:
       CacheSubnetGroupName: !Sub '${AWS::StackName}-cache-subnetgroup'
       Description: !Sub '${AWS::StackName} Subnet Group'
       SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
 
   ElastiCacheParameterGroup:
     Type: AWS::ElastiCache::ParameterGroup
@@ -1018,7 +1069,7 @@ Resources:
   MonitoringServerEC2:
     Type: 'AWS::EC2::Instance'
     Properties:
-      SubnetId: !Ref PublicSubnet1
+      SubnetId: !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "MonitoringServerAmi"]
       InstanceType: !If
         - UseDefaultMonitoringServerInstanceType
@@ -1476,8 +1527,8 @@ Resources:
       TerminationPolicies:
        - OldestInstance
       VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       Tags:
         - 
           Key: Name
@@ -1786,8 +1837,8 @@ Resources:
       TerminationPolicies:
       - OldestInstance
       VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       Tags:
         - 
           Key: Name
@@ -2057,8 +2108,8 @@ Resources:
       TerminationPolicies:
        - OldestInstance
       VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       Tags:
         -
           Key: Name
@@ -2184,7 +2235,7 @@ Resources:
       - ElastiCacheCluster
     Type: 'AWS::EC2::Instance'
     Properties:
-      SubnetId: !Ref PublicSubnet1
+      SubnetId: !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
       IamInstanceProfile: !Ref WebServerInstanceProfile
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "WebserverAmi"]
       InstanceType: !If
@@ -2523,8 +2574,8 @@ Outputs:
     Description: SBC RTP IP address
 
   VPC: 
-    Description: "A reference to the created VPC"
-    Value: !Ref "VPC"
+    Description: "The VPC this stack deployed into - created by this stack unless ExistingVpcId was supplied"
+    Value: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
     Export:
       Name: !Sub "${AWS::StackName}-VPC"
 
@@ -2535,20 +2586,20 @@ Outputs:
       Name: !Sub "${AWS::StackName}-SelfiepopVpcCidr"
 
   PublicSubnets:
-    Description: "A list of the public subnets"
-    Value: !Join [ ",", [ !Ref "PublicSubnet1", !Ref "PublicSubnet2" ]]
+    Description: "The public subnets this stack deployed into"
+    Value: !Join [ ",", [ !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]], !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]] ]]
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnets"
 
   PublicSubnet1:
-    Description: "A reference to the public subnet in the 1st Availability Zone"
-    Value: !Ref "PublicSubnet1"
+    Description: "The public subnet in the 1st availability zone"
+    Value: !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnet1"
 
   PublicSubnet2:
-    Description: "A reference to the public subnet in the 2nd Availability Zone"
-    Value: !Ref "PublicSubnet2"
+    Description: "The public subnet in the 2nd availability zone"
+    Value: !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnet2"
 

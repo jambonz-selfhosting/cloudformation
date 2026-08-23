@@ -40,7 +40,9 @@ The medium deployment creates:
 | `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
 | `AllowedSbcCidr` | CIDR for SIP/RTP access | 0.0.0.0/0 |
 | `AllowedSmppCidr` | CIDR for SMPP access | 0.0.0.0/0 |
-| `VpcCidr` | CIDR range for the VPC | 172.20.0.0/16 |
+| `VpcCidr` | CIDR range of the VPC. When using an existing VPC, set this to that VPC's CIDR | 172.20.0.0/16 |
+| `ExistingVpcId` | Optional. Blank creates a new VPC; set to a `vpc-...` id to deploy into a VPC you already have | (blank) |
+| `ExistingSubnetIds` | Optional. Required when `ExistingVpcId` is set: exactly two public subnet ids in different AZs, comma separated with no spaces | (blank) |
 | `MySQLUsername` | Database username | admin |
 | `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
@@ -62,6 +64,145 @@ The medium deployment creates:
 > recording servers on the burstable `t4g` tier. If you set an instance type explicitly, match
 > it to the selected architecture. arm64 availability is region-dependent — see the top-level
 > README.
+
+## Deploying into an existing VPC
+
+By default the stack creates its own VPC, two public subnets, internet gateway and route
+tables, and nothing else is required. To deploy into a VPC you already have, set these
+parameters:
+
+| Parameter | Example |
+|-----------|---------|
+| `ExistingVpcId` | `vpc-0abc123def456789` |
+| `ExistingSubnetIds` | `subnet-0aaaaaaaaaaaaaaaa,subnet-0bbbbbbbbbbbbbbbb` — exactly two, comma separated, **no spaces** |
+| `VpcCidr` | `172.20.0.0/16` — the CIDR of that VPC, **not** a new range |
+
+Leave `ExistingVpcId` blank and the stack behaves exactly as it always has. When it is set,
+`PublicSubnetCIDR` and `PublicSubnetCIDR2` are ignored.
+
+The *shape* of both new parameters is validated before any resource is created, so the wrong
+number of subnets, a stray space, a malformed id, or setting one parameter without the other
+is rejected in seconds instead of failing 20 minutes into a create and rolling back.
+
+What is **not** checked, and you must verify yourself: that the subnets actually exist, that
+they are two *different* subnets in two *different* AZs, that they belong to
+`ExistingVpcId`, and that `VpcCidr` matches the real VPC. The `VpcCidr` pattern only checks
+the shape - it accepts `999.999.999.999/99`.
+
+> **Passing two subnets on the CLI.** The `--parameters ParameterKey=...,ParameterValue=...`
+> shorthand splits on *every* comma, so the AWS CLI reads the second subnet as a new key and
+> the command fails to parse before it ever reaches CloudFormation. The comma needs escaping
+> **and** the argument needs shell quoting, or the shell eats the backslash and you get the
+> same failure:
+>
+> ```bash
+> # correct - single quotes keep the backslash intact
+> --parameters 'ParameterKey=ExistingSubnetIds,ParameterValue=subnet-0aaa\,subnet-0bbb'
+> ```
+>
+> A JSON parameter file avoids the problem entirely and is what the Terraform harness in
+> `cloudformation_terraform` emits: `--parameters file://params.json`.
+
+### `ExistingVpcId` cannot be changed after the stack is created
+
+Treat it as a create-time-only decision. Switching a live stack from its own VPC to an
+existing one (or back) cannot succeed: the security groups, DB subnet group and cache
+subnet group all carry fixed physical names, so the required replacement collides with
+itself, and the old VPC cannot be deleted while its ENIs remain. The stack ends in
+`UPDATE_ROLLBACK_FAILED`.
+
+The dangerous direction is accidental. **CloudFormation substitutes the template default
+for any parameter you omit on an update — it does not keep the previous value.** So an
+update that forgets `ExistingVpcId` silently flips back to "create a new VPC". Always pass
+it explicitly, or use `--parameters ParameterKey=ExistingVpcId,UsePreviousValue=true`, on
+every update. `aws cloudformation deploy` and console updates that start from the existing
+parameter set are not affected.
+
+### Requirements for the VPC and subnets you supply
+
+- **Two subnets, in two different availability zones.** The Aurora database, the ElastiCache
+  cluster and the recording load balancer all require two AZs. The parameter pattern
+  enforces that you pass exactly two ids, but it cannot tell whether they are in different
+  AZs or whether you pasted the same id twice — either produces
+  `DBSubnetGroupDoesNotCoverEnoughAZs` or "At least two subnets in two different
+  Availability Zones must be specified" part-way into the create.
+- **Both subnets must be public** — each needs a default route (`0.0.0.0/0`) to an internet
+  gateway. jambonz needs public IPs for SIP, RTP and the portal, and instances download
+  packages from the internet on first boot. Private subnets behind a NAT gateway will not
+  work.
+- **Auto-assign public IPv4 must be enabled on both subnets, and this failure is silent.**
+  The SBC and feature server instances request a public IP explicitly, but the web/monitoring server and the recording servers
+  inherit it from the subnet setting — and AWS defaults auto-assign to **off** for subnets
+  you create yourself. Without it those instances come up with no public
+  address, their first-boot UserData cannot reach Secrets Manager and never completes, and
+  the recording instances never pass their load balancer health check. Nothing in these
+  templates signals boot success, so **CloudFormation still reports `CREATE_COMPLETE`** —
+  you get a green stack and a broken cluster. Verify the setting before deploying: in the
+  console, *Subnet → Actions → Edit subnet settings → Enable auto-assign public IPv4
+  address*.
+- **The subnets need room to scale.** An internet-facing Application Load Balancer requires
+  each of its subnets to be at least a `/27` and to have 8 free addresses, and the
+  auto-scaling groups here can reach 16 instances between them, plus the standalone
+  instances and the RDS/ElastiCache ENIs. Subnets smaller than `/27` fail load balancer
+  creation outright; `/24`s that already hold your own workloads instead stall scale-out with
+  `InsufficientFreeAddressesInSubnet` during a call surge, which raises no stack event. The
+  created-VPC path never hit this because it always carves fresh `/24`s.
+- **Check the subnets' Network ACLs.** A fresh VPC gets an allow-all NACL, so this never
+  mattered before. A locked-down enterprise subnet that only permits 80/443 will
+  statelessly drop SIP (5060/5061/8443) and RTP (UDP 40000-60000) while every security group
+  still looks correct — calls connect with no audio and there is nothing in the stack events
+  to point at.
+- **`VpcCidr` must match the existing VPC's CIDR.** CloudFormation cannot look up the CIDR
+  of an existing VPC, so you have to tell it, and nothing verifies your answer. It does two
+  jobs: it drives the security group rules that let jambonz components reach each other, and
+  it is passed to the feature servers as `JAMBONES_NETWORK_CIDR`, which is how jambonz tells
+  internal traffic from external. Get it wrong — for instance by leaving the default while
+  your VPC is `10.42.0.0/16` — and the database, cache and inter-component ports are closed
+  to the very instances that need them while SIP is misclassified. Nothing fails at deploy
+  time; the stack reaches `CREATE_COMPLETE` and calls die with no obvious cause.
+- **DNS resolution and DNS hostnames should be enabled** on the VPC. The stack enables both
+  on the VPC it creates, and the database and cache endpoints are resolved by name. Note
+  that `enableDnsHostnames` is **off** by default for a VPC you created yourself, so check
+  rather than assume.
+- The subnets must be in the region the template was generated for.
+
+### Security: what `VpcCidr` opens up in a shared VPC
+
+Read this before deploying into a VPC that hosts anything else. jambonz components reach
+each other through security group rules written against `VpcCidr`, not against each other's
+security groups. When the stack created its own VPC that CIDR meant "jambonz only". In an
+existing VPC the same rules mean **every workload in that VPC** — 20 rules in total:
+
+| Port(s) | Service | Note |
+|---------|---------|------|
+| 3306 | Aurora MySQL | CDRs, account API keys, SIP credentials. `PubliclyAccessible: false` is the only other control. |
+| 6379 | ElastiCache Redis | live call state. No equivalent fallback. |
+| 8086, 8088 | InfluxDB + backup port | **typically unauthenticated** — call metrics |
+| 9080, 9060/udp | Homer webapp + HEP | full SIP capture, i.e. call metadata |
+| 4000 | Grafana | dashboards |
+| 16686, 14268-14269 | Jaeger query + collector | traces |
+| 3000-3009 | internal HTTP between api/sbc/feature servers | |
+| 5060/udp, 5060/tcp | SIP between components | |
+| 8080, 9090, 22222-22223/udp, 22224-22233/udp | rtpengine ng/ws, Prometheus scrape, DTMF events | |
+| 16000-32000/udp, 40000-60000/udp | RTP media | |
+
+Any EC2 instance, VPC-attached Lambda or container anywhere in that VPC can reach all of it.
+InfluxDB and Homer are the ones worth pausing on: they are usually unauthenticated and they
+hold call metadata.
+
+If that is not acceptable, deploy into a VPC dedicated to jambonz (or its own account), or
+convert these rules to `SourceSecurityGroupId` — the templates already use that form in a
+few places, and doing so would remove the dependence on `VpcCidr` entirely.
+
+### What the stack does and does not touch
+
+It still creates its own security groups, Elastic IPs, database subnet group, cache subnet
+group and load balancer, inside your VPC. It does not add, remove or modify any subnet,
+route table, route or gateway in your VPC.
+
+One exception on teardown: every Elastic IP carries `DeletionPolicy: Retain`, so
+`delete-stack` reaches `DELETE_COMPLETE` and leaves 2 Elastic IPs allocated and billed. Release them
+by hand after deleting the stack, or they sit in your account unattached.
 
 ## Generate and Deploy
 

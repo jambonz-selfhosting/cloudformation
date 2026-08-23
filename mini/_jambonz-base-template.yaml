@@ -50,11 +50,23 @@ Parameters:
     Default: 0.0.0.0/0
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
   VpcCidr:
-    Description: CIDR range for the VPC.
+    Description: "CIDR range of the VPC. When creating a new VPC (ExistingVpcId left blank) this is the CIDR that gets created. When deploying into an existing VPC, set this to that VPC's own CIDR - it is used in security group rules that allow internal traffic."
     Type: String
     ConstraintDescription: must be a valid network CIDR
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
     Default: 10.0.0.0/16
+  ExistingVpcId:
+    Description: "Optional. Leave BLANK (the default) to create a new VPC, subnet, internet gateway and route table. To deploy into a VPC you already have, enter its id (e.g. vpc-0abc123def456789). You must then also set ExistingSubnetIds, and set VpcCidr above to that VPC's CIDR."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^vpc-[0-9a-f]{8,17}$
+    ConstraintDescription: must be blank, or a VPC id of the form vpc-0abc123def456789
+  ExistingSubnetIds:
+    Description: "Optional. Required only when ExistingVpcId is set: the id of ONE PUBLIC subnet in that VPC to launch into (e.g. subnet-0abc123def456789). The subnet must have a default route to an internet gateway and auto-assign public IPv4 enabled - jambonz needs a public IP for SIP, RTP and the portal. Ignored when creating a new VPC."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^subnet-[0-9a-f]{8,17}$
+    ConstraintDescription: must be blank, or exactly one subnet id (subnet-0abc123def456789)
   Cloudwatch:
     Description: Send jambonz logs to cloudwatch
     Type: String
@@ -103,12 +115,36 @@ Parameters:
       - "true"
       - "false"
 
+Rules:
+  # ExistingVpcId and ExistingSubnetIds are only meaningful together. Rules are evaluated
+  # before any resource is touched, so a mismatch is rejected in seconds instead of failing
+  # 20 minutes into a create and rolling back - or worse, silently building a new VPC.
+  SubnetsRequireExistingVpcId:
+    RuleCondition:
+      Fn::Equals: [{Ref: ExistingVpcId}, ""]
+    Assertions:
+      - Assert:
+          Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
+        AssertDescription: "ExistingSubnetIds must be left blank when ExistingVpcId is blank. Supplying subnets without a VPC id would silently create a brand new VPC and ignore them."
+  ExistingVpcIdRequiresSubnets:
+    RuleCondition:
+      Fn::Not:
+        - Fn::Equals: [{Ref: ExistingVpcId}, ""]
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
+        AssertDescription: "ExistingSubnetIds is required when ExistingVpcId is set: the id of one public subnet in that VPC."
+
 Conditions:
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
   # Instance type condition - use regional default when parameter is blank
   UseDefaultInstanceType: !Equals [!Ref InstanceType, ""]
+
+  # Networking - create a new VPC unless the user pointed us at an existing one
+  CreateVpc: !Equals [!Ref ExistingVpcId, ""]
 
 Resources:
   EncryptionSecret:
@@ -159,12 +195,23 @@ Resources:
                 Resource: !Ref EncryptionSecret
   VPC:
     Type: 'AWS::EC2::VPC'
+    Condition: CreateVpc
     Properties:
       EnableDnsSupport: true
       EnableDnsHostnames: true
       CidrBlock: !Ref VpcCidr
   PublicSubnet:
     Type: 'AWS::EC2::Subnet'
+    Condition: CreateVpc
+    # Ordering: whatever launches into this subnet - the instance, and the EIP
+    # association that follows it - must wait for the internet gateway route, or the
+    # instance can come up before it has a way out and its UserData fails. This edge
+    # lives here, on a resource gated by the same condition as PublicRoute, so it
+    # disappears cleanly in existing-VPC mode. Do NOT move it onto an ungated
+    # resource: CloudFormation rejects a DependsOn pointing at a resource excluded by
+    # a false condition ("Unresolved resource dependencies"), which breaks every
+    # existing-VPC deploy.
+    DependsOn: PublicRoute
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Ref VpcCidr
@@ -191,7 +238,7 @@ Resources:
           AssociatePublicIpAddress: true
           DeviceIndex: '0'
           DeleteOnTermination: true
-          SubnetId: !Ref PublicSubnet
+          SubnetId: !If [CreateVpc, !Ref PublicSubnet, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
@@ -429,7 +476,7 @@ Resources:
   jambonzSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       GroupDescription: 'Allow sip, rtp, http and ssh access'
       SecurityGroupIngress:
         - Description: sip over udp
@@ -492,12 +539,10 @@ Resources:
           FromPort: 0
           ToPort: 0
           CidrIp: 0.0.0.0/0
-    DependsOn:
-      - PublicRoute
   sshSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       GroupDescription: 'Allow sip, rtp, http and ssh access'
       SecurityGroupIngress:
         - Description: ssh
@@ -510,17 +555,18 @@ Resources:
           FromPort: 0
           ToPort: 0
           CidrIp: 0.0.0.0/0
-    DependsOn:
-      - PublicRoute
   InternetGateway:
     Type: 'AWS::EC2::InternetGateway'
+    Condition: CreateVpc
     Properties: {}
   PublicRouteTable:
     Type: 'AWS::EC2::RouteTable'
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref VPC
   PublicRoute:
     Type: 'AWS::EC2::Route'
+    Condition: CreateVpc
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
       RouteTableId: !Ref PublicRouteTable
@@ -529,11 +575,13 @@ Resources:
       - VPCGatewayAttachment
   VPCGatewayAttachment:
     Type: 'AWS::EC2::VPCGatewayAttachment'
+    Condition: CreateVpc
     Properties:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
   PublicSubnetRouteTableAssociation:
     Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Condition: CreateVpc
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet
