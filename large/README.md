@@ -34,6 +34,10 @@ The large deployment creates:
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
 | `URLPortal` | DNS name for the portal | (required) |
 | `EnablePcaps` | Enable PCAPs for SIP traffic | (required) |
+| `EnableTLS` | Enable SIP over TLS (5061) and WSS (8443) on the SBC | false |
+| `SipDomain` | Required with `EnableTLS`: SIP domain for the certificate, e.g. `sip.example.com` | (blank) |
+| `CertEmail` | Required with `EnableTLS`: email Let's Encrypt registers the cert against | (blank) |
+| `HostedZoneId` | Required with `EnableTLS`: Route 53 hosted zone id for `SipDomain` | (blank) |
 | `InstanceTypeSbcSip` | EC2 instance type for SBC SIP servers | c5n.xlarge |
 | `InstanceTypeSbcRtp` | EC2 instance type for SBC RTP servers | c5n.xlarge |
 | `InstanceTypeFeatureServer` | EC2 instance type for Feature servers | c5n.xlarge |
@@ -288,6 +292,75 @@ After the stack is created, create the following DNS A records:
 
 **Pointing to SipServerIP:**
 - `sip.my-domain.example.com`
+
+### Enable SIP over TLS and WSS
+
+Set four parameters and the SBC configures itself at boot — no SSH, no manual certbot run:
+
+| Parameter | Example |
+|-----------|---------|
+| `EnableTLS` | `true` |
+| `SipDomain` | `sip.example.com` |
+| `CertEmail` | `admin@example.com` |
+| `HostedZoneId` | `Z1234567890ABC` |
+
+This brings up SIP over TLS on `5061` and SIP over secure WebSockets on `8443` — the latter
+is what browser clients (jsSIP, SIP.js) need, since browsers refuse plain `ws`. The security
+group already allows both from `AllowedSbcCidr`.
+
+Leave `EnableTLS` at `false` and nothing changes; the other three are ignored.
+
+#### What happens on the SBC
+
+The launch template writes `/usr/local/bin/drachtio_tls.sh` on every boot and runs it. The
+script:
+
+1. requests a certificate for `SipDomain` **and** `*.SipDomain` via certbot's Route 53
+   DNS-01 plugin;
+2. inserts the `<tls>` block into `/etc/drachtio.conf.xml`;
+3. appends the `sips:` contacts to `/etc/systemd/system/drachtio.service`;
+4. drops a renewal hook at `/etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh` and
+   enables `certbot.timer`;
+5. reloads systemd and restarts drachtio.
+
+Every step is guarded, so re-running it is a no-op. It is written out on each boot on
+purpose: a replacement instance in the autoscaling group starts with an empty
+`/etc/letsencrypt` and an unmodified `drachtio.conf.xml`, so it has to redo the work.
+
+The wildcard means you can give different jambonz accounts different SIP realms
+(`alice.sip.example.com`, `bob.sip.example.com`) under one certificate. Pass the bare
+domain — the `*.` is added for you.
+
+Because the whole thing lives in the launch template rather than the AMI, changing it is a
+stack update, not an image rebuild.
+
+#### Renewal
+
+Certificates last 90 days. The certbot package installs a systemd timer that renews them on
+its own; the missing piece is that drachtio keeps serving the old certificate until it
+restarts, so the script installs a deploy hook that restarts drachtio after each renewal.
+No cron entry is needed — the packaged timer already covers it.
+
+#### Requirements
+
+- **The DNS zone must be in Route 53, in this account.** DNS-01 is the only challenge that
+  can issue a wildcard, and the SBC has no port 80 open, so HTTP-01 was never an option. The
+  template grants the SBC `route53:ChangeResourceRecordSets` scoped to `HostedZoneId` alone,
+  plus `ListHostedZones` and `GetChange`, which accept no resource scope. That policy is
+  created only when `EnableTLS` is true.
+- **`sip.<your-domain>` must resolve to the SBC's Elastic IP** so clients can validate the
+  certificate. See the DNS records section above.
+- **certbot with the route53 plugin must be in the AMI.** Images built from the packer repo
+  with `install_certbot=yes` have it. If certbot is missing the boot script fails, logs the
+  error, and the SBC comes up **without TLS** — and since nothing here signals boot status,
+  the stack still reports `CREATE_COMPLETE`. Check `/var/log/cloud-init-output.log` on the
+  SBC after the first deploy.
+
+**Certificates are requested on every SBC boot**, since an autoscaled instance starts with an
+empty `/etc/letsencrypt`. Let's Encrypt allows 50 certificates per registered domain per
+week, so an SBC group that scales up and down repeatedly can hit that ceiling and boot
+without TLS. If you expect frequent scaling, issue the certificate once and distribute it
+from Secrets Manager instead of calling ACME per instance.
 
 ### Enable HTTPS for the portal
 

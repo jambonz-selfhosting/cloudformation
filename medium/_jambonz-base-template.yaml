@@ -233,6 +233,32 @@ Parameters:
     Default: 200
     MinValue: 100
 
+  EnableTLS:
+    Description: "Enable SIP over TLS (port 5061) and SIP over secure WebSockets (port 8443) on the SBC. Requires SipDomain, CertEmail and HostedZoneId. The SBC gets a wildcard certificate from Let's Encrypt at boot using certbot's Route 53 DNS-01 plugin, so the SIP domain's DNS zone must be hosted in Route 53 in this account."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  SipDomain:
+    Description: "Required when EnableTLS is true: the SIP domain the certificate is issued for, e.g. sip.example.com. A wildcard (*.sip.example.com) is requested alongside it, so different jambonz accounts can register under different SIP realms. Pass the bare domain - the leading *. is added for you. Leave blank when EnableTLS is false."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,}$
+    ConstraintDescription: must be blank, or a domain name such as sip.example.com
+  CertEmail:
+    Description: "Required when EnableTLS is true: the email address Let's Encrypt registers the certificate against and notifies about expiry. Leave blank when EnableTLS is false."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$
+    ConstraintDescription: must be blank, or a valid email address
+  HostedZoneId:
+    Description: "Required when EnableTLS is true: the Route 53 hosted zone id for SipDomain, e.g. Z1234567890ABC. It scopes the DNS write permission granted to the SBC to that one zone. Leave blank when EnableTLS is false."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^Z[A-Z0-9]{4,32}$
+    ConstraintDescription: must be blank, or a Route 53 hosted zone id such as Z1234567890ABC
+
 Rules:
   # ExistingVpcId and ExistingSubnetIds are only meaningful together. Rules are evaluated
   # before any resource is touched, so a mismatch is rejected in seconds instead of failing
@@ -254,6 +280,26 @@ Rules:
             - Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
         AssertDescription: "ExistingSubnetIds is required when ExistingVpcId is set: exactly two public subnet ids in that VPC, in different availability zones."
 
+  # TLS is all-or-nothing: certbot cannot run without a domain, an email, and a zone to
+  # write the DNS-01 challenge into. Checked before any resource is created, because the
+  # failure would otherwise land in the SBC's boot script, where nothing surfaces it.
+  TlsRequiresDomainEmailAndZone:
+    RuleCondition:
+      Fn::Equals: [{Ref: EnableTLS}, "true"]
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: SipDomain}, ""]
+        AssertDescription: "SipDomain is required when EnableTLS is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: CertEmail}, ""]
+        AssertDescription: "CertEmail is required when EnableTLS is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: HostedZoneId}, ""]
+        AssertDescription: "HostedZoneId is required when EnableTLS is true - certbot answers the Route 53 DNS-01 challenge in that zone."
+
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
@@ -267,6 +313,9 @@ Conditions:
 
   # Networking - create a new VPC unless the user pointed us at an existing one
   CreateVpc: !Equals [!Ref ExistingVpcId, ""]
+
+  # SIP TLS / WSS on the SBC
+  EnableTlsCondition: !Equals [!Ref EnableTLS, "true"]
 
 Resources:
   EncryptionSecret:
@@ -323,6 +372,29 @@ Resources:
       - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
       - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+
+  # Lets the SBC answer certbot's DNS-01 challenge. ListHostedZones and GetChange take no
+  # resource scope; the record write is pinned to the single zone the operator named.
+  # Only created when TLS is switched on.
+  Route53CertbotPolicy:
+    Type: AWS::IAM::Policy
+    Condition: EnableTlsCondition
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-route53-certbot-dns'
+      Roles:
+        - !Ref IamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'route53:ListHostedZones'
+              - 'route53:GetChange'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'route53:ChangeResourceRecordSets'
+            Resource: !Sub 'arn:aws:route53:::hostedzone/${HostedZoneId}'
 
   VPC:
     Type: AWS::EC2::VPC
@@ -1664,6 +1736,105 @@ Resources:
                 APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
                 sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
                 sudo /usr/local/bin/apiban/apiban-client-nftables FULL
+
+                # ---------------------------------------------------------------
+                # SIP over TLS (5061) and SIP over secure WebSockets (8443)
+                #
+                # The whole feature lives here rather than in the AMI, so it can be
+                # changed without a rebuild. The script below is written out on every
+                # boot, which matters for an autoscaled SBC: a replacement instance
+                # starts with an empty /etc/letsencrypt and an unmodified
+                # drachtio.conf.xml, so it has to redo the work. Every step is
+                # guarded, so re-running it is a no-op.
+                # ---------------------------------------------------------------
+                if [[ "${EnableTLS}" == "true" ]]; then
+                  echo "configuring SIP TLS/WSS for ${SipDomain}"
+
+                  cat << 'DRACHTIO_TLS_EOF' > /usr/local/bin/drachtio_tls.sh
+                #!/bin/bash
+                # Enable SIP over TLS and WSS on this SBC.
+                # Generated by the jambonz CloudFormation launch template - do not edit
+                # here, edit the template and replace the instance.
+                set -o pipefail
+
+                DOMAIN="$1"
+                EMAIL="$2"
+                CONF_FILE=/etc/drachtio.conf.xml
+                SERVICE_FILE=/etc/systemd/system/drachtio.service
+                LIVE_DIR="/etc/letsencrypt/live/$DOMAIN"
+
+                if [ -z "$DOMAIN" ] || [ -z "$EMAIL" ]; then
+                  echo "usage: $0 <sip-domain> <cert-email>" >&2
+                  exit 1
+                fi
+
+                # --- 1. certificate ------------------------------------------------
+                # Wildcard alongside the apex so each jambonz account can register
+                # under its own SIP realm. DNS-01 is the only challenge that issues a
+                # wildcard, and an SBC has no port 80 open, so it is also the only
+                # challenge available here.
+                if [ -d "$LIVE_DIR" ]; then
+                  echo "certificate for $DOMAIN already present, skipping certbot"
+                else
+                  if ! certbot certonly --non-interactive --agree-tos \
+                        --dns-route53 --dns-route53-propagation-seconds 60 \
+                        --email "$EMAIL" -d "$DOMAIN" -d "*.$DOMAIN"; then
+                    echo "ERROR: certbot failed, leaving drachtio without TLS" >&2
+                    exit 1
+                  fi
+                fi
+
+                # --- 2. <tls> block in drachtio.conf.xml ---------------------------
+                if grep -q "<tls>" "$CONF_FILE"; then
+                  echo "<tls> already present in $CONF_FILE"
+                else
+                  cp "$CONF_FILE" "$CONF_FILE.bak"
+                  TLS_BLOCK="    <tls>\n            <key-file>$LIVE_DIR/privkey.pem</key-file>\n            <cert-file>$LIVE_DIR/fullchain.pem</cert-file>\n            <chain-file>$LIVE_DIR/fullchain.pem</chain-file>\n        </tls>"
+                  sed -i "s|</sip>|$TLS_BLOCK\n    </sip>|" "$CONF_FILE"
+                  if grep -q "<tls>" "$CONF_FILE"; then
+                    echo "added <tls> to $CONF_FILE"
+                  else
+                    echo "ERROR: failed to add <tls> to $CONF_FILE, restoring backup" >&2
+                    mv "$CONF_FILE.bak" "$CONF_FILE"
+                    exit 1
+                  fi
+                fi
+
+                # --- 3. sips: contacts in drachtio.service -------------------------
+                if grep -q "transport=tls" "$SERVICE_FILE"; then
+                  echo "TLS contacts already present in $SERVICE_FILE"
+                else
+                  cp "$SERVICE_FILE" "$SERVICE_FILE.bak"
+                  sed -i '/--contact sip:${!LOCAL_IP};transport=tcp/a --contact sips:${!LOCAL_IP}:5061;transport=tls --external-ip ${!PUBLIC_IP} \\\n--contact sips:${!LOCAL_IP}:8443;transport=wss --external-ip ${!PUBLIC_IP} \\' "$SERVICE_FILE"
+                  if grep -q "transport=tls" "$SERVICE_FILE"; then
+                    echo "added TLS/WSS contacts to $SERVICE_FILE"
+                  else
+                    echo "ERROR: could not find the tcp contact line to anchor on, restoring backup" >&2
+                    mv "$SERVICE_FILE.bak" "$SERVICE_FILE"
+                    exit 1
+                  fi
+                fi
+
+                # --- 4. restart drachtio after renewals ----------------------------
+                # certbot's own systemd timer renews the cert, but drachtio keeps
+                # serving the old one until it restarts. A deploy hook closes that gap.
+                mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+                printf '%s\n' '#!/bin/bash' 'systemctl restart drachtio' \
+                  > /etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh
+                chmod +x /etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh
+                systemctl enable --now certbot.timer 2>/dev/null || true
+
+                systemctl daemon-reload
+                systemctl restart drachtio
+                echo "SIP TLS/WSS configured for $DOMAIN"
+                DRACHTIO_TLS_EOF
+
+                  chmod +x /usr/local/bin/drachtio_tls.sh
+                  /usr/local/bin/drachtio_tls.sh "${SipDomain}" "${CertEmail}" \
+                    || echo "WARNING: SIP TLS setup failed - see above. SBC is running without TLS."
+                else
+                  echo "SIP TLS/WSS not enabled"
+                fi
   
                 echo "user data script completed"
               - VPC_CIDR: !Ref VpcCidr
@@ -1679,6 +1850,9 @@ Resources:
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 EnablePcaps: !Ref EnablePcaps
+                EnableTLS: !Ref EnableTLS
+                SipDomain: !Ref SipDomain
+                CertEmail: !Ref CertEmail
 
   SbcServerPlacementGroup:
     Type: AWS::EC2::PlacementGroup
