@@ -1796,7 +1796,7 @@ Resources:
 
                 if [[ "${EnableTLS}" == "true" ]]; then
                   echo "configuring SIP TLS/WSS for ${SipDomain}"
-                  aws ssm get-parameter --name "/${AWS::StackName}/drachtio/tls-script" \
+                  aws ssm get-parameter --name "${TlsScriptParam}" \
                     --region ${AWS::Region} --query Parameter.Value --output text \
                     > /usr/local/bin/drachtio_tls.sh \
                     && chmod 755 /usr/local/bin/drachtio_tls.sh \
@@ -1809,7 +1809,7 @@ Resources:
                 if [[ "${EnableMtls}" == "true" ]]; then
                   MTLS_CN="${MtlsCommonName}"
                   [ -z "$MTLS_CN" ] && MTLS_CN="${SipDomain}"
-                  aws ssm get-parameter --name "/${AWS::StackName}/drachtio/mtls-script" \
+                  aws ssm get-parameter --name "${MtlsScriptParam}" \
                     --region ${AWS::Region} --query Parameter.Value --output text \
                     > /usr/local/bin/drachtio_mtls.sh \
                     && chmod 755 /usr/local/bin/drachtio_mtls.sh \
@@ -1838,6 +1838,12 @@ Resources:
                 DbCachingTTS: !Ref DbCachingTTS
                 EnablePcaps: !Ref EnablePcaps
                 EnableTLS: !Ref EnableTLS
+                # Referencing the parameters here rather than spelling their paths out
+                # makes CloudFormation order the launch template after them, which
+                # DependsOn cannot express because it rejects Fn::If. It also leaves
+                # the name declared in exactly one place.
+                TlsScriptParam: !If [EnableTlsCondition, !Ref DrachtioTlsScript, 'unused']
+                MtlsScriptParam: !If [EnableMtlsCondition, !Ref DrachtioMtlsScript, 'unused']
                 SipDomain: !Ref SipDomain
                 CertEmail: !Ref CertEmail
                 EnableMtls: !Ref EnableMtls

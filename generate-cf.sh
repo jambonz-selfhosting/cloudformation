@@ -675,7 +675,7 @@ backup_file_if_exists "$OUTPUT_TEMPLATE"
     #  - narrow the Architecture parameter to the architectures we actually copied AMIs for
     #  - splice the drachtio boot scripts into the SSM parameters that carry them
     #
-    # The scripts live in scripts/ as real shell files so they can be linted, diffed and
+    # The scripts live in boot-scripts/ as real shell files so they can be linted, diffed and
     # syntax-checked; they are folded in here rather than inlined in the base template.
     # EC2 caps user data at 16 KB, which is why they travel in Parameter Store instead.
     tail -n +13 "$BASE_TEMPLATE" | awk \
@@ -702,36 +702,6 @@ backup_file_if_exists "$OUTPUT_TEMPLATE"
 echo "✓ CloudFormation template generated: $OUTPUT_TEMPLATE"
 echo ""
 
-# EC2 rejects user data over 16 KB with InvalidUserData.Malformed, which surfaces as a
-# launch template that fails to create and takes the whole stack down with it. Check it
-# here, where it is cheap, rather than 20 minutes into a rollback.
-echo "Checking user data size..."
-UD_LIMIT=16384
-UD_FAIL=0
-while IFS=$'\t' read -r UD_NAME UD_LEN; do
-    [ -z "$UD_NAME" ] && continue
-    if [ "$UD_LEN" -gt "$UD_LIMIT" ]; then
-        echo "  ✗ $UD_NAME: $UD_LEN bytes, over the $UD_LIMIT byte EC2 limit"
-        UD_FAIL=1
-    elif [ "$UD_LEN" -gt $((UD_LIMIT * 85 / 100)) ]; then
-        echo "  ! $UD_NAME: $UD_LEN bytes, within 15% of the $UD_LIMIT byte limit"
-    fi
-done < <(yq eval '
-    .Resources | to_entries | .[]
-    | select(.value.Properties.UserData != null or .value.Properties.LaunchTemplateData.UserData != null)
-    | .key + "\t" + ((.value.Properties.UserData // .value.Properties.LaunchTemplateData.UserData)
-                      | .["Fn::Base64"] | .["Fn::Sub"] | .[0] | length | tostring)
-' "$OUTPUT_TEMPLATE" 2>/dev/null)
-
-if [ "$UD_FAIL" -ne 0 ]; then
-    echo ""
-    echo "ERROR: user data exceeds the EC2 limit; the stack would fail to create."
-    echo "       Move whatever grew into scripts/ and let the SSM parameters carry it."
-    exit 1
-fi
-echo "✓ All user data is within the EC2 limit"
-echo ""
-
 # Validate that the generated file is valid YAML
 echo "Validating generated template..."
 if ! yq eval '.' "$OUTPUT_TEMPLATE" > /dev/null 2>&1; then
@@ -742,6 +712,64 @@ if ! yq eval '.' "$OUTPUT_TEMPLATE" > /dev/null 2>&1; then
     exit 1
 fi
 echo "✓ Template is valid YAML"
+echo ""
+
+# EC2 rejects user data over 16 KB with InvalidUserData.Malformed, which surfaces as a
+# launch template that fails to create and takes the whole stack down with it. Check it
+# here, where it is cheap, rather than 20 minutes into a rollback. Runs after the YAML
+# check so a malformed template cannot slip through by yielding no rows.
+echo "Checking user data size..."
+UD_LIMIT=16384
+UD_FAIL=0
+UD_SEEN=0
+while IFS=$'\t' read -r UD_NAME UD_BODY; do
+    [ -z "$UD_NAME" ] && continue
+    UD_SEEN=$((UD_SEEN + 1))
+    # Each ${Foo} is charged what it plausibly expands to, by name: ARNs are long,
+    # endpoints and hostnames middling, everything else short. ${!Foo} is skipped - it
+    # is the Fn::Sub escape for a shell variable and stays literal.
+    UD_LEN=$(printf '%s' "$UD_BODY" | awk '
+        { line = $0
+          total += length(line)
+          while (match(line, /\$\{[^!}][^}]*\}/)) {
+              name = substr(line, RSTART + 2, RLENGTH - 3)
+              if (name ~ /[Aa][Rr][Nn]/)                       est = 130
+              else if (name ~ /Host|HOST|Address|Endpoint/)    est = 90
+              else if (name ~ /^AWS::/)                        est = 30
+              else                                             est = 60
+              total += est - RLENGTH
+              line = substr(line, RSTART + RLENGTH)
+          }
+        }
+        END { print total }
+    ')
+    if [ "$UD_LEN" -gt "$UD_LIMIT" ]; then
+        echo "  ✗ $UD_NAME: up to $UD_LEN bytes once substituted, over the $UD_LIMIT byte EC2 limit"
+        UD_FAIL=1
+    elif [ "$UD_LEN" -gt $((UD_LIMIT * 85 / 100)) ]; then
+        echo "  ! $UD_NAME: up to $UD_LEN bytes, within 15% of the $UD_LIMIT byte limit"
+    fi
+done < <(yq eval '
+    .Resources | to_entries | .[]
+    | select(.value.Properties.UserData != null or .value.Properties.LaunchTemplateData.UserData != null)
+    | .key + "\t" + ((.value.Properties.UserData // .value.Properties.LaunchTemplateData.UserData)
+                      | .["Fn::Base64"] | .["Fn::Sub"] | .[0] | sub("\n"; " "))
+' "$OUTPUT_TEMPLATE")
+
+# A silent zero here would mean the expression stopped matching - short tags, a
+# single-string Fn::Sub - and the guard would pass every template forever after.
+if [ "$UD_SEEN" -eq 0 ]; then
+    echo "ERROR: found no user data to measure. The size guard is not working;"
+    echo "       fix it before trusting this template."
+    exit 1
+fi
+if [ "$UD_FAIL" -ne 0 ]; then
+    echo ""
+    echo "ERROR: user data exceeds the EC2 limit; the stack would fail to create."
+    echo "       Move whatever grew into boot-scripts/ and let the SSM parameters carry it."
+    exit 1
+fi
+echo "✓ All $UD_SEEN user data blocks are within the EC2 limit"
 echo ""
 
 # ============================================================

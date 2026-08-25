@@ -43,6 +43,7 @@ The large deployment creates:
 | `MtlsCaKeyParam` | Required with `EnableMtls`: SSM parameter holding the private CA key (SecureString) | (blank) |
 | `MtlsCommonName` | CN placed in the client certificate. Blank uses `SipDomain` | (blank) |
 | `MtlsCaFile` | Authorities allowed to sign the *carrier's* server certificate | system bundle |
+| `MtlsVerifyServerCert` | Verify the carrier's certificate at all | false |
 | `MtlsVerifyServerName` | Require the carrier's certificate to match the hostname dialled | false |
 | `InstanceTypeSbcSip` | EC2 instance type for SBC SIP servers | c5n.xlarge |
 | `InstanceTypeSbcRtp` | EC2 instance type for SBC RTP servers | c5n.xlarge |
@@ -463,9 +464,15 @@ and no CA key exists to leak.
 #### `MtlsVerifyServerName` affects every trunk
 
 `verify-server-cert`, `verify-server-name` and `sni` apply to **all** outbound TLS from this
-server, not just the mTLS carrier. Leave `MtlsVerifyServerName` at `false` if any trunk is
-configured by IP address — an IP can never match a hostname in a certificate. `sni` is on by
-default and the template does not touch it.
+server, not just the mTLS carrier — which is why both are parameters defaulting to `false`,
+so switching mTLS on changes nothing for trunks you already have.
+
+`MtlsVerifyServerCert` turns on validation of the carrier's own certificate against
+`MtlsCaFile`. It is worth enabling, but check first that every TLS carrier you use presents a
+certificate chaining to that file; one using a private hierarchy will start failing.
+`MtlsVerifyServerName` additionally requires the certificate to match the hostname dialled,
+so leave it off if any trunk is configured by IP address — an IP can never match a hostname.
+`sni` is on by default and the template does not touch it.
 
 #### Confirm it took
 

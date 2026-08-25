@@ -9,6 +9,7 @@ CA_KEY_PARAM="$3"
 REGION="$4"
 CA_FILE="$5"
 VERIFY_NAME="$6"
+VERIFY_CERT="$7"
 
 CONF=/etc/drachtio.conf.xml
 TLSDIR=/etc/drachtio/tls
@@ -16,10 +17,16 @@ LEAF="$TLSDIR/carrier-client.pem"
 KEY="$TLSDIR/carrier-client.key"
 RENEW_BEFORE=$((30*24*3600))
 
-if [ -z "$DOMAIN" ] || [ -z "$CA_CERT_PARAM" ] || [ -z "$CA_KEY_PARAM" ]; then
-  echo "usage: $0 <cn> <ca-cert-param> <ca-key-param> <region> <ca-file> <verify-server-name>" >&2
+if [ -z "$DOMAIN" ] || [ -z "$CA_CERT_PARAM" ] || [ -z "$CA_KEY_PARAM" ] \
+   || [ -z "$REGION" ] || [ -z "$CA_FILE" ] || [ -z "$VERIFY_NAME" ] || [ -z "$VERIFY_CERT" ]; then
+  echo "usage: $0 <cn> <ca-cert-param> <ca-key-param> <region> <ca-file> <verify-name> <verify-cert>" >&2
   exit 1
 fi
+
+# CHANGED tracks whether this run altered anything. drachtio is restarted only if it
+# did: the renewal timer re-runs this script weekly, and an unconditional restart would
+# drop every registration and in-progress call on this SBC once a week for nothing.
+CHANGED=0
 
 # Nothing to do while the current leaf still has a month left.
 if [ -f "$LEAF" ] && [ -f "$KEY" ] && openssl x509 -in "$LEAF" -noout -checkend "$RENEW_BEFORE" >/dev/null 2>&1; then
@@ -73,10 +80,13 @@ subjectAltName   = DNS:$DOMAIN
 CNF
 
   # A fresh key per instance. It is written straight to its final home and never copied.
+  # Into tmpfs, not straight onto the live path: if signing or verification fails below
+  # we must leave the working key and certificate in place, or drachtio would load a
+  # mismatched pair on its next restart and every outbound handshake would fail.
   openssl req -new -newkey rsa:2048 -nodes \
-    -keyout "$KEY" -out "$WORK/req.csr" -config "$WORK/req.cnf" 2>/dev/null || {
+    -keyout "$WORK/leaf.key" -out "$WORK/req.csr" -config "$WORK/req.cnf" 2>/dev/null || {
     echo "ERROR: could not generate the key and CSR" >&2; exit 1; }
-  chmod 600 "$KEY"
+  chmod 600 "$WORK/leaf.key"
 
   # Declare the extensions explicitly rather than relying on -copy_extensions,
   # which is silently ignored before OpenSSL 3.0.
@@ -89,15 +99,18 @@ CNF
     echo "ERROR: signing failed - is $CA_KEY_PARAM the key for $CA_CERT_PARAM?" >&2; exit 1; }
 
   # client/cert-file is a chain: leaf first, then the CA.
-  cat "$WORK/leaf.pem" "$WORK/ca.pem" > "$LEAF"
-  chmod 644 "$LEAF"
+  cat "$WORK/leaf.pem" "$WORK/ca.pem" > "$WORK/chain.pem"
 
-  # Refuse to configure drachtio with a certificate the carrier would reject.
+  # Refuse to install a certificate the carrier would reject.
   openssl verify -purpose sslclient -CAfile "$WORK/ca.pem" "$WORK/leaf.pem" >/dev/null 2>&1 || {
     echo "ERROR: leaf is not usable for client authentication" >&2; exit 1; }
-  openssl x509 -in "$LEAF" -noout -ext extendedKeyUsage 2>/dev/null | grep -q "Client Authentication" || {
+  openssl x509 -in "$WORK/chain.pem" -noout -ext extendedKeyUsage 2>/dev/null | grep -q "Client Authentication" || {
     echo "ERROR: leaf is missing the clientAuth extended key usage" >&2; exit 1; }
 
+  # Only now does the live pair change, and both halves move together.
+  install -m 600 "$WORK/leaf.key"   "$KEY"
+  install -m 644 "$WORK/chain.pem" "$LEAF"
+  CHANGED=1
   echo "issued client certificate for $DOMAIN, valid 365 days"
 fi
 
@@ -110,16 +123,21 @@ if grep -q "<client>" "$CONF"; then
   echo "<client> already present in $CONF"
 else
   cp "$CONF" "$CONF.bak"
-  BLOCK="    <client>\n            <key-file>$KEY</key-file>\n            <cert-file>$LEAF</cert-file>\n            <ca-file>$CA_FILE</ca-file>\n        </client>\n        <verify-server-cert>true</verify-server-cert>\n        <verify-server-name>$VERIFY_NAME</verify-server-name>"
+  BLOCK="    <client>\n            <key-file>$KEY</key-file>\n            <cert-file>$LEAF</cert-file>\n            <ca-file>$CA_FILE</ca-file>\n        </client>\n        <verify-server-cert>$VERIFY_CERT</verify-server-cert>\n        <verify-server-name>$VERIFY_NAME</verify-server-name>"
   sed -i "s|</tls>|$BLOCK\n        </tls>|" "$CONF"
   grep -q "<client>" "$CONF" || {
     echo "ERROR: could not insert <client>, restoring backup" >&2; mv "$CONF.bak" "$CONF"; exit 1; }
+  CHANGED=1
   echo "added <client> to $CONF"
 fi
 
-systemctl daemon-reload
-systemctl restart drachtio
-echo "mTLS configured for $DOMAIN"
+if [ "$CHANGED" -eq 1 ]; then
+  systemctl daemon-reload
+  systemctl restart drachtio
+  echo "mTLS configured for $DOMAIN"
+else
+  echo "nothing changed, leaving drachtio alone"
+fi
 
 # Renewal. The leaf lasts a year and this script returns immediately while more
 # than a month is left, so a weekly check costs almost nothing.
@@ -128,7 +146,7 @@ cat > /etc/systemd/system/drachtio-mtls-renew.service <<UNIT
 Description=Renew the drachtio outbound client certificate
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/drachtio_mtls.sh $DOMAIN $CA_CERT_PARAM $CA_KEY_PARAM $REGION $CA_FILE $VERIFY_NAME
+ExecStart=/usr/local/bin/drachtio_mtls.sh "$DOMAIN" "$CA_CERT_PARAM" "$CA_KEY_PARAM" "$REGION" "$CA_FILE" "$VERIFY_NAME" "$VERIFY_CERT"
 UNIT
 cat > /etc/systemd/system/drachtio-mtls-renew.timer <<UNIT
 [Unit]
@@ -136,7 +154,6 @@ Description=Weekly check on the drachtio outbound client certificate
 [Timer]
 OnCalendar=weekly
 RandomizedDelaySec=3600
-Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
