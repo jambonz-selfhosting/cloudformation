@@ -1807,9 +1807,19 @@ Resources:
                 sudo /usr/local/bin/apiban/apiban-client-nftables FULL
 
                 if [[ "${EnableTLS}" == "true" ]]; then
-                  # Naming the policy here is what orders it before this instance: DependsOn
-                  # cannot take Fn::If, and an IAM policy has nothing else to reference.
                   echo "configuring SIP TLS/WSS for ${SipDomain} (policy ${TlsPolicyDep})"
+                  # certbot hides a plugin's flags until the plugin is installed; see README.
+                  if ! certbot plugins --non-interactive 2>/dev/null | grep -q dns-route53; then
+                    echo "installing the certbot dns-route53 plugin"
+                    if command -v apt-get >/dev/null 2>&1; then
+                      { DEBIAN_FRONTEND=noninteractive apt-get update -qq \
+                        && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-certbot-dns-route53; } \
+                        || echo "WARNING: could not install python3-certbot-dns-route53; TLS setup will fail."
+                    else
+                      dnf install -y python3-certbot-dns-route53 >/dev/null 2>&1 \
+                        || echo "WARNING: could not install python3-certbot-dns-route53; TLS setup will fail."
+                    fi
+                  fi
                   aws ssm get-parameter --name "${TlsScriptParam}" \
                     --region ${AWS::Region} --query Parameter.Value --output text \
                     > /usr/local/bin/drachtio_tls.sh \

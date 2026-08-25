@@ -478,21 +478,29 @@ so leave it off if any trunk is configured by IP address — an IP can never mat
 #### Confirm it took
 
 ```
-sudo grep -a "tls client\|tls verify policy" /var/log/drachtio/drachtio.log | tail -4
+sudo grep -a "tls client" /var/log/drachtio/drachtio.log | tail -3
 ```
 
 ```
 tls client key file:   /etc/drachtio/tls/carrier-client.key
 tls client cert file:  /etc/drachtio/tls/carrier-client.pem
 tls client ca file:    /etc/ssl/certs/ca-certificates.crt
-tls verify policy: incoming cert no, outgoing cert yes, outgoing name no
 ```
 
-If those lines are absent, drachtio did not read `<client>` — usually a path it cannot read,
-or the element sitting outside `<tls>`. Nothing else reports it: a stack that fails here
-still reaches `CREATE_COMPLETE`, and a missing identity surfaces as calls that fail to
-connect rather than a SIP rejection you can inspect, because the handshake dies before any
-SIP is exchanged.
+Those three lines are the check. If they are absent, drachtio did not read `<client>` —
+usually a path it cannot read, or the element sitting outside `<tls>`. Nothing else reports
+it: a stack that fails here still reaches `CREATE_COMPLETE`, and a missing identity surfaces
+as calls that fail to connect rather than a SIP rejection you can inspect, because the
+handshake dies before any SIP is exchanged.
+
+drachtio logs a fourth line, `tls verify policy: …`, only when at least one of the verify
+switches is on. With both at their default of `false` it never appears, so its absence says
+nothing about whether mTLS is working — do not use it as the test. Turning
+`MtlsVerifyServerCert` on produces:
+
+```
+tls verify policy: incoming cert no, outgoing cert yes, outgoing name no
+```
 
 ### Enable HTTPS for the portal
 
