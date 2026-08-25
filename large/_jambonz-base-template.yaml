@@ -398,13 +398,17 @@ Resources:
   # Lets the SBC answer certbot's DNS-01 challenge. ListHostedZones and GetChange take no
   # resource scope; the record write is pinned to the single zone the operator named.
   # Only created when TLS is switched on.
+  #
+  # This must be SbcSipIamRole, the role behind SbcSipInstanceProfile - that is the only
+  # role the instances running certbot assume. IamRole here backs the recording servers
+  # and would leave the SBC without permission.
   Route53CertbotPolicy:
     Type: AWS::IAM::Policy
     Condition: EnableTlsCondition
     Properties:
       PolicyName: !Sub '${AWS::StackName}-route53-certbot-dns'
       Roles:
-        - !Ref IamRole
+        - !Ref SbcSipIamRole
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -1649,7 +1653,12 @@ Resources:
                 printf '%s\n' '#!/bin/bash' 'systemctl restart drachtio' \
                   > /etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh
                 chmod +x /etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh
-                systemctl enable --now certbot.timer 2>/dev/null || true
+                # Debian names the renewal unit certbot.timer, RHEL certbot-renew.timer.
+                # Without one of them nothing ever runs "certbot renew" and the hook above
+                # never fires, so say so loudly rather than failing silently.
+                systemctl enable --now certbot.timer 2>/dev/null \
+                  || systemctl enable --now certbot-renew.timer 2>/dev/null \
+                  || echo "WARNING: no certbot renewal timer found - the certificate will expire in 90 days"
 
                 systemctl daemon-reload
                 systemctl restart drachtio

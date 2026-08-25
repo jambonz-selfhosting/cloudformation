@@ -338,9 +338,12 @@ No cron entry is needed — the packaged timer already covers it.
 
 - **The DNS zone must be in Route 53, in this account.** DNS-01 is the only challenge that
   can issue a wildcard, and the SBC has no port 80 open, so HTTP-01 was never an option. The
-  template grants the SBC `route53:ChangeResourceRecordSets` scoped to `HostedZoneId` alone,
-  plus `ListHostedZones` and `GetChange`, which accept no resource scope. That policy is
-  created only when `EnableTLS` is true.
+  template grants `route53:ChangeResourceRecordSets` scoped to `HostedZoneId` alone, plus
+  `ListHostedZones` and `GetChange`, which accept no resource scope. That policy is created
+  only when `EnableTLS` is true. Note that this deployment shares a single IAM role across
+  the SBC, feature, web/monitoring and recording instances, so the grant reaches all of
+  them — feature servers run customer-supplied webhooks. If that matters to you, use a
+  hosted zone dedicated to SIP rather than one carrying production records.
 - **`sip.<your-domain>` must resolve to the SBC's Elastic IP** so clients can validate the
   certificate. See the DNS records section above.
 - **certbot with the route53 plugin must be in the AMI.** Images built from the packer repo
@@ -349,11 +352,22 @@ No cron entry is needed — the packaged timer already covers it.
   the stack still reports `CREATE_COMPLETE`. Check `/var/log/cloud-init-output.log` on the
   SBC after the first deploy.
 
-**Certificates are requested on every SBC boot**, since an autoscaled instance starts with an
-empty `/etc/letsencrypt`. Let's Encrypt allows 50 certificates per registered domain per
-week, so an SBC group that scales up and down repeatedly can hit that ceiling and boot
-without TLS. If you expect frequent scaling, issue the certificate once and distribute it
-from Secrets Manager instead of calling ACME per instance.
+#### Rate limit — read this before scaling the SBC
+
+**A certificate is requested on every SBC boot**, since an autoscaled instance starts with an
+empty `/etc/letsencrypt`. Every one of those requests asks for the identical hostname set
+(`SipDomain` plus its wildcard), so the limit that binds is Let's Encrypt's **duplicate
+certificate** limit — **5 per week for the same set of hostnames** — not the more generous
+50-per-registered-domain figure.
+
+Five SBC boots in a rolling week is not a lot: scaling the group toward `MaxSize`, one
+health-check replacement, or a few stack recreations during testing will reach it. When it
+trips, certbot returns "too many certificates already issued", the boot script logs the
+failure and continues, **and the SBC serves plain SIP behind a stack that reports
+`CREATE_COMPLETE`**.
+
+If you expect anything more than occasional replacement, issue the certificate once and
+distribute it from Secrets Manager rather than calling ACME per instance.
 
 ### Enable HTTPS for the portal
 
