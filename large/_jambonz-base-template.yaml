@@ -66,6 +66,7 @@ Metadata:
           - MtlsCaKeyParam
           - MtlsCommonName
           - MtlsCaFile
+          - MtlsVerifyServerCert
           - MtlsVerifyServerName
       - Label:
           default: "Monitoring and logging"
@@ -112,6 +113,8 @@ Metadata:
         default: "Client certificate CN (blank uses the SIP domain)"
       MtlsCaFile:
         default: "Trust store for the carrier's certificate"
+      MtlsVerifyServerCert:
+        default: "Verify the carrier's certificate at all?"
       MtlsVerifyServerName:
         default: "Require the carrier's certificate to match the hostname?"
 
@@ -383,7 +386,7 @@ Parameters:
     ConstraintDescription: must be blank, or a Route 53 hosted zone id such as Z1234567890ABC
 
   EnableMtls:
-    Description: "Enable mutual TLS on outbound SIP: drachtio presents a client certificate when a carrier asks for one during the TLS handshake. Requires EnableTLS, plus a private CA in Parameter Store. Carriers that do not ask are sent nothing, so turning this on is harmless for the rest of your trunks."
+    Description: "Enable mutual TLS on outbound SIP: drachtio presents a client certificate when a carrier asks for one during the TLS handshake. Requires EnableTLS, plus a private CA in Parameter Store. Presenting the certificate is harmless for carriers that do not ask, but MtlsVerifyServerCert and MtlsVerifyServerName below apply to every outbound TLS connection this server makes - read their descriptions before enabling."
     Type: String
     Default: "false"
     AllowedValues:
@@ -411,6 +414,15 @@ Parameters:
     Description: "Authorities allowed to sign the CARRIER's server certificate on outbound TLS. The system bundle suits carriers using a public authority; point it at a PEM file you install if the carrier presents a certificate from a private hierarchy."
     Type: String
     Default: "/etc/ssl/certs/ca-certificates.crt"
+    AllowedPattern: ^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be an absolute path, using only letters, digits, dot, dash, underscore and slash
+  MtlsVerifyServerCert:
+    Description: "Verify the CARRIER's server certificate against MtlsCaFile. This applies to EVERY outbound TLS connection this server makes, not only the mTLS carrier, so switching it on can break an existing trunk whose certificate does not chain to MtlsCaFile - a carrier using a private hierarchy, for instance. Default false keeps today's behaviour; turn it on once you have confirmed every TLS carrier validates."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
   MtlsVerifyServerName:
     Description: "Require the carrier's certificate to match the hostname dialled. This applies to EVERY outbound TLS connection this server makes, not only the mTLS carrier - leave it false if any trunk is configured by IP address, since an IP can never match a hostname in a certificate."
     Type: String
@@ -1815,7 +1827,7 @@ Resources:
                     && chmod 755 /usr/local/bin/drachtio_mtls.sh \
                     && /usr/local/bin/drachtio_mtls.sh "$MTLS_CN" \
                          "${MtlsCaCertParam}" "${MtlsCaKeyParam}" "${AWS::Region}" \
-                         "${MtlsCaFile}" "${MtlsVerifyServerName}" \
+                         "${MtlsCaFile}" "${MtlsVerifyServerName}" "${MtlsVerifyServerCert}" \
                     || echo "WARNING: mTLS setup failed - see above. Outbound TLS calls to carriers requiring mTLS will fail."
                 else
                   echo "mTLS not enabled"
@@ -1852,6 +1864,7 @@ Resources:
                 MtlsCommonName: !Ref MtlsCommonName
                 MtlsCaFile: !Ref MtlsCaFile
                 MtlsVerifyServerName: !Ref MtlsVerifyServerName
+                MtlsVerifyServerCert: !Ref MtlsVerifyServerCert
 
     
   SbcSipAutoScalingGroup:

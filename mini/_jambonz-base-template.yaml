@@ -35,6 +35,23 @@ Metadata:
           - Architecture
           - InstanceType
       - Label:
+          default: "SIP TLS and WSS (optional)"
+        Parameters:
+          - EnableTLS
+          - SipDomain
+          - CertEmail
+          - HostedZoneId
+      - Label:
+          default: "Mutual TLS on outbound calls (optional)"
+        Parameters:
+          - EnableMtls
+          - MtlsCaCertParam
+          - MtlsCaKeyParam
+          - MtlsCommonName
+          - MtlsCaFile
+          - MtlsVerifyServerCert
+          - MtlsVerifyServerName
+      - Label:
           default: "Monitoring and logging"
         Parameters:
           - Cloudwatch
@@ -57,6 +74,26 @@ Metadata:
         default: "Deploy into this VPC (blank creates a new one)"
       ExistingSubnetIds:
         default: "Public subnets in that VPC"
+      EnableTLS:
+        default: "Enable SIP over TLS and WSS?"
+      SipDomain:
+        default: "SIP domain for the certificate"
+      CertEmail:
+        default: "Let's Encrypt registration email"
+      HostedZoneId:
+        default: "Route 53 hosted zone id for the SIP domain"
+      EnableMtls:
+        default: "Present a client certificate on outbound calls?"
+      MtlsCaCertParam:
+        default: "SSM parameter: private CA certificate"
+      MtlsCaKeyParam:
+        default: "SSM parameter: private CA key (SecureString)"
+      MtlsCommonName:
+        default: "Client certificate CN (blank uses the SIP domain)"
+      MtlsCaFile:
+        default: "Trust store for the carrier's certificate"
+      MtlsVerifyServerName:
+        default: "Require the carrier's certificate to match the hostname?"
 
 Parameters:
   Architecture:
@@ -162,6 +199,78 @@ Parameters:
       - "true"
       - "false"
 
+  EnableTLS:
+    Description: "Enable SIP over TLS (port 5061) and SIP over secure WebSockets (port 8443) on the SBC. Requires SipDomain, CertEmail and HostedZoneId. The SBC gets a wildcard certificate from Let's Encrypt at boot using certbot's Route 53 DNS-01 plugin, so the SIP domain's DNS zone must be hosted in Route 53 in this account."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  SipDomain:
+    Description: "Required when EnableTLS is true: the SIP domain the certificate is issued for, e.g. sip.example.com. A wildcard (*.sip.example.com) is requested alongside it, so different jambonz accounts can register under different SIP realms. Pass the bare domain - the leading *. is added for you. Leave blank when EnableTLS is false."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,}$
+    ConstraintDescription: must be blank, or a domain name such as sip.example.com
+  CertEmail:
+    Description: "Required when EnableTLS is true: the email address Let's Encrypt registers the certificate against and notifies about expiry. Leave blank when EnableTLS is false."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$
+    ConstraintDescription: must be blank, or a valid email address
+  HostedZoneId:
+    Description: "Required when EnableTLS is true: the Route 53 hosted zone id for SipDomain, e.g. Z1234567890ABC. It scopes the DNS write permission granted to the SBC to that one zone. Leave blank when EnableTLS is false."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^Z[A-Z0-9]{4,32}$
+    ConstraintDescription: must be blank, or a Route 53 hosted zone id such as Z1234567890ABC
+
+  EnableMtls:
+    Description: "Enable mutual TLS on outbound SIP: drachtio presents a client certificate when a carrier asks for one during the TLS handshake. Requires EnableTLS, plus a private CA in Parameter Store. Presenting the certificate is harmless for carriers that do not ask, but MtlsVerifyServerCert and MtlsVerifyServerName below apply to every outbound TLS connection this server makes - read their descriptions before enabling."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  MtlsCaCertParam:
+    Description: "Required when EnableMtls is true: SSM Parameter Store name holding the private CA certificate in PEM, e.g. /proagent/sip-mtls/client-ca-pem. This is the file the carrier loads into its trust store; it is public."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be blank, or an SSM parameter name beginning with /
+  MtlsCaKeyParam:
+    Description: "Required when EnableMtls is true: SSM Parameter Store name holding the private CA key in PEM, e.g. /proagent/sip-mtls/client-ca-key. Store it as a SecureString. Every SBC can read it, and anyone holding it can issue certificates the carrier will accept - see the README before enabling."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be blank, or an SSM parameter name beginning with /
+  MtlsCommonName:
+    Description: "Optional: the CN and SAN placed in the client certificate. Leave blank to use SipDomain. Set it only if the carrier asked for a specific name."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,}$
+    ConstraintDescription: must be blank, or a domain name such as sip.example.com
+  MtlsCaFile:
+    Description: "Authorities allowed to sign the CARRIER's server certificate on outbound TLS. The system bundle suits carriers using a public authority; point it at a PEM file you install if the carrier presents a certificate from a private hierarchy."
+    Type: String
+    Default: "/etc/ssl/certs/ca-certificates.crt"
+    AllowedPattern: ^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be an absolute path, using only letters, digits, dot, dash, underscore and slash
+  MtlsVerifyServerCert:
+    Description: "Verify the CARRIER's server certificate against MtlsCaFile. This applies to EVERY outbound TLS connection this server makes, not only the mTLS carrier, so switching it on can break an existing trunk whose certificate does not chain to MtlsCaFile - a carrier using a private hierarchy, for instance. Default false keeps today's behaviour; turn it on once you have confirmed every TLS carrier validates."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  MtlsVerifyServerName:
+    Description: "Require the carrier's certificate to match the hostname dialled. This applies to EVERY outbound TLS connection this server makes, not only the mTLS carrier - leave it false if any trunk is configured by IP address, since an IP can never match a hostname in a certificate."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
 Rules:
   # ExistingVpcId and ExistingSubnetIds are only meaningful together. Rules are evaluated
   # before any resource is touched, so a mismatch is rejected in seconds instead of failing
@@ -183,6 +292,46 @@ Rules:
             - Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
         AssertDescription: "ExistingSubnetIds is required when ExistingVpcId is set: the id of one public subnet in that VPC."
 
+  # TLS is all-or-nothing: certbot cannot run without a domain, an email, and a zone to
+  # write the DNS-01 challenge into. Checked before any resource is created, because the
+  # failure would otherwise land in the SBC's boot script, where nothing surfaces it.
+  TlsRequiresDomainEmailAndZone:
+    RuleCondition:
+      Fn::Equals: [{Ref: EnableTLS}, "true"]
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: SipDomain}, ""]
+        AssertDescription: "SipDomain is required when EnableTLS is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: CertEmail}, ""]
+        AssertDescription: "CertEmail is required when EnableTLS is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: HostedZoneId}, ""]
+        AssertDescription: "HostedZoneId is required when EnableTLS is true - certbot answers the Route 53 DNS-01 challenge in that zone."
+
+  # mTLS needs a sips: contact to attach the identity to, and that contact only
+  # exists once inbound TLS is on. It also cannot sign anything without both halves
+  # of the CA. Checked up front, because the failure would otherwise appear only in
+  # the SBC's boot log.
+  MtlsRequiresTlsAndCa:
+    RuleCondition:
+      Fn::Equals: [{Ref: EnableMtls}, "true"]
+    Assertions:
+      - Assert:
+          Fn::Equals: [{Ref: EnableTLS}, "true"]
+        AssertDescription: "EnableTLS must be true when EnableMtls is true - mTLS attaches to the sips: contact that inbound TLS creates."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: MtlsCaCertParam}, ""]
+        AssertDescription: "MtlsCaCertParam is required when EnableMtls is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: MtlsCaKeyParam}, ""]
+        AssertDescription: "MtlsCaKeyParam is required when EnableMtls is true - the SBC signs its own certificate."
+
 Conditions:
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
@@ -192,6 +341,10 @@ Conditions:
 
   # Networking - create a new VPC unless the user pointed us at an existing one
   CreateVpc: !Equals [!Ref ExistingVpcId, ""]
+
+  # SIP TLS / WSS on the SBC
+  EnableTlsCondition: !Equals [!Ref EnableTLS, "true"]
+  EnableMtlsCondition: !Equals [!Ref EnableMtls, "true"]
 
 Resources:
   EncryptionSecret:
@@ -240,6 +393,98 @@ Resources:
                 Action:
                   - 'secretsmanager:GetSecretValue'
                 Resource: !Ref EncryptionSecret
+  # Lets the SBC answer certbot's DNS-01 challenge. ListHostedZones and GetChange take no
+  # resource scope; the record write is pinned to the single zone the operator named.
+  # Only created when TLS is switched on.
+  #
+  # Note the blast radius: this deployment shares one IamRole across the SBC, feature,
+  # web/monitoring and recording instance profiles, so the grant reaches all of them, not
+  # just the SBC. Feature servers execute customer-supplied webhooks. Narrowing it means
+  # giving the SBC its own role and instance profile, which replaces the instances.
+  Route53CertbotPolicy:
+    Type: AWS::IAM::Policy
+    Condition: EnableTlsCondition
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-route53-certbot-dns'
+      Roles:
+        - !Ref IamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'route53:ListHostedZones'
+              - 'route53:GetChange'
+            Resource: '*'
+          - Effect: Allow
+            Action: 'ssm:GetParameter'
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/drachtio/*'
+          - Effect: Allow
+            Action:
+              - 'route53:ChangeResourceRecordSets'
+            Resource: !Sub 'arn:aws:route53:::hostedzone/${HostedZoneId}'
+
+  # Read access to the private CA, and the KMS grant a SecureString needs. Scoped to
+  # the two named parameters and, for KMS, to calls arriving through Parameter Store.
+  # Only created when mTLS is switched on.
+  MtlsCaPolicy:
+    Type: AWS::IAM::Policy
+    Condition: EnableMtlsCondition
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-mtls-ca-read'
+      Roles:
+        - !Ref IamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 'ssm:GetParameter'
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/drachtio/*'
+          - Effect: Allow
+            Action: 'ssm:GetParameter'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaCertParam}'
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaKeyParam}'
+          - Effect: Allow
+            Action: 'kms:Decrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
+
+  # The boot scripts live in Parameter Store rather than in UserData. EC2 caps UserData
+  # at 16 KB and this deployment already spends most of it; embedding both scripts blew
+  # past the limit and the launch template failed to create. Keeping them here leaves
+  # them versioned with the template and editable without an AMI rebuild, which was the
+  # point of moving them out of the AMI, while UserData only carries a fetch.
+  # Advanced tier raises the value limit from 4 KB to 8 KB. Both parameters exist only
+  # while their feature is switched on.
+  DrachtioTlsScript:
+    Type: AWS::SSM::Parameter
+    Condition: EnableTlsCondition
+    Properties:
+      Name: !Sub '/${AWS::StackName}/drachtio/tls-script'
+      Type: String
+      Tier: Advanced
+      Description: "Boot script that obtains the inbound SIP TLS certificate and configures drachtio"
+      Value: |
+        # __DRACHTIO_TLS_SCRIPT__
+        # Replaced by generate-cf.sh with the contents of boot-scripts/drachtio_tls.sh.
+        # The script is kept as a real shell file so it can be linted and
+        # diffed; this base template is not deployable on its own.
+  DrachtioMtlsScript:
+    Type: AWS::SSM::Parameter
+    Condition: EnableMtlsCondition
+    Properties:
+      Name: !Sub '/${AWS::StackName}/drachtio/mtls-script'
+      Type: String
+      Tier: Advanced
+      Description: "Boot script that issues the outbound client certificate and configures drachtio"
+      Value: |
+        # __DRACHTIO_MTLS_SCRIPT__
+        # Replaced by generate-cf.sh with the contents of boot-scripts/drachtio_mtls.sh.
+        # The script is kept as a real shell file so it can be linted and
+        # diffed; this base template is not deployable on its own.
   VPC:
     Type: 'AWS::EC2::VPC'
     Condition: CreateVpc
@@ -511,8 +756,50 @@ Resources:
               APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
               sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
               sudo /usr/local/bin/apiban/apiban-client-nftables FULL
+
+              if [[ "${EnableTLS}" == "true" ]]; then
+                echo "configuring SIP TLS/WSS for ${SipDomain}"
+                aws ssm get-parameter --name "${TlsScriptParam}" \
+                  --region ${AWS::Region} --query Parameter.Value --output text \
+                  > /usr/local/bin/drachtio_tls.sh \
+                  && chmod 755 /usr/local/bin/drachtio_tls.sh \
+                  && /usr/local/bin/drachtio_tls.sh "${SipDomain}" "${CertEmail}" \
+                  || echo "WARNING: SIP TLS setup failed - see above. SBC is running without TLS."
+              else
+                echo "SIP TLS/WSS not enabled"
+              fi
+
+              if [[ "${EnableMtls}" == "true" ]]; then
+                MTLS_CN="${MtlsCommonName}"
+                [ -z "$MTLS_CN" ] && MTLS_CN="${SipDomain}"
+                aws ssm get-parameter --name "${MtlsScriptParam}" \
+                  --region ${AWS::Region} --query Parameter.Value --output text \
+                  > /usr/local/bin/drachtio_mtls.sh \
+                  && chmod 755 /usr/local/bin/drachtio_mtls.sh \
+                  && /usr/local/bin/drachtio_mtls.sh "$MTLS_CN" \
+                       "${MtlsCaCertParam}" "${MtlsCaKeyParam}" "${AWS::Region}" \
+                       "${MtlsCaFile}" "${MtlsVerifyServerName}" "${MtlsVerifyServerCert}" \
+                  || echo "WARNING: mTLS setup failed - see above. Outbound TLS calls to carriers requiring mTLS will fail."
+              else
+                echo "mTLS not enabled"
+              fi
               
             - URLPortal: !Ref URLPortal
+              SipDomain: !Ref SipDomain
+              CertEmail: !Ref CertEmail
+              EnableTLS: !Ref EnableTLS
+              EnableMtls: !Ref EnableMtls
+              MtlsCaCertParam: !Ref MtlsCaCertParam
+              MtlsCaKeyParam: !Ref MtlsCaKeyParam
+              MtlsCommonName: !Ref MtlsCommonName
+              MtlsCaFile: !Ref MtlsCaFile
+              MtlsVerifyServerName: !Ref MtlsVerifyServerName
+              MtlsVerifyServerCert: !Ref MtlsVerifyServerCert
+              # Referencing the parameters rather than spelling their paths out makes
+              # CloudFormation order the instance after them; DependsOn cannot express
+              # this because it rejects Fn::If.
+              TlsScriptParam: !If [EnableTlsCondition, !Ref DrachtioTlsScript, 'unused']
+              MtlsScriptParam: !If [EnableMtlsCondition, !Ref DrachtioMtlsScript, 'unused']
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
               JWT_SECRET_ARN: !Ref EncryptionSecret

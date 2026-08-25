@@ -25,6 +25,17 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `VpcCidr` | CIDR range of the VPC. When using an existing VPC, set this to that VPC's CIDR | 10.0.0.0/16 |
 | `ExistingVpcId` | Optional. Blank creates a new VPC; set to a `vpc-...` id to deploy into a VPC you already have | (blank) |
 | `ExistingSubnetIds` | Optional. Required when `ExistingVpcId` is set: the id of one public subnet in that VPC | (blank) |
+| `EnableTLS` | Enable SIP over TLS (5061) and WSS (8443) | false |
+| `SipDomain` | Required with `EnableTLS`: SIP domain for the certificate | (blank) |
+| `CertEmail` | Required with `EnableTLS`: email Let's Encrypt registers the cert against | (blank) |
+| `HostedZoneId` | Required with `EnableTLS`: Route 53 hosted zone id for `SipDomain` | (blank) |
+| `EnableMtls` | Present a client certificate on outbound SIP over TLS | false |
+| `MtlsCaCertParam` | Required with `EnableMtls`: SSM parameter holding the private CA certificate | (blank) |
+| `MtlsCaKeyParam` | Required with `EnableMtls`: SSM parameter holding the private CA key | (blank) |
+| `MtlsCommonName` | CN placed in the client certificate. Blank uses `SipDomain` | (blank) |
+| `MtlsCaFile` | Authorities allowed to sign the *carrier's* server certificate | system bundle |
+| `MtlsVerifyServerCert` | Verify the carrier's certificate at all | false |
+| `MtlsVerifyServerName` | Require the carrier's certificate to match the hostname dialled | false |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
 | `URLPortal` | DNS name for the portal | (required) |
@@ -181,6 +192,199 @@ After the stack is created, create the following A records, all pointing to the 
 - `grafana.my-domain.example.com`
 - `homer.my-domain.example.com`
 - `sip.my-domain.example.com`
+
+### Enable SIP over TLS and WSS
+
+Set four parameters and the instance configures itself at boot — no SSH, no manual certbot run:
+
+| Parameter | Example |
+|-----------|---------|
+| `EnableTLS` | `true` |
+| `SipDomain` | `sip.example.com` |
+| `CertEmail` | `admin@example.com` |
+| `HostedZoneId` | `Z1234567890ABC` |
+
+This brings up SIP over TLS on `5061` and SIP over secure WebSockets on `8443` — the latter
+is what browser clients (jsSIP, SIP.js) need, since browsers refuse plain `ws`. The security
+group already allows both from `AllowedSbcCidr`.
+
+Leave `EnableTLS` at `false` and nothing changes; the other three are ignored.
+
+#### What happens on the SBC
+
+The launch template writes `/usr/local/bin/drachtio_tls.sh` on every boot and runs it. The
+script:
+
+1. requests a certificate for `SipDomain` **and** `*.SipDomain` via certbot's Route 53
+   DNS-01 plugin;
+2. inserts the `<tls>` block into `/etc/drachtio.conf.xml`;
+3. appends the `sips:` contacts to `/etc/systemd/system/drachtio.service`;
+4. drops a renewal hook at `/etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh` and
+   enables `certbot.timer`;
+5. reloads systemd and restarts drachtio.
+
+Every step is guarded, so re-running it is a no-op. It is written out on each boot on
+purpose: a replacement instance in the autoscaling group starts with an empty
+`/etc/letsencrypt` and an unmodified `drachtio.conf.xml`, so it has to redo the work.
+
+The wildcard means you can give different jambonz accounts different SIP realms
+(`alice.sip.example.com`, `bob.sip.example.com`) under one certificate. Pass the bare
+domain — the `*.` is added for you.
+
+Because the whole thing lives in the launch template rather than the AMI, changing it is a
+stack update, not an image rebuild.
+
+#### Where the boot scripts live
+
+EC2 caps user data at 16 KB and this deployment already spends most of it, so the two boot
+scripts travel in Parameter Store as `/<stack-name>/drachtio/tls-script` and
+`/<stack-name>/drachtio/mtls-script`; user data only carries the fetch.
+
+They are kept as ordinary shell files — [`boot-scripts/drachtio_tls.sh`](../boot-scripts/drachtio_tls.sh)
+and [`boot-scripts/drachtio_mtls.sh`](../boot-scripts/drachtio_mtls.sh) — so they can be linted,
+diffed and syntax-checked like any other script, and `generate-cf.sh` folds them into the
+parameters when it builds the template. The generated template is therefore self-contained:
+an instance runs exactly what that stack version declared, with nothing fetched from outside
+AWS at boot and no chance of drifting when a newer script lands in the repository.
+
+The generator refuses to build if either script fails `bash -n` or exceeds the 8 KB
+parameter limit, and it checks every user data block against the 16 KB EC2 limit before
+writing the template. Each parameter is created only while its feature is switched on, and
+uses the advanced tier for its 8 KB value limit at about $0.05 per parameter per month.
+
+#### Renewal
+
+Certificates last 90 days. The certbot package installs a systemd timer that renews them on
+its own; the missing piece is that drachtio keeps serving the old certificate until it
+restarts, so the script installs a deploy hook that restarts drachtio after each renewal.
+No cron entry is needed — the packaged timer already covers it.
+
+#### Requirements
+
+- **The DNS zone must be in Route 53, in this account.** DNS-01 is the only challenge that
+  can issue a wildcard, and the SBC has no port 80 open, so HTTP-01 was never an option. The
+  template grants `route53:ChangeResourceRecordSets` scoped to `HostedZoneId` alone, plus
+  `ListHostedZones` and `GetChange`, which accept no resource scope. That policy is created
+  only when `EnableTLS` is true. Note that this deployment is a single instance, so the grant
+  reaches nothing else.
+- **`sip.<your-domain>` must resolve to the instance's Elastic IP** so clients can validate the
+  certificate. See the DNS records section above.
+- **certbot with the route53 plugin must be in the AMI.** Images built from the packer repo
+  with `install_certbot=yes` have it. If certbot is missing the boot script fails, logs the
+  error, and the SBC comes up **without TLS** — and since nothing here signals boot status,
+  the stack still reports `CREATE_COMPLETE`. Check `/var/log/cloud-init-output.log` on the
+  instance after the first deploy.
+
+#### Rate limit — read this before scaling the SBC
+
+**A certificate is requested on every boot**, since an autoscaled instance starts with an
+empty `/etc/letsencrypt`. Every one of those requests asks for the identical hostname set
+(`SipDomain` plus its wildcard), so the limit that binds is Let's Encrypt's **duplicate
+certificate** limit — **5 per week for the same set of hostnames** — not the more generous
+50-per-registered-domain figure.
+
+Five SBC boots in a rolling week is not a lot: scaling the group toward `MaxSize`, one
+health-check replacement, or a few stack recreations during testing will reach it. When it
+trips, certbot returns "too many certificates already issued", the boot script logs the
+failure and continues, **and the SBC serves plain SIP behind a stack that reports
+`CREATE_COMPLETE`**.
+
+A single instance is replaced far less often than an autoscaling group, so this is
+unlikely to bite outside repeated testing.
+
+### Enable mutual TLS on outbound calls
+
+Some carriers refuse SIP over TLS unless the caller also proves who it is. Ordinary TLS
+proves the carrier's identity to you; mTLS proves yours to them. There is nothing to enable
+per carrier — the requirement is signalled during the handshake, and carriers that don't ask
+are sent nothing.
+
+| Parameter | Example |
+|-----------|---------|
+| `EnableMtls` | `true` |
+| `MtlsCaCertParam` | `/proagent/sip-mtls/client-ca-pem` |
+| `MtlsCaKeyParam` | `/proagent/sip-mtls/client-ca-key` |
+| `MtlsCommonName` | blank, or the name the carrier asked for |
+
+`EnableTLS` must already be true. mTLS attaches the identity to the `sips:` contact that the
+inbound TLS step creates; without it drachtio ignores the configuration silently.
+
+#### This is a second, unrelated certificate
+
+The Let's Encrypt certificate cannot be reused, for two independent reasons. A carrier
+requiring mTLS wants a certificate from an authority *it* trusts, not one anybody could
+obtain. And a client certificate needs the `clientAuth` extended key usage, which the public
+authorities have stopped issuing — Let's Encrypt issued its last on 2026-07-08. A certificate
+carrying only `serverAuth` is rejected as `unsuitable certificate purpose`.
+
+So this one comes from a private CA you run: a root valid for years that the carrier loads
+into its trust store once, and short-lived leaf certificates signed by it. Rotating a leaf
+needs nothing from the carrier, because their trust anchor has not changed.
+
+#### What each instance does at boot
+
+1. reads the CA certificate and key from Parameter Store into **tmpfs**;
+2. generates its own key — a fresh one per instance — straight into
+   `/etc/drachtio/tls/carrier-client.key`, mode 0600;
+3. signs a CSR for `MtlsCommonName` with `clientAuth` declared explicitly, valid one year;
+4. writes the chain (leaf, then CA) to `/etc/drachtio/tls/carrier-client.pem`;
+5. refuses to go further unless `openssl verify -purpose sslclient` passes and the
+   certificate really carries `clientAuth`;
+6. inserts `<client>` into the existing `<tls>` block and restarts drachtio;
+7. shreds the CA material on every exit path.
+
+A weekly timer re-runs the same script. It exits immediately while the leaf has more than a
+month left, so it reaches Parameter Store roughly once a year per instance.
+
+#### The CA private key reaches the instance — read this before enabling
+
+`MtlsCaKeyParam` gives the instance role read access to the key that signs certificates the
+carrier accepts. If an SBC is compromised, the attacker can mint identities the carrier will
+trust until the CA itself is withdrawn — which takes the carrier removing it from their trust
+store, and that ends every trunk using it.
+
+The template limits the exposure as far as it can: the key is fetched into `/dev/shm`, never
+written to the root volume, shredded through a `trap` on every exit path including a kill,
+and never echoed to a log. The IAM grant names the two parameters exactly, and the
+`kms:Decrypt` it needs is conditioned on `kms:ViaService` being Parameter Store.
+
+That is mitigation, not removal. **The alternative is to sign once outside AWS** and put only
+the leaf key and certificate in Parameter Store, so no SBC ever sees the CA key. The cost is
+one signing round a year and a single shared identity across the group. If the CA is in AWS
+Private CA, a third option removes both problems — each instance calls `issue-certificate`
+and no CA key exists to leak.
+
+#### `MtlsVerifyServerName` affects every trunk
+
+`verify-server-cert`, `verify-server-name` and `sni` apply to **all** outbound TLS from this
+server, not just the mTLS carrier — which is why both are parameters defaulting to `false`,
+so switching mTLS on changes nothing for trunks you already have.
+
+`MtlsVerifyServerCert` turns on validation of the carrier's own certificate against
+`MtlsCaFile`. It is worth enabling, but check first that every TLS carrier you use presents a
+certificate chaining to that file; one using a private hierarchy will start failing.
+`MtlsVerifyServerName` additionally requires the certificate to match the hostname dialled,
+so leave it off if any trunk is configured by IP address — an IP can never match a hostname.
+`sni` is on by default and the template does not touch it.
+
+#### Confirm it took
+
+```
+sudo grep -a "tls client\|tls verify policy" /var/log/drachtio/drachtio.log | tail -4
+```
+
+```
+tls client key file:   /etc/drachtio/tls/carrier-client.key
+tls client cert file:  /etc/drachtio/tls/carrier-client.pem
+tls client ca file:    /etc/ssl/certs/ca-certificates.crt
+tls verify policy: incoming cert no, outgoing cert yes, outgoing name no
+```
+
+If those lines are absent, drachtio did not read `<client>` — usually a path it cannot read,
+or the element sitting outside `<tls>`. Nothing else reports it: a stack that fails here
+still reaches `CREATE_COMPLETE`, and a missing identity surfaces as calls that fail to
+connect rather than a SIP rejection you can inspect, because the handshake dies before any
+SIP is exchanged.
 
 ### Enable HTTPS for the portal
 
