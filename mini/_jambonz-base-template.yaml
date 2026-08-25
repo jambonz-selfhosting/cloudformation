@@ -11,6 +11,53 @@
 
 AWSTemplateFormatVersion: 2010-09-09
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "You must set these"
+        Parameters:
+          - KeyName
+          - URLPortal
+      - Label:
+          default: "Networking"
+        Parameters:
+          - VpcCidr
+          - ExistingVpcId
+          - ExistingSubnetIds
+          - AllowedSshCidr
+          - AllowedHttpCidr
+          - AllowedSipCidr
+          - AllowedRtpCidr
+      - Label:
+          default: "Instance sizing"
+        Parameters:
+          - Architecture
+          - InstanceType
+      - Label:
+          default: "Monitoring and logging"
+        Parameters:
+          - Cloudwatch
+          - CloudwatchLogRetention
+          - EnableOpenTelemetry
+      - Label:
+          default: "Other options"
+        Parameters:
+          - EnableEBSEncryption
+          - KrispApiKey
+          - AicApiKey
+    ParameterLabels:
+      KeyName:
+        default: "EC2 key pair for SSH"
+      URLPortal:
+        default: "DNS name for the jambonz portal"
+      VpcCidr:
+        default: "CIDR of the VPC (must match when using an existing one)"
+      ExistingVpcId:
+        default: "Deploy into this VPC (blank creates a new one)"
+      ExistingSubnetIds:
+        default: "Public subnets in that VPC"
+
 Parameters:
   Architecture:
     Description: "CPU architecture to deploy. amd64 is Intel/AMD x86_64; arm64 is AWS Graviton (lower cost per vCPU). Only architectures whose AMIs were copied by generate-cf.sh are offered. Any InstanceType you specify below must match this architecture."

@@ -11,6 +11,110 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "You must set these"
+        Parameters:
+          - KeyName
+          - URLPortal
+      - Label:
+          default: "Networking"
+        Parameters:
+          - VpcCidr
+          - ExistingVpcId
+          - ExistingSubnetIds
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - AllowedSshCidr
+          - AllowedHttpCidr
+          - AllowedSipCidr
+          - AllowedRtpCidr
+          - AllowedSmppCidr
+      - Label:
+          default: "Instance sizing"
+        Parameters:
+          - Architecture
+          - InstanceTypeSbcSip
+          - InstanceTypeSbcRtp
+          - InstanceTypeFeatureServer
+          - InstanceTypeWebserver
+          - InstanceTypeMonitoringServer
+          - RecordingInstanceType
+          - WebMonitoringDiskSize
+      - Label:
+          default: "Database and cache"
+        Parameters:
+          - MySQLUsername
+          - MySQLPassword
+          - ElastiCacheNodeType
+          - AuroraDBMinCapacity
+          - AuroraDBMaxCapacity
+      - Label:
+          default: "SIP TLS and WSS (optional)"
+        Parameters:
+          - EnableTLS
+          - SipDomain
+          - CertEmail
+          - HostedZoneId
+      - Label:
+          default: "Mutual TLS on outbound calls (optional)"
+        Parameters:
+          - EnableMtls
+          - MtlsCaCertParam
+          - MtlsCaKeyParam
+          - MtlsCommonName
+          - MtlsCaFile
+          - MtlsVerifyServerName
+      - Label:
+          default: "Monitoring and logging"
+        Parameters:
+          - Cloudwatch
+          - CloudwatchLogRetention
+          - EnablePcaps
+          - EnableOpenTelemetry
+          - StatsSampleRate
+      - Label:
+          default: "Other options"
+        Parameters:
+          - DeployRecordingCluster
+          - EnableEBSEncryption
+          - DbCachingTTS
+          - KrispApiKey
+          - AicApiKey
+    ParameterLabels:
+      KeyName:
+        default: "EC2 key pair for SSH"
+      URLPortal:
+        default: "DNS name for the jambonz portal"
+      VpcCidr:
+        default: "CIDR of the VPC (must match when using an existing one)"
+      ExistingVpcId:
+        default: "Deploy into this VPC (blank creates a new one)"
+      ExistingSubnetIds:
+        default: "Public subnets in that VPC"
+      EnableTLS:
+        default: "Enable SIP over TLS and WSS?"
+      SipDomain:
+        default: "SIP domain for the certificate"
+      CertEmail:
+        default: "Let's Encrypt registration email"
+      HostedZoneId:
+        default: "Route 53 hosted zone id for the SIP domain"
+      EnableMtls:
+        default: "Present a client certificate on outbound calls?"
+      MtlsCaCertParam:
+        default: "SSM parameter: private CA certificate"
+      MtlsCaKeyParam:
+        default: "SSM parameter: private CA key (SecureString)"
+      MtlsCommonName:
+        default: "Client certificate CN (blank uses the SIP domain)"
+      MtlsCaFile:
+        default: "Trust store for the carrier's certificate"
+      MtlsVerifyServerName:
+        default: "Require the carrier's certificate to match the hostname?"
+
 Parameters:
 
   Architecture:
