@@ -38,6 +38,12 @@ The large deployment creates:
 | `SipDomain` | Required with `EnableTLS`: SIP domain for the certificate, e.g. `sip.example.com` | (blank) |
 | `CertEmail` | Required with `EnableTLS`: email Let's Encrypt registers the cert against | (blank) |
 | `HostedZoneId` | Required with `EnableTLS`: Route 53 hosted zone id for `SipDomain` | (blank) |
+| `EnableMtls` | Present a client certificate on outbound SIP over TLS | false |
+| `MtlsCaCertParam` | Required with `EnableMtls`: SSM parameter holding the private CA certificate | (blank) |
+| `MtlsCaKeyParam` | Required with `EnableMtls`: SSM parameter holding the private CA key (SecureString) | (blank) |
+| `MtlsCommonName` | CN placed in the client certificate. Blank uses `SipDomain` | (blank) |
+| `MtlsCaFile` | Authorities allowed to sign the *carrier's* server certificate | system bundle |
+| `MtlsVerifyServerName` | Require the carrier's certificate to match the hostname dialled | false |
 | `InstanceTypeSbcSip` | EC2 instance type for SBC SIP servers | c5n.xlarge |
 | `InstanceTypeSbcRtp` | EC2 instance type for SBC RTP servers | c5n.xlarge |
 | `InstanceTypeFeatureServer` | EC2 instance type for Feature servers | c5n.xlarge |
@@ -373,6 +379,94 @@ failure and continues, **and the SBC serves plain SIP behind a stack that report
 
 If you expect anything more than occasional replacement, issue the certificate once and
 distribute it from Secrets Manager rather than calling ACME per instance.
+
+### Enable mutual TLS on outbound calls
+
+Some carriers refuse SIP over TLS unless the caller also proves who it is. Ordinary TLS
+proves the carrier's identity to you; mTLS proves yours to them. There is nothing to enable
+per carrier — the requirement is signalled during the handshake, and carriers that don't ask
+are sent nothing.
+
+| Parameter | Example |
+|-----------|---------|
+| `EnableMtls` | `true` |
+| `MtlsCaCertParam` | `/proagent/sip-mtls/client-ca-pem` |
+| `MtlsCaKeyParam` | `/proagent/sip-mtls/client-ca-key` |
+| `MtlsCommonName` | blank, or the name the carrier asked for |
+
+`EnableTLS` must already be true. mTLS attaches the identity to the `sips:` contact that the
+inbound TLS step creates; without it drachtio ignores the configuration silently.
+
+#### This is a second, unrelated certificate
+
+The Let's Encrypt certificate cannot be reused, for two independent reasons. A carrier
+requiring mTLS wants a certificate from an authority *it* trusts, not one anybody could
+obtain. And a client certificate needs the `clientAuth` extended key usage, which the public
+authorities have stopped issuing — Let's Encrypt issued its last on 2026-07-08. A certificate
+carrying only `serverAuth` is rejected as `unsuitable certificate purpose`.
+
+So this one comes from a private CA you run: a root valid for years that the carrier loads
+into its trust store once, and short-lived leaf certificates signed by it. Rotating a leaf
+needs nothing from the carrier, because their trust anchor has not changed.
+
+#### What each instance does at boot
+
+1. reads the CA certificate and key from Parameter Store into **tmpfs**;
+2. generates its own key — a fresh one per instance — straight into
+   `/etc/drachtio/tls/carrier-client.key`, mode 0600;
+3. signs a CSR for `MtlsCommonName` with `clientAuth` declared explicitly, valid one year;
+4. writes the chain (leaf, then CA) to `/etc/drachtio/tls/carrier-client.pem`;
+5. refuses to go further unless `openssl verify -purpose sslclient` passes and the
+   certificate really carries `clientAuth`;
+6. inserts `<client>` into the existing `<tls>` block and restarts drachtio;
+7. shreds the CA material on every exit path.
+
+A weekly timer re-runs the same script. It exits immediately while the leaf has more than a
+month left, so it reaches Parameter Store roughly once a year per instance.
+
+#### The CA private key reaches every SBC — read this before enabling
+
+`MtlsCaKeyParam` gives the SBC role read access to the key that signs certificates the
+carrier accepts. If an SBC is compromised, the attacker can mint identities the carrier will
+trust until the CA itself is withdrawn — which takes the carrier removing it from their trust
+store, and that ends every trunk using it.
+
+The template limits the exposure as far as it can: the key is fetched into `/dev/shm`, never
+written to the root volume, shredded through a `trap` on every exit path including a kill,
+and never echoed to a log. The IAM grant names the two parameters exactly, and the
+`kms:Decrypt` it needs is conditioned on `kms:ViaService` being Parameter Store.
+
+That is mitigation, not removal. **The alternative is to sign once outside AWS** and put only
+the leaf key and certificate in Parameter Store, so no SBC ever sees the CA key. The cost is
+one signing round a year and a single shared identity across the group. If the CA is in AWS
+Private CA, a third option removes both problems — each instance calls `issue-certificate`
+and no CA key exists to leak.
+
+#### `MtlsVerifyServerName` affects every trunk
+
+`verify-server-cert`, `verify-server-name` and `sni` apply to **all** outbound TLS from this
+server, not just the mTLS carrier. Leave `MtlsVerifyServerName` at `false` if any trunk is
+configured by IP address — an IP can never match a hostname in a certificate. `sni` is on by
+default and the template does not touch it.
+
+#### Confirm it took
+
+```
+sudo grep -a "tls client\|tls verify policy" /var/log/drachtio/drachtio.log | tail -4
+```
+
+```
+tls client key file:   /etc/drachtio/tls/carrier-client.key
+tls client cert file:  /etc/drachtio/tls/carrier-client.pem
+tls client ca file:    /etc/ssl/certs/ca-certificates.crt
+tls verify policy: incoming cert no, outgoing cert yes, outgoing name no
+```
+
+If those lines are absent, drachtio did not read `<client>` — usually a path it cannot read,
+or the element sitting outside `<tls>`. Nothing else reports it: a stack that fails here
+still reaches `CREATE_COMPLETE`, and a missing identity surfaces as calls that fail to
+connect rather than a SIP rejection you can inspect, because the handshake dies before any
+SIP is exchanged.
 
 ### Enable HTTPS for the portal
 

@@ -259,6 +259,43 @@ Parameters:
     AllowedPattern: ^$|^Z[A-Z0-9]{4,32}$
     ConstraintDescription: must be blank, or a Route 53 hosted zone id such as Z1234567890ABC
 
+  EnableMtls:
+    Description: "Enable mutual TLS on outbound SIP: drachtio presents a client certificate when a carrier asks for one during the TLS handshake. Requires EnableTLS, plus a private CA in Parameter Store. Carriers that do not ask are sent nothing, so turning this on is harmless for the rest of your trunks."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  MtlsCaCertParam:
+    Description: "Required when EnableMtls is true: SSM Parameter Store name holding the private CA certificate in PEM, e.g. /proagent/sip-mtls/client-ca-pem. This is the file the carrier loads into its trust store; it is public."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be blank, or an SSM parameter name beginning with /
+  MtlsCaKeyParam:
+    Description: "Required when EnableMtls is true: SSM Parameter Store name holding the private CA key in PEM, e.g. /proagent/sip-mtls/client-ca-key. Store it as a SecureString. Every SBC can read it, and anyone holding it can issue certificates the carrier will accept - see the README before enabling."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be blank, or an SSM parameter name beginning with /
+  MtlsCommonName:
+    Description: "Optional: the CN and SAN placed in the client certificate. Leave blank to use SipDomain. Set it only if the carrier asked for a specific name."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[a-zA-Z0-9][a-zA-Z0-9\.\-]*\.[a-zA-Z]{2,}$
+    ConstraintDescription: must be blank, or a domain name such as sip.example.com
+  MtlsCaFile:
+    Description: "Authorities allowed to sign the CARRIER's server certificate on outbound TLS. The system bundle suits carriers using a public authority; point it at a PEM file you install if the carrier presents a certificate from a private hierarchy."
+    Type: String
+    Default: "/etc/ssl/certs/ca-certificates.crt"
+  MtlsVerifyServerName:
+    Description: "Require the carrier's certificate to match the hostname dialled. This applies to EVERY outbound TLS connection this server makes, not only the mTLS carrier - leave it false if any trunk is configured by IP address, since an IP can never match a hostname in a certificate."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
 Rules:
   # ExistingVpcId and ExistingSubnetIds are only meaningful together. Rules are evaluated
   # before any resource is touched, so a mismatch is rejected in seconds instead of failing
@@ -300,6 +337,26 @@ Rules:
             - Fn::Equals: [{Ref: HostedZoneId}, ""]
         AssertDescription: "HostedZoneId is required when EnableTLS is true - certbot answers the Route 53 DNS-01 challenge in that zone."
 
+  # mTLS needs a sips: contact to attach the identity to, and that contact only
+  # exists once inbound TLS is on. It also cannot sign anything without both halves
+  # of the CA. Checked up front, because the failure would otherwise appear only in
+  # the SBC's boot log.
+  MtlsRequiresTlsAndCa:
+    RuleCondition:
+      Fn::Equals: [{Ref: EnableMtls}, "true"]
+    Assertions:
+      - Assert:
+          Fn::Equals: [{Ref: EnableTLS}, "true"]
+        AssertDescription: "EnableTLS must be true when EnableMtls is true - mTLS attaches to the sips: contact that inbound TLS creates."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: MtlsCaCertParam}, ""]
+        AssertDescription: "MtlsCaCertParam is required when EnableMtls is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: MtlsCaKeyParam}, ""]
+        AssertDescription: "MtlsCaKeyParam is required when EnableMtls is true - the SBC signs its own certificate."
+
 Conditions:
   DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
@@ -316,6 +373,7 @@ Conditions:
 
   # SIP TLS / WSS on the SBC
   EnableTlsCondition: !Equals [!Ref EnableTLS, "true"]
+  EnableMtlsCondition: !Equals [!Ref EnableMtls, "true"]
 
 Resources:
   EncryptionSecret:
@@ -400,6 +458,31 @@ Resources:
             Action:
               - 'route53:ChangeResourceRecordSets'
             Resource: !Sub 'arn:aws:route53:::hostedzone/${HostedZoneId}'
+
+  # Read access to the private CA, and the KMS grant a SecureString needs. Scoped to
+  # the two named parameters and, for KMS, to calls arriving through Parameter Store.
+  # Only created when mTLS is switched on.
+  MtlsCaPolicy:
+    Type: AWS::IAM::Policy
+    Condition: EnableMtlsCondition
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-mtls-ca-read'
+      Roles:
+        - !Ref IamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 'ssm:GetParameter'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaCertParam}'
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaKeyParam}'
+          - Effect: Allow
+            Action: 'kms:Decrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
 
   VPC:
     Type: AWS::EC2::VPC
@@ -1845,6 +1928,180 @@ Resources:
                 else
                   echo "SIP TLS/WSS not enabled"
                 fi
+
+                # ---------------------------------------------------------------
+                # mTLS: the client certificate drachtio presents on outbound TLS.
+                #
+                # Separate from the inbound certificate above in every way - different key,
+                # different issuer, different lifetime. A carrier that requires mTLS wants a
+                # certificate signed by an authority it trusts, and a client certificate needs
+                # the clientAuth extended key usage, which the public authorities no longer
+                # issue. So this one comes from a private CA.
+                #
+                # The CA lives in Parameter Store. Each instance pulls it into tmpfs, signs a
+                # key it generated itself, and shreds the CA before it exits - the CA private
+                # key must never reach the root volume or an EBS snapshot.
+                # ---------------------------------------------------------------
+                if [[ "${EnableMtls}" == "true" ]]; then
+                  cat << 'DRACHTIO_MTLS_EOF' > /usr/local/bin/drachtio_mtls.sh
+                #!/bin/bash
+                # Issue and install the client certificate drachtio presents on outbound TLS.
+                # Generated by the jambonz CloudFormation launch template - edit the template.
+                set -o pipefail
+
+                DOMAIN="$1"
+                CA_CERT_PARAM="$2"
+                CA_KEY_PARAM="$3"
+                REGION="$4"
+                CA_FILE="$5"
+                VERIFY_NAME="$6"
+
+                CONF=/etc/drachtio.conf.xml
+                TLSDIR=/etc/drachtio/tls
+                LEAF="$TLSDIR/carrier-client.pem"
+                KEY="$TLSDIR/carrier-client.key"
+                RENEW_BEFORE=$((30*24*3600))
+
+                if [ -z "$DOMAIN" ] || [ -z "$CA_CERT_PARAM" ] || [ -z "$CA_KEY_PARAM" ]; then
+                  echo "usage: $0 <cn> <ca-cert-param> <ca-key-param> <region> <ca-file> <verify-server-name>" >&2
+                  exit 1
+                fi
+
+                # Nothing to do while the current leaf still has a month left.
+                if [ -f "$LEAF" ] && [ -f "$KEY" ] && openssl x509 -in "$LEAF" -noout -checkend "$RENEW_BEFORE" >/dev/null 2>&1; then
+                  echo "client certificate still valid for more than 30 days, leaving it alone"
+                else
+                  install -d -m 0750 "$TLSDIR"
+
+                  # CA material lives in tmpfs and is shredded on every exit path. It must never
+                  # reach the root volume, an EBS snapshot, or a log line.
+                  WORK=$(mktemp -d -p /dev/shm 2>/dev/null) || WORK=$(mktemp -d)
+                  cleanup() { find "$WORK" -type f -exec shred -u {} + 2>/dev/null; rm -rf "$WORK"; }
+                  trap cleanup EXIT INT TERM
+                  chmod 700 "$WORK"
+
+                  # --with-decryption is what makes a SecureString readable; it also needs kms:Decrypt.
+                  aws ssm get-parameter --name "$CA_KEY_PARAM" --with-decryption --region "$REGION" \
+                      --query Parameter.Value --output text > "$WORK/ca.key" 2>"$WORK/err" || {
+                    echo "ERROR: cannot read $CA_KEY_PARAM" >&2; sed 's/^/       /' "$WORK/err" >&2; exit 1; }
+                  chmod 600 "$WORK/ca.key"
+
+                  aws ssm get-parameter --name "$CA_CERT_PARAM" --with-decryption --region "$REGION" \
+                      --query Parameter.Value --output text > "$WORK/ca.pem" 2>"$WORK/err" || {
+                    echo "ERROR: cannot read $CA_CERT_PARAM" >&2; sed 's/^/       /' "$WORK/err" >&2; exit 1; }
+
+                  # jq prints the string "null" for a missing field, so a size check is not enough -
+                  # ask openssl whether these are really a key and a certificate.
+                  openssl pkey -in "$WORK/ca.key" -noout 2>/dev/null || {
+                    echo "ERROR: $CA_KEY_PARAM does not hold a PEM private key" >&2
+                    exit 1; }
+                  openssl x509 -in "$WORK/ca.pem" -noout 2>/dev/null || {
+                    echo "ERROR: $CA_CERT_PARAM does not hold a PEM certificate" >&2
+                    exit 1; }
+
+                  # A CA certificate that cannot sign will fail later in a much less obvious way.
+                  openssl x509 -in "$WORK/ca.pem" -noout -ext basicConstraints 2>/dev/null | grep -q "CA:TRUE" || {
+                    echo "ERROR: $CA_CERT_PARAM is not a CA certificate (basicConstraints lacks CA:TRUE)" >&2; exit 1; }
+
+                  cat > "$WORK/req.cnf" <<CNF
+                [req]
+                default_md         = sha256
+                prompt             = no
+                distinguished_name = dn
+                req_extensions     = ext
+                [dn]
+                CN = $DOMAIN
+                [ext]
+                basicConstraints = critical,CA:FALSE
+                keyUsage         = critical,digitalSignature
+                extendedKeyUsage = clientAuth
+                subjectAltName   = DNS:$DOMAIN
+                CNF
+
+                  # A fresh key per instance. It is written straight to its final home and never copied.
+                  openssl req -new -newkey rsa:2048 -nodes \
+                    -keyout "$KEY" -out "$WORK/req.csr" -config "$WORK/req.cnf" 2>/dev/null || {
+                    echo "ERROR: could not generate the key and CSR" >&2; exit 1; }
+                  chmod 600 "$KEY"
+
+                  # Declare the extensions explicitly rather than relying on -copy_extensions,
+                  # which is silently ignored before OpenSSL 3.0.
+                  printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=clientAuth\nsubjectAltName=DNS:%s\n' \
+                    "$DOMAIN" > "$WORK/leaf.ext"
+
+                  openssl x509 -req -in "$WORK/req.csr" \
+                    -CA "$WORK/ca.pem" -CAkey "$WORK/ca.key" -CAcreateserial \
+                    -days 365 -sha256 -extfile "$WORK/leaf.ext" -out "$WORK/leaf.pem" 2>/dev/null || {
+                    echo "ERROR: signing failed - is $CA_KEY_PARAM the key for $CA_CERT_PARAM?" >&2; exit 1; }
+
+                  # client/cert-file is a chain: leaf first, then the CA.
+                  cat "$WORK/leaf.pem" "$WORK/ca.pem" > "$LEAF"
+                  chmod 644 "$LEAF"
+
+                  # Refuse to configure drachtio with a certificate the carrier would reject.
+                  openssl verify -purpose sslclient -CAfile "$WORK/ca.pem" "$WORK/leaf.pem" >/dev/null 2>&1 || {
+                    echo "ERROR: leaf is not usable for client authentication" >&2; exit 1; }
+                  openssl x509 -in "$LEAF" -noout -ext extendedKeyUsage 2>/dev/null | grep -q "Client Authentication" || {
+                    echo "ERROR: leaf is missing the clientAuth extended key usage" >&2; exit 1; }
+
+                  echo "issued client certificate for $DOMAIN, valid 365 days"
+                fi
+
+                # The <client> element has to sit inside an existing <tls>, which the inbound TLS
+                # step creates. Without <tls> drachtio ignores it silently.
+                grep -q "<tls>" "$CONF" || {
+                  echo "ERROR: no <tls> in $CONF - enable inbound TLS before mTLS" >&2; exit 1; }
+
+                if grep -q "<client>" "$CONF"; then
+                  echo "<client> already present in $CONF"
+                else
+                  cp "$CONF" "$CONF.bak"
+                  BLOCK="    <client>\n            <key-file>$KEY</key-file>\n            <cert-file>$LEAF</cert-file>\n            <ca-file>$CA_FILE</ca-file>\n        </client>\n        <verify-server-cert>true</verify-server-cert>\n        <verify-server-name>$VERIFY_NAME</verify-server-name>"
+                  sed -i "s|</tls>|$BLOCK\n        </tls>|" "$CONF"
+                  grep -q "<client>" "$CONF" || {
+                    echo "ERROR: could not insert <client>, restoring backup" >&2; mv "$CONF.bak" "$CONF"; exit 1; }
+                  echo "added <client> to $CONF"
+                fi
+
+                systemctl daemon-reload
+                systemctl restart drachtio
+                echo "mTLS configured for $DOMAIN"
+                DRACHTIO_MTLS_EOF
+
+                  chmod 755 /usr/local/bin/drachtio_mtls.sh
+                  MTLS_CN="${MtlsCommonName}"
+                  [ -z "$MTLS_CN" ] && MTLS_CN="${SipDomain}"
+                  /usr/local/bin/drachtio_mtls.sh "$MTLS_CN" \
+                    "${MtlsCaCertParam}" "${MtlsCaKeyParam}" "${AWS::Region}" \
+                    "${MtlsCaFile}" "${MtlsVerifyServerName}" \
+                    || echo "WARNING: mTLS setup failed - see above. Outbound TLS calls to carriers requiring mTLS will fail."
+
+                  # A leaf lasts a year; the script reissues only inside the last month, so a
+                  # weekly check costs nothing and keeps long-lived instances current.
+                  cat << 'MTLS_TIMER_EOF' > /etc/systemd/system/drachtio-mtls-renew.service
+                [Unit]
+                Description=Renew the drachtio outbound client certificate
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/local/bin/drachtio_mtls.sh MTLS_ARGS
+                MTLS_TIMER_EOF
+                  sed -i "s|MTLS_ARGS|$MTLS_CN ${MtlsCaCertParam} ${MtlsCaKeyParam} ${AWS::Region} ${MtlsCaFile} ${MtlsVerifyServerName}|" \
+                    /etc/systemd/system/drachtio-mtls-renew.service
+                  cat << 'MTLS_TIMER2_EOF' > /etc/systemd/system/drachtio-mtls-renew.timer
+                [Unit]
+                Description=Weekly check on the drachtio outbound client certificate
+                [Timer]
+                OnCalendar=weekly
+                RandomizedDelaySec=3600
+                Persistent=true
+                [Install]
+                WantedBy=timers.target
+                MTLS_TIMER2_EOF
+                  systemctl daemon-reload
+                  systemctl enable --now drachtio-mtls-renew.timer 2>/dev/null || true
+                else
+                  echo "mTLS not enabled"
+                fi
   
                 echo "user data script completed"
               - VPC_CIDR: !Ref VpcCidr
@@ -1863,6 +2120,12 @@ Resources:
                 EnableTLS: !Ref EnableTLS
                 SipDomain: !Ref SipDomain
                 CertEmail: !Ref CertEmail
+                EnableMtls: !Ref EnableMtls
+                MtlsCaCertParam: !Ref MtlsCaCertParam
+                MtlsCaKeyParam: !Ref MtlsCaKeyParam
+                MtlsCommonName: !Ref MtlsCommonName
+                MtlsCaFile: !Ref MtlsCaFile
+                MtlsVerifyServerName: !Ref MtlsVerifyServerName
 
   SbcServerPlacementGroup:
     Type: AWS::EC2::PlacementGroup
