@@ -382,19 +382,25 @@ No cron entry is needed — the packaged timer already covers it.
   the stack still reports `CREATE_COMPLETE`. Check `/var/log/cloud-init-output.log` on the
   SBC after the first deploy.
 
-#### Rate limit — read this before scaling the SBC
+#### Read this before scaling the SBC past one instance
 
-**A certificate is requested on every SBC boot**, since an autoscaled instance starts with an
-empty `/etc/letsencrypt`. Every one of those requests asks for the identical hostname set
-(`SipDomain` plus its wildcard), so the limit that binds is Let's Encrypt's **duplicate
-certificate** limit — **5 per week for the same set of hostnames** — not the more generous
-50-per-registered-domain figure.
+A certificate is requested on **every SBC boot**, since an autoscaled instance starts with an
+empty `/etc/letsencrypt`. The initial deploy is fine — `DesiredCapacity` is 1, so exactly one
+instance boots and issues. Scaling past that is where it breaks, in two ways.
 
-Five SBC boots in a rolling week is not a lot: scaling the group toward `MaxSize`, one
-health-check replacement, or a few stack recreations during testing will reach it. When it
-trips, certbot returns "too many certificates already issued", the boot script logs the
-failure and continues, **and the SBC serves plain SIP behind a stack that reports
-`CREATE_COMPLETE`**.
+**Two instances issuing at once corrupt each other's challenge.** The DNS-01 challenge is a
+single `_acme-challenge.<SipDomain>` TXT record, and certbot's route53 plugin writes it with
+UPSERT carrying only the token from its own process. Two SBCs launching together will each
+overwrite the other's token, and one or both validations fail.
+
+**And the fifth issuance in a week is refused.** Every request asks for the identical hostname
+set, so the binding limit is Let's Encrypt's **duplicate certificate** limit — **5 per week
+for the same set of names** — not the more generous 50-per-registered-domain figure. Scaling
+toward `MaxSize`, a health-check replacement, or a few stack recreations during testing will
+reach it.
+
+Both failures are silent: certbot's error is logged, the boot script continues, **and the SBC
+serves plain SIP behind a stack reporting `CREATE_COMPLETE`**.
 
 If you expect anything more than occasional replacement, issue the certificate once and
 distribute it from Secrets Manager rather than calling ACME per instance.

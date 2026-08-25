@@ -1807,7 +1807,9 @@ Resources:
                 sudo /usr/local/bin/apiban/apiban-client-nftables FULL
 
                 if [[ "${EnableTLS}" == "true" ]]; then
-                  echo "configuring SIP TLS/WSS for ${SipDomain}"
+                  # Naming the policy here is what orders it before this instance: DependsOn
+                  # cannot take Fn::If, and an IAM policy has nothing else to reference.
+                  echo "configuring SIP TLS/WSS for ${SipDomain} (policy ${TlsPolicyDep})"
                   aws ssm get-parameter --name "${TlsScriptParam}" \
                     --region ${AWS::Region} --query Parameter.Value --output text \
                     > /usr/local/bin/drachtio_tls.sh \
@@ -1819,6 +1821,7 @@ Resources:
                 fi
 
                 if [[ "${EnableMtls}" == "true" ]]; then
+                  echo "configuring mTLS (policy ${MtlsPolicyDep})"
                   MTLS_CN="${MtlsCommonName}"
                   [ -z "$MTLS_CN" ] && MTLS_CN="${SipDomain}"
                   aws ssm get-parameter --name "${MtlsScriptParam}" \
@@ -1855,6 +1858,8 @@ Resources:
                 # DependsOn cannot express because it rejects Fn::If. It also leaves
                 # the name declared in exactly one place.
                 TlsScriptParam: !If [EnableTlsCondition, !Ref DrachtioTlsScript, 'unused']
+                TlsPolicyDep: !If [EnableTlsCondition, !Ref Route53CertbotPolicy, 'unused']
+                MtlsPolicyDep: !If [EnableMtlsCondition, !Ref MtlsCaPolicy, 'unused']
                 MtlsScriptParam: !If [EnableMtlsCondition, !Ref DrachtioMtlsScript, 'unused']
                 SipDomain: !Ref SipDomain
                 CertEmail: !Ref CertEmail

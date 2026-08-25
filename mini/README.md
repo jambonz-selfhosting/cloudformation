@@ -140,18 +140,27 @@ cd ..  # Go to project root
 # Wait for AMI copy to complete
 ```
 
-Then deploy the generated template:
+Then deploy the generated template. It carries the drachtio boot scripts, so it is over
+the 51,200-byte limit that `--template-body` accepts and has to go through S3 — the
+generator prints the same instructions when it finishes.
 
 ```bash
+# Upload the template (create the bucket first if you do not have one)
+aws s3 cp jambonz-mini-us-west-2-amd64.yaml s3://my-cf-templates-bucket/
+
+# Deploy using --template-url
 aws cloudformation create-stack \
   --stack-name jambonz-mini \
-  --template-body file://jambonz-mini-us-west-2-amd64.yaml \
+  --template-url https://my-cf-templates-bucket.s3.us-west-2.amazonaws.com/jambonz-mini-us-west-2-amd64.yaml \
   --capabilities CAPABILITY_IAM \
   --region us-west-2 \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
     ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
+
+Uploading via the console works too: *Create stack → Upload a template file* has no such
+limit, since the console puts it in S3 for you.
 
 ## Monitor Stack Creation
 
