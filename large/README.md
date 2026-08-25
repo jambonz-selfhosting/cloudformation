@@ -343,12 +343,20 @@ stack update, not an image rebuild.
 #### Where the boot scripts live
 
 EC2 caps user data at 16 KB and this deployment already spends most of it, so the two boot
-scripts are held in Parameter Store as `/<stack-name>/drachtio/tls-script` and
-`/<stack-name>/drachtio/mtls-script` rather than inlined. The template still declares them
-in full, so they stay versioned alongside the resources they configure and a change is a
-stack update rather than an AMI rebuild; user data only carries the fetch. Each parameter is
-created only while its feature is switched on and uses the advanced tier, which raises the
-value limit from 4 KB to 8 KB and costs about $0.05 per parameter per month.
+scripts travel in Parameter Store as `/<stack-name>/drachtio/tls-script` and
+`/<stack-name>/drachtio/mtls-script`; user data only carries the fetch.
+
+They are kept as ordinary shell files — [`boot-scripts/drachtio_tls.sh`](../boot-scripts/drachtio_tls.sh)
+and [`boot-scripts/drachtio_mtls.sh`](../boot-scripts/drachtio_mtls.sh) — so they can be linted,
+diffed and syntax-checked like any other script, and `generate-cf.sh` folds them into the
+parameters when it builds the template. The generated template is therefore self-contained:
+an instance runs exactly what that stack version declared, with nothing fetched from outside
+AWS at boot and no chance of drifting when a newer script lands in the repository.
+
+The generator refuses to build if either script fails `bash -n` or exceeds the 8 KB
+parameter limit, and it checks every user data block against the 16 KB EC2 limit before
+writing the template. Each parameter is created only while its feature is switched on, and
+uses the advanced tier for its 8 KB value limit at about $0.05 per parameter per month.
 
 #### Renewal
 

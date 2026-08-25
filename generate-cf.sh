@@ -595,6 +595,28 @@ if [ ! -f "$BASE_TEMPLATE" ]; then
     exit 1
 fi
 
+# The drachtio boot scripts are spliced into the template's SSM parameters below.
+TLS_SCRIPT="$SCRIPT_DIR/boot-scripts/drachtio_tls.sh"
+MTLS_SCRIPT="$SCRIPT_DIR/boot-scripts/drachtio_mtls.sh"
+if grep -q "__DRACHTIO_TLS_SCRIPT__" "$BASE_TEMPLATE"; then
+    for f in "$TLS_SCRIPT" "$MTLS_SCRIPT"; do
+        if [ ! -f "$f" ]; then
+            echo "ERROR: Cannot find $f, which the base template expects to splice in"
+            exit 1
+        fi
+        if ! bash -n "$f"; then
+            echo "ERROR: $f is not valid bash - refusing to build a template around it"
+            exit 1
+        fi
+        # The scripts ride in SSM parameters, whose advanced tier caps a value at 8 KB.
+        SCRIPT_BYTES=$(wc -c < "$f")
+        if [ "$SCRIPT_BYTES" -gt 8192 ]; then
+            echo "ERROR: $f is $SCRIPT_BYTES bytes, over the 8192 byte SSM parameter limit"
+            exit 1
+        fi
+    done
+fi
+
 # Create Mappings section.
 # Both maps are keyed by architecture - a generated template targets a single
 # region, so the Architecture parameter is what selects between entries.
@@ -648,19 +670,66 @@ backup_file_if_exists "$OUTPUT_TEMPLATE"
     # Insert Mappings section
     echo -e "$MAPPINGS"
 
-    # Append the rest of the template (from line 13 onwards), narrowing the
-    # Architecture parameter to the architectures we actually copied AMIs for.
+    # Append the rest of the template (from line 13 onwards), doing two substitutions:
+    #
+    #  - narrow the Architecture parameter to the architectures we actually copied AMIs for
+    #  - splice the drachtio boot scripts into the SSM parameters that carry them
+    #
+    # The scripts live in scripts/ as real shell files so they can be linted, diffed and
+    # syntax-checked; they are folded in here rather than inlined in the base template.
+    # EC2 caps user data at 16 KB, which is why they travel in Parameter Store instead.
     tail -n +13 "$BASE_TEMPLATE" | awk \
         -v allowed="$(echo "$ARCHES" | tr ' ' ',' | sed 's/,/, /g')" \
-        -v def="$DEFAULT_ARCH" '
+        -v def="$DEFAULT_ARCH" \
+        -v tls_script="$TLS_SCRIPT" \
+        -v mtls_script="$MTLS_SCRIPT" '
+        function emit(path,    line) {
+            while ((getline line < path) > 0) {
+                if (line == "") print ""; else print "        " line
+            }
+            close(path)
+        }
         $0 == "  Architecture:" { inarch = 1; print; next }
         inarch && /^    Default: / { print "    Default: " def; next }
         inarch && /^    AllowedValues: / { print "    AllowedValues: [" allowed "]"; inarch = 0; next }
-        { print }
+        /^        # __DRACHTIO_TLS_SCRIPT__$/  { emit(tls_script);  skip = 1; next }
+        /^        # __DRACHTIO_MTLS_SCRIPT__$/ { emit(mtls_script); skip = 1; next }
+        skip && /^        # / { next }
+        { skip = 0; print }
     '
 } > "$OUTPUT_TEMPLATE"
 
 echo "✓ CloudFormation template generated: $OUTPUT_TEMPLATE"
+echo ""
+
+# EC2 rejects user data over 16 KB with InvalidUserData.Malformed, which surfaces as a
+# launch template that fails to create and takes the whole stack down with it. Check it
+# here, where it is cheap, rather than 20 minutes into a rollback.
+echo "Checking user data size..."
+UD_LIMIT=16384
+UD_FAIL=0
+while IFS=$'\t' read -r UD_NAME UD_LEN; do
+    [ -z "$UD_NAME" ] && continue
+    if [ "$UD_LEN" -gt "$UD_LIMIT" ]; then
+        echo "  ✗ $UD_NAME: $UD_LEN bytes, over the $UD_LIMIT byte EC2 limit"
+        UD_FAIL=1
+    elif [ "$UD_LEN" -gt $((UD_LIMIT * 85 / 100)) ]; then
+        echo "  ! $UD_NAME: $UD_LEN bytes, within 15% of the $UD_LIMIT byte limit"
+    fi
+done < <(yq eval '
+    .Resources | to_entries | .[]
+    | select(.value.Properties.UserData != null or .value.Properties.LaunchTemplateData.UserData != null)
+    | .key + "\t" + ((.value.Properties.UserData // .value.Properties.LaunchTemplateData.UserData)
+                      | .["Fn::Base64"] | .["Fn::Sub"] | .[0] | length | tostring)
+' "$OUTPUT_TEMPLATE" 2>/dev/null)
+
+if [ "$UD_FAIL" -ne 0 ]; then
+    echo ""
+    echo "ERROR: user data exceeds the EC2 limit; the stack would fail to create."
+    echo "       Move whatever grew into scripts/ and let the SSM parameters carry it."
+    exit 1
+fi
+echo "✓ All user data is within the EC2 limit"
 echo ""
 
 # Validate that the generated file is valid YAML
