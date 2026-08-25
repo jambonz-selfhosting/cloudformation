@@ -333,6 +333,16 @@ domain — the `*.` is added for you.
 Because the whole thing lives in the launch template rather than the AMI, changing it is a
 stack update, not an image rebuild.
 
+#### Where the boot scripts live
+
+EC2 caps user data at 16 KB and this deployment already spends most of it, so the two boot
+scripts are held in Parameter Store as `/<stack-name>/drachtio/tls-script` and
+`/<stack-name>/drachtio/mtls-script` rather than inlined. The template still declares them
+in full, so they stay versioned alongside the resources they configure and a change is a
+stack update rather than an AMI rebuild; user data only carries the fetch. Each parameter is
+created only while its feature is switched on and uses the advanced tier, which raises the
+value limit from 4 KB to 8 KB and costs about $0.05 per parameter per month.
+
 #### Renewal
 
 Certificates last 90 days. The certbot package installs a systemd timer that renews them on
