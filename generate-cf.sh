@@ -595,28 +595,6 @@ if [ ! -f "$BASE_TEMPLATE" ]; then
     exit 1
 fi
 
-# The drachtio boot scripts are spliced into the template's SSM parameters below.
-TLS_SCRIPT="$SCRIPT_DIR/boot-scripts/drachtio_tls.sh"
-MTLS_SCRIPT="$SCRIPT_DIR/boot-scripts/drachtio_mtls.sh"
-if grep -q "__DRACHTIO_TLS_SCRIPT__" "$BASE_TEMPLATE"; then
-    for f in "$TLS_SCRIPT" "$MTLS_SCRIPT"; do
-        if [ ! -f "$f" ]; then
-            echo "ERROR: Cannot find $f, which the base template expects to splice in"
-            exit 1
-        fi
-        if ! bash -n "$f"; then
-            echo "ERROR: $f is not valid bash - refusing to build a template around it"
-            exit 1
-        fi
-        # The scripts ride in SSM parameters, whose advanced tier caps a value at 8 KB.
-        SCRIPT_BYTES=$(wc -c < "$f")
-        if [ "$SCRIPT_BYTES" -gt 8192 ]; then
-            echo "ERROR: $f is $SCRIPT_BYTES bytes, over the 8192 byte SSM parameter limit"
-            exit 1
-        fi
-    done
-fi
-
 # Create Mappings section.
 # Both maps are keyed by architecture - a generated template targets a single
 # region, so the Architecture parameter is what selects between entries.
@@ -670,32 +648,15 @@ backup_file_if_exists "$OUTPUT_TEMPLATE"
     # Insert Mappings section
     echo -e "$MAPPINGS"
 
-    # Append the rest of the template (from line 13 onwards), doing two substitutions:
-    #
-    #  - narrow the Architecture parameter to the architectures we actually copied AMIs for
-    #  - splice the drachtio boot scripts into the SSM parameters that carry them
-    #
-    # The scripts live in boot-scripts/ as real shell files so they can be linted, diffed and
-    # syntax-checked; they are folded in here rather than inlined in the base template.
-    # EC2 caps user data at 16 KB, which is why they travel in Parameter Store instead.
+    # Append the rest of the template (from line 13 onwards), narrowing the Architecture
+    # parameter to the architectures we actually copied AMIs for.
     tail -n +13 "$BASE_TEMPLATE" | awk \
         -v allowed="$(echo "$ARCHES" | tr ' ' ',' | sed 's/,/, /g')" \
-        -v def="$DEFAULT_ARCH" \
-        -v tls_script="$TLS_SCRIPT" \
-        -v mtls_script="$MTLS_SCRIPT" '
-        function emit(path,    line) {
-            while ((getline line < path) > 0) {
-                if (line == "") print ""; else print "        " line
-            }
-            close(path)
-        }
+        -v def="$DEFAULT_ARCH" '
         $0 == "  Architecture:" { inarch = 1; print; next }
         inarch && /^    Default: / { print "    Default: " def; next }
         inarch && /^    AllowedValues: / { print "    AllowedValues: [" allowed "]"; inarch = 0; next }
-        /^        # __DRACHTIO_TLS_SCRIPT__$/  { emit(tls_script);  skip = 1; next }
-        /^        # __DRACHTIO_MTLS_SCRIPT__$/ { emit(mtls_script); skip = 1; next }
-        skip && /^        # / { next }
-        { skip = 0; print }
+        { print }
     '
 } > "$OUTPUT_TEMPLATE"
 
@@ -766,7 +727,7 @@ fi
 if [ "$UD_FAIL" -ne 0 ]; then
     echo ""
     echo "ERROR: user data exceeds the EC2 limit; the stack would fail to create."
-    echo "       Move whatever grew into boot-scripts/ and let the SSM parameters carry it."
+    echo "       Move whatever grew into the AMI (packer files/) rather than trimming prose."
     exit 1
 fi
 echo "✓ All $UD_SEEN user data blocks are within the EC2 limit"

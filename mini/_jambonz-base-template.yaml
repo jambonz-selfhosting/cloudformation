@@ -92,6 +92,8 @@ Metadata:
         default: "Client certificate CN (blank uses the SIP domain)"
       MtlsCaFile:
         default: "Trust store for the carrier's certificate"
+      MtlsVerifyServerCert:
+        default: "Verify the carrier's certificate at all?"
       MtlsVerifyServerName:
         default: "Require the carrier's certificate to match the hostname?"
 
@@ -396,11 +398,6 @@ Resources:
   # Lets the SBC answer certbot's DNS-01 challenge. ListHostedZones and GetChange take no
   # resource scope; the record write is pinned to the single zone the operator named.
   # Only created when TLS is switched on.
-  #
-  # Note the blast radius: this deployment shares one IamRole across the SBC, feature,
-  # web/monitoring and recording instance profiles, so the grant reaches all of them, not
-  # just the SBC. Feature servers execute customer-supplied webhooks. Narrowing it means
-  # giving the SBC its own role and instance profile, which replaces the instances.
   Route53CertbotPolicy:
     Type: AWS::IAM::Policy
     Condition: EnableTlsCondition
@@ -416,9 +413,6 @@ Resources:
               - 'route53:ListHostedZones'
               - 'route53:GetChange'
             Resource: '*'
-          - Effect: Allow
-            Action: 'ssm:GetParameter'
-            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/drachtio/*'
           - Effect: Allow
             Action:
               - 'route53:ChangeResourceRecordSets'
@@ -439,9 +433,6 @@ Resources:
         Statement:
           - Effect: Allow
             Action: 'ssm:GetParameter'
-            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/drachtio/*'
-          - Effect: Allow
-            Action: 'ssm:GetParameter'
             Resource:
               - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaCertParam}'
               - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaKeyParam}'
@@ -452,39 +443,6 @@ Resources:
               StringEquals:
                 'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
 
-  # The boot scripts live in Parameter Store rather than in UserData. EC2 caps UserData
-  # at 16 KB and this deployment already spends most of it; embedding both scripts blew
-  # past the limit and the launch template failed to create. Keeping them here leaves
-  # them versioned with the template and editable without an AMI rebuild, which was the
-  # point of moving them out of the AMI, while UserData only carries a fetch.
-  # Advanced tier raises the value limit from 4 KB to 8 KB. Both parameters exist only
-  # while their feature is switched on.
-  DrachtioTlsScript:
-    Type: AWS::SSM::Parameter
-    Condition: EnableTlsCondition
-    Properties:
-      Name: !Sub '/${AWS::StackName}/drachtio/tls-script'
-      Type: String
-      Tier: Advanced
-      Description: "Boot script that obtains the inbound SIP TLS certificate and configures drachtio"
-      Value: |
-        # __DRACHTIO_TLS_SCRIPT__
-        # Replaced by generate-cf.sh with the contents of boot-scripts/drachtio_tls.sh.
-        # The script is kept as a real shell file so it can be linted and
-        # diffed; this base template is not deployable on its own.
-  DrachtioMtlsScript:
-    Type: AWS::SSM::Parameter
-    Condition: EnableMtlsCondition
-    Properties:
-      Name: !Sub '/${AWS::StackName}/drachtio/mtls-script'
-      Type: String
-      Tier: Advanced
-      Description: "Boot script that issues the outbound client certificate and configures drachtio"
-      Value: |
-        # __DRACHTIO_MTLS_SCRIPT__
-        # Replaced by generate-cf.sh with the contents of boot-scripts/drachtio_mtls.sh.
-        # The script is kept as a real shell file so it can be linted and
-        # diffed; this base template is not deployable on its own.
   VPC:
     Type: 'AWS::EC2::VPC'
     Condition: CreateVpc
@@ -759,24 +717,12 @@ Resources:
 
               if [[ "${EnableTLS}" == "true" ]]; then
                 echo "configuring SIP TLS/WSS for ${SipDomain} (policy ${TlsPolicyDep})"
-                # certbot hides a plugin's flags until the plugin is installed; see README.
-                if ! certbot plugins --non-interactive 2>/dev/null | grep -q dns-route53; then
-                  echo "installing the certbot dns-route53 plugin"
-                  if command -v apt-get >/dev/null 2>&1; then
-                    { DEBIAN_FRONTEND=noninteractive apt-get update -qq \
-                      && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-certbot-dns-route53; } \
-                      || echo "WARNING: could not install python3-certbot-dns-route53; TLS setup will fail."
-                  else
-                    dnf install -y python3-certbot-dns-route53 >/dev/null 2>&1 \
-                      || echo "WARNING: could not install python3-certbot-dns-route53; TLS setup will fail."
-                  fi
+                if [ ! -x /usr/local/bin/drachtio_tls.sh ]; then
+                  echo "ERROR: drachtio_tls.sh not in this AMI - rebuild the image or pick a newer one."
+                else
+                  /usr/local/bin/drachtio_tls.sh "${SipDomain}" "${CertEmail}" \
+                    || echo "WARNING: SIP TLS setup failed - see above. SBC is running without TLS."
                 fi
-                aws ssm get-parameter --name "${TlsScriptParam}" \
-                  --region ${AWS::Region} --query Parameter.Value --output text \
-                  > /usr/local/bin/drachtio_tls.sh \
-                  && chmod 755 /usr/local/bin/drachtio_tls.sh \
-                  && /usr/local/bin/drachtio_tls.sh "${SipDomain}" "${CertEmail}" \
-                  || echo "WARNING: SIP TLS setup failed - see above. SBC is running without TLS."
               else
                 echo "SIP TLS/WSS not enabled"
               fi
@@ -785,14 +731,14 @@ Resources:
                 echo "configuring mTLS (policy ${MtlsPolicyDep})"
                 MTLS_CN="${MtlsCommonName}"
                 [ -z "$MTLS_CN" ] && MTLS_CN="${SipDomain}"
-                aws ssm get-parameter --name "${MtlsScriptParam}" \
-                  --region ${AWS::Region} --query Parameter.Value --output text \
-                  > /usr/local/bin/drachtio_mtls.sh \
-                  && chmod 755 /usr/local/bin/drachtio_mtls.sh \
-                  && /usr/local/bin/drachtio_mtls.sh "$MTLS_CN" \
+                if [ ! -x /usr/local/bin/drachtio_mtls.sh ]; then
+                  echo "ERROR: drachtio_mtls.sh not in this AMI - rebuild the image or pick a newer one."
+                else
+                  /usr/local/bin/drachtio_mtls.sh "$MTLS_CN" \
                        "${MtlsCaCertParam}" "${MtlsCaKeyParam}" "${AWS::Region}" \
                        "${MtlsCaFile}" "${MtlsVerifyServerName}" "${MtlsVerifyServerCert}" \
-                  || echo "WARNING: mTLS setup failed - see above. Outbound TLS calls to carriers requiring mTLS will fail."
+                    || echo "WARNING: mTLS setup failed - see above. Outbound TLS calls to carriers requiring mTLS will fail."
+                fi
               else
                 echo "mTLS not enabled"
               fi
@@ -811,10 +757,8 @@ Resources:
               # Referencing the parameters rather than spelling their paths out makes
               # CloudFormation order the instance after them; DependsOn cannot express
               # this because it rejects Fn::If.
-              TlsScriptParam: !If [EnableTlsCondition, !Ref DrachtioTlsScript, 'unused']
               TlsPolicyDep: !If [EnableTlsCondition, !Ref Route53CertbotPolicy, 'unused']
               MtlsPolicyDep: !If [EnableMtlsCondition, !Ref MtlsCaPolicy, 'unused']
-              MtlsScriptParam: !If [EnableMtlsCondition, !Ref DrachtioMtlsScript, 'unused']
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
               JWT_SECRET_ARN: !Ref EncryptionSecret

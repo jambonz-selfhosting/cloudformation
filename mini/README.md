@@ -140,9 +140,10 @@ cd ..  # Go to project root
 # Wait for AMI copy to complete
 ```
 
-Then deploy the generated template. It carries the drachtio boot scripts, so it is over
-the 51,200-byte limit that `--template-body` accepts and has to go through S3 — the
-generator prints the same instructions when it finishes.
+Then deploy the generated template. Mini's template is around 42 KB, comfortably under the
+51,200-byte limit that `--template-body` accepts, so it deploys straight from disk — the
+generator prints the same command when it finishes. (Medium and large are far larger and do
+need the S3 route.)
 
 ```bash
 # Upload the template (create the bucket first if you do not have one)
@@ -215,14 +216,14 @@ Set four parameters and the instance configures itself at boot — no SSH, no ma
 
 This brings up SIP over TLS on `5061` and SIP over secure WebSockets on `8443` — the latter
 is what browser clients (jsSIP, SIP.js) need, since browsers refuse plain `ws`. The security
-group already allows both from `AllowedSbcCidr`.
+group already allows both from `AllowedSipCidr`.
 
 Leave `EnableTLS` at `false` and nothing changes; the other three are ignored.
 
 #### What happens on the SBC
 
-The launch template writes `/usr/local/bin/drachtio_tls.sh` on every boot and runs it. The
-script:
+The launch template runs `/usr/local/bin/drachtio_tls.sh`, which the AMI already carries.
+The script:
 
 1. requests a certificate for `SipDomain` **and** `*.SipDomain` via certbot's Route 53
    DNS-01 plugin;
@@ -232,34 +233,34 @@ script:
    enables `certbot.timer`;
 5. reloads systemd and restarts drachtio.
 
-Every step is guarded, so re-running it is a no-op. It is written out on each boot on
-purpose: a replacement instance in the autoscaling group starts with an empty
-`/etc/letsencrypt` and an unmodified `drachtio.conf.xml`, so it has to redo the work.
+Every step is guarded, so re-running it is a no-op. It runs on each boot on purpose: a
+replacement instance in the autoscaling group starts with an empty `/etc/letsencrypt` and
+an unmodified `drachtio.conf.xml`, so it has to redo the work.
 
 The wildcard means you can give different jambonz accounts different SIP realms
 (`alice.sip.example.com`, `bob.sip.example.com`) under one certificate. Pass the bare
 domain — the `*.` is added for you.
 
-Because the whole thing lives in the launch template rather than the AMI, changing it is a
-stack update, not an image rebuild.
+The script lives in the AMI, so changing it means rebuilding the image and repointing
+`mappings/ami-mappings.yaml` — not a stack update.
 
 #### Where the boot scripts live
 
-EC2 caps user data at 16 KB and this deployment already spends most of it, so the two boot
-scripts travel in Parameter Store as `/<stack-name>/drachtio/tls-script` and
-`/<stack-name>/drachtio/mtls-script`; user data only carries the fetch.
+Both scripts ship inside the AMI at `/usr/local/bin/drachtio_tls.sh` and
+`/usr/local/bin/drachtio_mtls.sh`, installed by the packer build. User data only invokes
+them, which is what keeps it under the 16 KB EC2 limit. The certbot `dns-route53` plugin
+they depend on is installed at image build time as well, so nothing is fetched from apt or
+Parameter Store while the instance boots.
 
-They are kept as ordinary shell files — [`boot-scripts/drachtio_tls.sh`](../boot-scripts/drachtio_tls.sh)
-and [`boot-scripts/drachtio_mtls.sh`](../boot-scripts/drachtio_mtls.sh) — so they can be linted,
-diffed and syntax-checked like any other script, and `generate-cf.sh` folds them into the
-parameters when it builds the template. The generated template is therefore self-contained:
-an instance runs exactly what that stack version declared, with nothing fetched from outside
-AWS at boot and no chance of drifting when a newer script lands in the repository.
+The scripts live in the [packer repository](https://github.com/jambonz-selfhosting/packer)
+under `files/`, and are installed by `scripts/install_certbot.sh` for the `mini`, `sip` and
+`sip-rtp` variants. That is the only copy — edit them there.
 
-The generator refuses to build if either script fails `bash -n` or exceeds the 8 KB
-parameter limit, and it checks every user data block against the 16 KB EC2 limit before
-writing the template. Each parameter is created only while its feature is switched on, and
-uses the advanced tier for its 8 KB value limit at about $0.05 per parameter per month.
+**This couples the feature to the image.** `EnableTLS` and `EnableMtls` only work on an AMI
+built with those scripts present. On an older image user data prints
+`ERROR: drachtio_tls.sh not in this AMI` and the instance comes up without TLS rather than
+failing the stack. If you see that, rebuild the image or point `ami-mappings.yaml` at a
+newer one.
 
 #### Renewal
 
