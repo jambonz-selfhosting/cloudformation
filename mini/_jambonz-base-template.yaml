@@ -60,6 +60,11 @@ Parameters:
     Type: String
     Default: true
     AllowedValues: [true, false]
+  ExistingEncryptionSecret:
+    Description: "OPTIONAL. Supply an existing encryption secret to reuse, for example when rebuilding an instance against an existing database. Leave BLANK and the stack generates one in Secrets Manager and creates an IAM role so the instance can read it. When supplied, no Secrets Manager secret and no IAM role are created, and CloudWatch log shipping is disabled because it requires that same role."
+    Type: String
+    Default: ""
+    NoEcho: true
   CloudwatchLogRetention:
     Description: "Number of days to retain cloudwatch logs"
     Type: Number
@@ -104,6 +109,11 @@ Parameters:
       - "false"
 
 Conditions:
+  # Blank ExistingEncryptionSecret => generate one in Secrets Manager and create
+  # the IAM role the instance needs to read it. Supplied => skip both, which also
+  # means no CloudWatch agent, since it needs the same role.
+  GenerateEncryptionSecret: !Equals [!Ref ExistingEncryptionSecret, ""]
+
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
@@ -113,6 +123,7 @@ Conditions:
 Resources:
   EncryptionSecret:
     Type: AWS::SecretsManager::Secret
+    Condition: GenerateEncryptionSecret
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Auto-generated encryption secret for jambonz"
@@ -123,6 +134,7 @@ Resources:
 
   IamRole:
     Type: AWS::IAM::Role
+    Condition: GenerateEncryptionSecret
     Properties:
       Description: jambonz mini IAM role
       AssumeRolePolicyDocument:
@@ -170,6 +182,7 @@ Resources:
       CidrBlock: !Ref VpcCidr
   jambonzInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
+    Condition: GenerateEncryptionSecret
     Properties:
       Path: /
       Roles:
@@ -181,7 +194,7 @@ Resources:
         - UseDefaultInstanceType
         - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, MiniDefault]
         - !Ref InstanceType
-      IamInstanceProfile: !Ref jambonzInstanceProfile
+      IamInstanceProfile: !If [GenerateEncryptionSecret, !Ref jambonzInstanceProfile, !Ref "AWS::NoValue"]
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "MiniAmi"]
       KeyName: !Ref KeyName
       NetworkInterfaces:
@@ -202,8 +215,15 @@ Resources:
             - |
               #!/bin/bash -xe
 
-              # Fetch JWT_SECRET from Secrets Manager
-              JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
+              # Use the encryption secret supplied as a stack parameter when one was
+              # given; otherwise fetch the stack-generated one from Secrets Manager,
+              # which requires the IAM role created alongside it.
+              if [ -n "${ProvidedEncryptionSecret}" ]; then
+                echo "Using encryption secret supplied as a stack parameter"
+                JWT_SECRET="${ProvidedEncryptionSecret}"
+              else
+                JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
+              fi
 
               echo "update /etc/hosts file to include hostname: $(hostname)"
               echo "127.0.0.1 $(hostname)" | sudo tee -a /etc/hosts > /dev/null
@@ -419,9 +439,12 @@ Resources:
               sudo /usr/local/bin/apiban/apiban-client-nftables FULL
               
             - URLPortal: !Ref URLPortal
-              Cloudwatch: !Ref Cloudwatch
+              # CloudWatch log shipping needs the IAM role, so force it off when
+              # the role is not created
+              Cloudwatch: !If [GenerateEncryptionSecret, !Ref Cloudwatch, "false"]
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
-              JWT_SECRET_ARN: !Ref EncryptionSecret
+              JWT_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref EncryptionSecret, ""]
+              ProvidedEncryptionSecret: !Ref ExistingEncryptionSecret
               KrispApiKey: !Ref KrispApiKey
               AicApiKey: !Ref AicApiKey
               EnableOpenTelemetry: !Ref EnableOpenTelemetry
