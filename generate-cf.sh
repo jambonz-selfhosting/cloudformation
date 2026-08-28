@@ -686,6 +686,16 @@ UD_SEEN=0
 while IFS=$'\t' read -r UD_NAME UD_BODY; do
     [ -z "$UD_NAME" ] && continue
     UD_SEEN=$((UD_SEEN + 1))
+    # A matched resource with an empty body means the expression below stopped
+    # matching this one's shape - a short tag, or a single-string Fn::Sub. Scoring
+    # that as 0 bytes would wave through exactly the oversized user data this guard
+    # exists to catch, and UD_SEEN would not notice because other rows still match.
+    if [ -z "$UD_BODY" ]; then
+        echo "ERROR: $UD_NAME has user data the size guard cannot read."
+        echo "       Expected Fn::Base64 -> Fn::Sub -> [body, vars]; fix the"
+        echo "       expression in generate-cf.sh before trusting this template."
+        exit 1
+    fi
     # Each ${Foo} is charged what it plausibly expands to, by name: ARNs are long,
     # endpoints and hostnames middling, everything else short. ${!Foo} is skipped - it
     # is the Fn::Sub escape for a shell variable and stays literal.
@@ -717,8 +727,8 @@ done < <(yq eval '
                       | .["Fn::Base64"] | .["Fn::Sub"] | .[0] | sub("\n"; " "))
 ' "$OUTPUT_TEMPLATE")
 
-# A silent zero here would mean the expression stopped matching - short tags, a
-# single-string Fn::Sub - and the guard would pass every template forever after.
+# Zero rows means the expression matched nothing at all; the per-row check above
+# catches the subtler case where only some resources stopped matching.
 if [ "$UD_SEEN" -eq 0 ]; then
     echo "ERROR: found no user data to measure. The size guard is not working;"
     echo "       fix it before trusting this template."

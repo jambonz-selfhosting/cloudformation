@@ -146,18 +146,14 @@ generator prints the same command when it finishes. (Medium and large are far la
 need the S3 route.)
 
 ```bash
-# Upload the template (create the bucket first if you do not have one)
-aws s3 cp jambonz-mini-us-west-2-amd64.yaml s3://my-cf-templates-bucket/
-
-# Deploy using --template-url
 aws cloudformation create-stack \
-  --stack-name jambonz-mini \
-  --template-url https://my-cf-templates-bucket.s3.us-west-2.amazonaws.com/jambonz-mini-us-west-2-amd64.yaml \
-  --capabilities CAPABILITY_IAM \
   --region us-west-2 \
+  --stack-name jambonz-mini \
+  --template-body file://jambonz-mini-us-west-2-arm64.yaml \
+  --capabilities CAPABILITY_IAM \
   --parameters \
-    ParameterKey=KeyName,ParameterValue=my-keypair \
-    ParameterKey=URLPortal,ParameterValue=my-domain.example.com
+    ParameterKey=KeyName,ParameterValue=<your-key-name> \
+    ParameterKey=URLPortal,ParameterValue=<your-domain>
 ```
 
 Uploading via the console works too: *Create stack → Upload a template file* has no such
@@ -229,13 +225,13 @@ The script:
    DNS-01 plugin;
 2. inserts the `<tls>` block into `/etc/drachtio.conf.xml`;
 3. appends the `sips:` contacts to `/etc/systemd/system/drachtio.service`;
-4. drops a renewal hook at `/etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh` and
+4. drops a renewal hook at `/etc/letsencrypt/renewal-hooks/deploy/drachtio-tls.sh` and
    enables `certbot.timer`;
 5. reloads systemd and restarts drachtio.
 
 Every step is guarded, so re-running it is a no-op. It runs on each boot on purpose: a
-replacement instance in the autoscaling group starts with an empty `/etc/letsencrypt` and
-an unmodified `drachtio.conf.xml`, so it has to redo the work.
+replacement instance starts with an empty `/etc/letsencrypt` and an unmodified
+`drachtio.conf.xml`, so it has to redo the work.
 
 The wildcard means you can give different jambonz accounts different SIP realms
 (`alice.sip.example.com`, `bob.sip.example.com`) under one certificate. Pass the bare
@@ -261,6 +257,31 @@ built with those scripts present. On an older image user data prints
 `ERROR: drachtio_tls.sh not in this AMI` and the instance comes up without TLS rather than
 failing the stack. If you see that, rebuild the image or point `ami-mappings.yaml` at a
 newer one.
+
+#### The certificate is cached in Parameter Store
+
+Let's Encrypt allows **5 duplicate certificates per registered domain per week**, and the
+boot script runs on every replacement. mini is a single instance rather than an autoscaling
+group, so this bites when you rebuild the stack, move to a new AMI, or run more than one
+mini on the same SIP domain — without a cache a handful of rebuilds exhausts the allowance
+and the next one comes up with no TLS until the window rolls.
+
+The issued certificate and its key are therefore stored under
+`<TlsCertParamPrefix>/<SipDomain>/fullchain` and `.../privkey` (a SecureString). A booting
+SBC reuses the cached copy when it still parses, pairs with its key, covers the domain and
+has more than 30 days left; only when none of that holds does it ask Let's Encrypt, and it
+writes the result back for the next instance. Renewal refreshes the cached copy too.
+
+`TlsCertParamPrefix` defaults to `/jambonz/tls`. Stacks that serve the same `SipDomain`
+should share it — the rate limit is per domain, not per stack, so sharing the prefix is what
+keeps them from competing for the same five requests. The SBC's IAM policy grants read and
+write on exactly `<prefix>/<SipDomain>/*`, nothing wider.
+
+Two caveats. These parameters are written by the instance, not by CloudFormation, so they
+**outlive the stack** — delete them by hand when you tear a deployment down for good, since
+one of them holds a private key. And two instances that boot at the same moment both miss
+the cache and both ask Let's Encrypt, so a large simultaneous scale-out can still spend more
+than one request.
 
 #### Renewal
 

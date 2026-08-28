@@ -40,6 +40,7 @@ Metadata:
           - EnableTLS
           - SipDomain
           - CertEmail
+          - TlsCertParamPrefix
           - HostedZoneId
       - Label:
           default: "Mutual TLS on outbound calls (optional)"
@@ -80,6 +81,8 @@ Metadata:
         default: "SIP domain for the certificate"
       CertEmail:
         default: "Let's Encrypt registration email"
+      TlsCertParamPrefix:
+        default: "SSM prefix for the cached TLS certificate"
       HostedZoneId:
         default: "Route 53 hosted zone id for the SIP domain"
       EnableMtls:
@@ -220,6 +223,12 @@ Parameters:
     Default: ""
     AllowedPattern: ^$|^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$
     ConstraintDescription: must be blank, or a valid email address
+  TlsCertParamPrefix:
+    Description: "SSM Parameter Store prefix under which the issued SIP TLS certificate is cached, so replacing an instance does not spend one of Let's Encrypt's 5 duplicate certificates per week. The certificate and its key are written under <prefix>/<SipDomain>/, and the SBC is granted read and write on exactly that path. Stacks sharing a SIP domain should share this prefix. Note that these parameters outlive the stack - delete them by hand if you tear the deployment down for good."
+    Type: String
+    Default: "/jambonz/tls"
+    AllowedPattern: ^/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$
+    ConstraintDescription: must begin with / and must not end with one, e.g. /jambonz/tls
   HostedZoneId:
     Description: "Required when EnableTLS is true: the Route 53 hosted zone id for SipDomain, e.g. Z1234567890ABC. It scopes the DNS write permission granted to the SBC to that one zone. Leave blank when EnableTLS is false."
     Type: String
@@ -416,7 +425,31 @@ Resources:
           - Effect: Allow
             Action:
               - 'route53:ChangeResourceRecordSets'
+              # certbot 2.1.0, which the Debian images ship, never calls this - it
+              # accumulates both challenges in memory and UPSERTs them in one batch.
+              # It is in certbot's own documented policy though, so grant it rather
+              # than have a future version fail the DNS-01 challenge at boot, where
+              # the only symptom is an SBC that quietly serves plain SIP.
+              - 'route53:ListResourceRecordSets'
             Resource: !Sub 'arn:aws:route53:::hostedzone/${HostedZoneId}'
+          # Let's Encrypt issues at most 5 duplicate certificates per week, so the one
+          # we get is cached here and reused by every later instance for this SIP
+          # domain. Put as well as Get: whoever issues it also stores it.
+          - Effect: Allow
+            Action:
+              - 'ssm:GetParameter'
+              - 'ssm:PutParameter'
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${TlsCertParamPrefix}/${SipDomain}/*'
+          # Encrypt as well as Decrypt, unlike the mTLS policy: this role writes the
+          # SecureString, it does not only read one.
+          - Effect: Allow
+            Action:
+              - 'kms:Decrypt'
+              - 'kms:Encrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
 
   # Read access to the private CA, and the KMS grant a SecureString needs. Scoped to
   # the two named parameters and, for KMS, to calls arriving through Parameter Store.
@@ -721,6 +754,7 @@ Resources:
                   echo "ERROR: drachtio_tls.sh not in this AMI - rebuild the image or pick a newer one."
                 else
                   /usr/local/bin/drachtio_tls.sh "${SipDomain}" "${CertEmail}" \
+                    "${TlsCertParamPrefix}" "${AWS::Region}" \
                     || echo "WARNING: SIP TLS setup failed - see above. SBC is running without TLS."
                 fi
               else
@@ -746,6 +780,7 @@ Resources:
             - URLPortal: !Ref URLPortal
               SipDomain: !Ref SipDomain
               CertEmail: !Ref CertEmail
+              TlsCertParamPrefix: !Ref TlsCertParamPrefix
               EnableTLS: !Ref EnableTLS
               EnableMtls: !Ref EnableMtls
               MtlsCaCertParam: !Ref MtlsCaCertParam

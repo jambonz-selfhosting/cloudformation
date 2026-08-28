@@ -319,7 +319,7 @@ The script:
    DNS-01 plugin;
 2. inserts the `<tls>` block into `/etc/drachtio.conf.xml`;
 3. appends the `sips:` contacts to `/etc/systemd/system/drachtio.service`;
-4. drops a renewal hook at `/etc/letsencrypt/renewal-hooks/deploy/restart-drachtio.sh` and
+4. drops a renewal hook at `/etc/letsencrypt/renewal-hooks/deploy/drachtio-tls.sh` and
    enables `certbot.timer`;
 5. reloads systemd and restarts drachtio.
 
@@ -351,6 +351,37 @@ built with those scripts present. On an older image user data prints
 `ERROR: drachtio_tls.sh not in this AMI` and the instance comes up without TLS rather than
 failing the stack. If you see that, rebuild the image or point `ami-mappings.yaml` at a
 newer one.
+
+#### The certificate is cached in Parameter Store
+
+Let's Encrypt allows **5 duplicate certificates per registered domain per week**. An SBC in
+an autoscaling group re-runs the boot script on every replacement, so without a cache a few
+instance churns exhaust the allowance and every SBC after that comes up with no TLS until
+the window rolls.
+
+The issued certificate and its key are therefore stored under
+`<TlsCertParamPrefix>/<SipDomain>/fullchain` and `.../privkey` (a SecureString). A booting
+SBC reuses the cached copy when it still parses, pairs with its key, covers the domain and
+has more than 30 days left; only when none of that holds does it ask Let's Encrypt, and it
+writes the result back for the next instance. Renewal refreshes the cached copy too.
+
+`TlsCertParamPrefix` defaults to `/jambonz/tls`. Stacks that serve the same `SipDomain`
+should share it — the rate limit is per domain, not per stack, so sharing the prefix is what
+keeps them from competing for the same five requests. The SBC's IAM policy grants read and
+write on exactly `<prefix>/<SipDomain>/*`, nothing wider.
+
+**On medium the grant is wider than the SBC.** This deployment shares one `IamRole` across
+the SBC, feature server, web/monitoring and recording instance profiles, so all of them can
+read the cached private key — and feature servers execute customer-supplied webhooks.
+Narrowing it means giving the SBC its own role and instance profile, which replaces the
+instances. large already scopes both TLS policies to `SbcSipIamRole`; mini is a single host,
+so the distinction does not arise.
+
+Two caveats. These parameters are written by the instance, not by CloudFormation, so they
+**outlive the stack** — delete them by hand when you tear a deployment down for good, since
+one of them holds a private key. And two instances that boot at the same moment both miss
+the cache and both ask Let's Encrypt, so a large simultaneous scale-out can still spend more
+than one request.
 
 #### Renewal
 
