@@ -1,0 +1,32 @@
+name: cfn-lint
+
+# Lints the CloudFormation base templates on every push and pull request.
+#
+# These templates cannot be checked with `aws cloudformation validate-template`:
+# medium is 81KB and large is 101KB, against a 51,200 byte limit for an inline
+# template body. Until this workflow existed they were never validated by
+# anything.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  cfn-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install cfn-lint
+        run: pip install --disable-pip-version-check cfn-lint
+
+      - name: Lint templates
+        # Templates and ignored rules come from .cfnlintrc.yaml.
+        # Warnings are reported but only errors fail the build.
+        run: cfn-lint --non-zero-exit-code error

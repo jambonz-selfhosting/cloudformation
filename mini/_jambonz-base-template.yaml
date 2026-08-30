@@ -11,6 +11,86 @@
 
 AWSTemplateFormatVersion: 2010-09-09
 
+Metadata:
+  # Groups and labels the parameters in the CloudFormation console. Purely
+  # cosmetic - it changes nothing about how the stack deploys - but it makes the
+  # three kinds of parameter distinguishable at a glance:
+  #   REQUIRED  - no default, the stack will not create until you supply one
+  #   optional  - blank by default, fill in only to switch a feature on
+  #   (neither) - already carries a sensible default, change only with reason
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "REQUIRED - you must supply a value for these"
+        Parameters:
+          - KeyName
+          - URLPortal
+      - Label:
+          default: "Security and compliance - optional, leave blank for the standard setup"
+        Parameters:
+          - SecretsParameterPath
+          - KmsKeyId
+      - Label:
+          default: "Third-party API keys - optional, leave blank if unused"
+        Parameters:
+          - KrispApiKey
+          - AicApiKey
+      - Label:
+          default: "Compute - defaults suit most deployments"
+        Parameters:
+          - Architecture
+          - InstanceType
+      - Label:
+          default: "Networking - defaults suit most deployments"
+        Parameters:
+          - VpcCidr
+          - AllowedSshCidr
+          - AllowedHttpCidr
+          - AllowedSipCidr
+          - AllowedRtpCidr
+      - Label:
+          default: "Logging, monitoring and encryption - defaults suit most deployments"
+        Parameters:
+          - Cloudwatch
+          - CloudwatchLogRetention
+          - EnableOpenTelemetry
+          - EnableEBSEncryption
+    ParameterLabels:
+      KeyName:
+        default: "REQUIRED - EC2 key pair for SSH access"
+      URLPortal:
+        default: "REQUIRED - DNS name you will point at the web server"
+      SecretsParameterPath:
+        default: "optional - SSM Parameter Store path holding your secrets"
+      KmsKeyId:
+        default: "optional - customer managed KMS key ARN"
+      KrispApiKey:
+        default: "optional - Krisp API key"
+      AicApiKey:
+        default: "optional - ai-coustics API key"
+      InstanceType:
+        default: "optional - instance type (blank uses the optimized default)"
+      Architecture:
+        default: "CPU architecture"
+      VpcCidr:
+        default: "VPC CIDR"
+      AllowedSshCidr:
+        default: "Allowed SSH source CIDR"
+      AllowedHttpCidr:
+        default: "Allowed HTTP/HTTPS source CIDR"
+      AllowedSipCidr:
+        default: "Allowed SIP source CIDR"
+      AllowedRtpCidr:
+        default: "Allowed RTP source CIDR"
+      Cloudwatch:
+        default: "Ship logs to CloudWatch"
+      CloudwatchLogRetention:
+        default: "CloudWatch log retention (days)"
+      EnableOpenTelemetry:
+        default: "Enable OpenTelemetry tracing"
+      EnableEBSEncryption:
+        default: "Encrypt EBS volumes"
+
 Parameters:
   Architecture:
     Description: "CPU architecture to deploy. amd64 is Intel/AMD x86_64; arm64 is AWS Graviton (lower cost per vCPU). Only architectures whose AMIs were copied by generate-cf.sh are offered. Any InstanceType you specify below must match this architecture."
@@ -22,7 +102,7 @@ Parameters:
     Type: String
     Default: ""
   KeyName:
-    Description: Name of an EC2 KeyPair to enable SSH access to the instance.
+    Description: "REQUIRED. Name of an EC2 KeyPair to enable SSH access to the instance."
     Type: 'AWS::EC2::KeyPair::KeyName'
     ConstraintDescription: must be the name of an existing EC2 KeyPair.
   AllowedSshCidr:
@@ -60,11 +140,18 @@ Parameters:
     Type: String
     Default: true
     AllowedValues: [true, false]
-  ExistingEncryptionSecret:
-    Description: "OPTIONAL. Supply an existing encryption secret to reuse, for example when rebuilding an instance against an existing database. Leave BLANK and the stack generates one in Secrets Manager and creates an IAM role so the instance can read it. When supplied, no Secrets Manager secret and no IAM role are created, and CloudWatch log shipping is disabled because it requires that same role."
+  SecretsParameterPath:
+    Description: "OPTIONAL. An SSM Parameter Store path (e.g. /jambonz/prod) holding the jambonz secrets. The parameters MUST be created as SecureStrings BEFORE this stack, because the instance reads them at first boot; CloudFormation cannot create SecureStrings itself. Every direct child of the path becomes an environment variable, so the path is a namespace, not a fixed schema; jambonz currently requires ENCRYPTION_SECRET, JWT_SECRET, AUTHENTICATION_KEY, JAMBONZ_RECORD_WS_PASSWORD and BASIC_AUTH_PASSWORD. Give each a DISTINCT value: ENCRYPTION_SECRET keys the encrypted database columns and can never be rotated without re-encrypting them, while the other four are credentials you can rotate freely. When supplied, the apps fetch secrets at process start, no secret values are written to ecosystem.config.js or the upload_recordings unit file, and no Secrets Manager secret is generated. Leave BLANK for the default behavior (a stack-generated secret in Secrets Manager)."
     Type: String
     Default: ""
-    NoEcho: true
+    AllowedPattern: "^$|^/[a-zA-Z0-9_./-]*[a-zA-Z0-9_.-]$"
+    ConstraintDescription: "must begin with / and must not end with /"
+  KmsKeyId:
+    Description: "OPTIONAL. ARN of a customer managed KMS key protecting the jambonz secrets - the SecureStrings under SecretsParameterPath, or the stack-generated Secrets Manager secret. Leave BLANK to use the AWS-managed default key (alias/aws/ssm or alias/aws/secretsmanager), which is sufficient for most deployments. Supply your own key when you need a second access-control boundary (a principal then needs both the SSM/Secrets Manager grant AND kms:Decrypt on this key), the ability to revoke access by disabling the key, or auditable automatic key rotation. Must be a full key ARN, not a key ID or alias."
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^arn:aws[a-zA-Z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/.+$"
+    ConstraintDescription: "must be a full KMS key ARN, e.g. arn:aws:kms:us-east-1:123456789012:key/1234abcd-..."
   CloudwatchLogRetention:
     Description: "Number of days to retain cloudwatch logs"
     Type: Number
@@ -109,12 +196,17 @@ Parameters:
       - "false"
 
 Conditions:
-  # Blank ExistingEncryptionSecret => generate one in Secrets Manager and create
-  # the IAM role the instance needs to read it. Supplied => skip both, which also
-  # means no CloudWatch agent, since it needs the same role.
-  GenerateEncryptionSecret: !Equals [!Ref ExistingEncryptionSecret, ""]
+  # Exactly two modes, selected by whether SecretsParameterPath is supplied:
+  #   set   => the apps fetch secrets from SSM Parameter Store at process start
+  #   blank => the stack generates a secret in Secrets Manager and the boot
+  #            script writes it into the app config
+  # Either way an IAM role is created, so CloudWatch log shipping always works.
+  UseSsmSecrets: !Not [!Equals [!Ref SecretsParameterPath, ""]]
+  GenerateEncryptionSecret: !Equals [!Ref SecretsParameterPath, ""]
 
-  ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
+  # A customer managed KMS key was supplied to protect the secrets.
+  HasKmsKey: !Not [!Equals [!Ref KmsKeyId, ""]]
+
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
   # Instance type condition - use regional default when parameter is blank
@@ -127,6 +219,7 @@ Resources:
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Auto-generated encryption secret for jambonz"
+      KmsKeyId: !If [HasKmsKey, !Ref KmsKeyId, !Ref "AWS::NoValue"]
       GenerateSecretString:
         PasswordLength: 16
         ExcludeCharacters: "/?%,; \\[]&'\"$`"
@@ -134,7 +227,6 @@ Resources:
 
   IamRole:
     Type: AWS::IAM::Role
-    Condition: GenerateEncryptionSecret
     Properties:
       Description: jambonz mini IAM role
       AssumeRolePolicyDocument:
@@ -165,10 +257,34 @@ Resources:
                 Action:
                   - 'ssm:GetParameter'
                 Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
-              - Effect: Allow
-                Action:
-                  - 'secretsmanager:GetSecretValue'
-                Resource: !Ref EncryptionSecret
+              - !If
+                - GenerateEncryptionSecret
+                - Effect: Allow
+                  Action:
+                    - 'secretsmanager:GetSecretValue'
+                  Resource: !Ref EncryptionSecret
+                - !Ref 'AWS::NoValue'
+              - !If
+                - UseSsmSecrets
+                - Effect: Allow
+                  Action:
+                    - 'ssm:GetParameter'
+                    - 'ssm:GetParametersByPath'
+                  Resource:
+                    - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}'
+                    - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}/*'
+                - !Ref 'AWS::NoValue'
+              # Decrypting a SecureString (or the Secrets Manager secret) needs
+              # kms:Decrypt when a customer managed key protects it. The
+              # AWS-managed default key grants this through the service itself,
+              # so no statement is needed in that case.
+              - !If
+                - HasKmsKey
+                - Effect: Allow
+                  Action:
+                    - 'kms:Decrypt'
+                  Resource: !Ref KmsKeyId
+                - !Ref 'AWS::NoValue'
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -182,7 +298,6 @@ Resources:
       CidrBlock: !Ref VpcCidr
   jambonzInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
-    Condition: GenerateEncryptionSecret
     Properties:
       Path: /
       Roles:
@@ -194,7 +309,7 @@ Resources:
         - UseDefaultInstanceType
         - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, MiniDefault]
         - !Ref InstanceType
-      IamInstanceProfile: !If [GenerateEncryptionSecret, !Ref jambonzInstanceProfile, !Ref "AWS::NoValue"]
+      IamInstanceProfile: !Ref jambonzInstanceProfile
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "MiniAmi"]
       KeyName: !Ref KeyName
       NetworkInterfaces:
@@ -215,14 +330,20 @@ Resources:
             - |
               #!/bin/bash -xe
 
-              # Use the encryption secret supplied as a stack parameter when one was
-              # given; otherwise fetch the stack-generated one from Secrets Manager,
-              # which requires the IAM role created alongside it.
-              if [ -n "${ProvidedEncryptionSecret}" ]; then
-                echo "Using encryption secret supplied as a stack parameter"
-                JWT_SECRET="${ProvidedEncryptionSecret}"
+              # Resolve the encryption secret.
+              #   SSM mode: nothing to fetch here. The pm2 apps load their secrets
+              #     at process start via the ssm-env preload and upload_recordings
+              #     via its ExecStartPre drop-in, so the value is never needed in
+              #     this script - and never traced into the cloud-init log.
+              #   default mode: read the stack-generated Secrets Manager secret.
+              #     Tracing is disabled around the fetch so the value does not land
+              #     in /var/log/cloud-init-output.log or the EC2 console output.
+              if [ -n "${SecretsParameterPath}" ]; then
+                echo "secrets are sourced from SSM Parameter Store under ${SecretsParameterPath}"
               else
+                set +x
                 JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
+                set -x
               fi
 
               echo "update /etc/hosts file to include hostname: $(hostname)"
@@ -280,8 +401,19 @@ Resources:
               sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=$NEW_DB_PASSWD/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              if [ -n "${SecretsParameterPath}" ]; then
+                # SSM mode: no secret values in the unit file. The drop-in that
+                # sources them at service start is installed by
+                # /opt/jambonz/apply-ssm-secrets.sh, run once below.
+                :
+              else
+                # tracing off: these seds expand the secret, and with -x bash would
+                # echo it into /var/log/cloud-init-output.log and the EC2 console
+                set +x
+                sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                set -x
+              fi
               # fix path for Debian package install
               sudo sed -i -e "s|/usr/local/bin/upload_recordings|/usr/bin/upload_recordings|g" /etc/systemd/system/upload_recordings.service
 
@@ -318,7 +450,22 @@ Resources:
               sudo sed -i -e "s/\(.*\)--JAMBONES_API_BASE_URL--\(.*\)/\1http:\/\/$PUBLIC_IPV4\/v1\2/g" $HOME/apps/ecosystem.config.js 
               
               # replace JWT_SECRET
-              sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1${!JWT_SECRET}\2/g" $HOME/apps/ecosystem.config.js 
+              if [ -n "${SecretsParameterPath}" ]; then
+                # SSM mode: all deploy-time wiring lives in a script shipped in
+                # the image, so the systemd/pm2 details stay in the packer repo
+                # next to the files they configure and every jambonz role
+                # (mini, fs, web, sbc, recording) uses the same implementation.
+                # It writes /etc/jambonz/ssm.conf, points the pm2 apps at the
+                # ssm-env preload, and installs the upload_recordings drop-in,
+                # skipping whichever of those this role does not have.
+                sudo /opt/jambonz/apply-ssm-secrets.sh \
+                  "${SecretsParameterPath}" "${AWS::Region}" \
+                  $HOME/apps/ecosystem.config.js
+              else
+                set +x
+                sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1${!JWT_SECRET}\2/g" $HOME/apps/ecosystem.config.js
+                set -x
+              fi
 
               # reset the database
               JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
@@ -439,12 +586,10 @@ Resources:
               sudo /usr/local/bin/apiban/apiban-client-nftables FULL
               
             - URLPortal: !Ref URLPortal
-              # CloudWatch log shipping needs the IAM role, so force it off when
-              # the role is not created
-              Cloudwatch: !If [GenerateEncryptionSecret, !Ref Cloudwatch, "false"]
+              Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
               JWT_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref EncryptionSecret, ""]
-              ProvidedEncryptionSecret: !Ref ExistingEncryptionSecret
+              SecretsParameterPath: !Ref SecretsParameterPath
               KrispApiKey: !Ref KrispApiKey
               AicApiKey: !Ref AicApiKey
               EnableOpenTelemetry: !Ref EnableOpenTelemetry
