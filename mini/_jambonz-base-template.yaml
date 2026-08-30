@@ -323,17 +323,10 @@ Resources:
               sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
               if [ -n "${SecretsParameterPath}" ]; then
-                # SSM mode: no secret values in the unit file. Install the drop-in
-                # shipped in the image (its systemd syntax is owned by the packer
-                # repo alongside the unit itself) and fill in the two deploy-time
-                # values. It fetches the secrets into a root-only env file on
-                # tmpfs at every service start.
-                sudo mkdir -p /etc/systemd/system/upload_recordings.service.d
-                sudo cp /opt/jambonz/upload_recordings-ssm.conf \
-                  /etc/systemd/system/upload_recordings.service.d/ssm-env.conf
-                sudo sed -i -e "s|__SSM_PATH__|${SecretsParameterPath}|g" \
-                  -e "s|__AWS_REGION__|${AWS::Region}|g" \
-                  /etc/systemd/system/upload_recordings.service.d/ssm-env.conf
+                # SSM mode: no secret values in the unit file. The drop-in that
+                # sources them at service start is installed by
+                # /opt/jambonz/apply-ssm-secrets.sh, run once below.
+                :
               else
                 # tracing off: these seds expand the secret, and with -x bash would
                 # echo it into /var/log/cloud-init-output.log and the EC2 console
@@ -379,30 +372,16 @@ Resources:
               
               # replace JWT_SECRET
               if [ -n "${SecretsParameterPath}" ]; then
-                # SSM mode: no secret values in ecosystem.config.js.
-                #
-                # DELETE the placeholder lines rather than blanking them. pm2's
-                # ProcessContainer applies the app's declared env AFTER a -r
-                # preload has run, so a key left in the file as '' is written
-                # back over the value the preload fetched, and api-server dies on
-                # its `assert.ok(process.env.JWT_SECRET)`. A key that is absent
-                # from the file cannot be clobbered.
-                sudo sed -i -e "/JWT-SECRET-GOES_HERE/d" $HOME/apps/ecosystem.config.js
-
-                # node_args MUST be an array. pm2 passes it to cluster workers as
-                # execArgv, and a plain string is dropped - the preload then never
-                # runs at all for cluster-mode apps such as api-server.
-                sudo sed -i -e "s|node_args: \[\]|node_args: ['-r', '/opt/jambonz/ssm-env.cjs']|g" $HOME/apps/ecosystem.config.js
-
-                # The preload reads its path/region from this file, not from the
-                # app env: pm2 cluster workers have none of ecosystem.config.js
-                # in their environment at the time a -r preload executes.
-                sudo mkdir -p /etc/jambonz
-                sudo tee /etc/jambonz/ssm.conf > /dev/null <<SSMCONF
-              JAMBONES_SSM_PARAMETER_PATH=${SecretsParameterPath}
-              JAMBONES_SSM_REGION=${AWS::Region}
-              SSMCONF
-                sudo chmod 0644 /etc/jambonz/ssm.conf
+                # SSM mode: all deploy-time wiring lives in a script shipped in
+                # the image, so the systemd/pm2 details stay in the packer repo
+                # next to the files they configure and every jambonz role
+                # (mini, fs, web, sbc, recording) uses the same implementation.
+                # It writes /etc/jambonz/ssm.conf, points the pm2 apps at the
+                # ssm-env preload, and installs the upload_recordings drop-in,
+                # skipping whichever of those this role does not have.
+                sudo /opt/jambonz/apply-ssm-secrets.sh \
+                  "${SecretsParameterPath}" "${AWS::Region}" \
+                  $HOME/apps/ecosystem.config.js
               else
                 set +x
                 sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1${!JWT_SECRET}\2/g" $HOME/apps/ecosystem.config.js
