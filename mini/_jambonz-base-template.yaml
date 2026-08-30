@@ -207,7 +207,6 @@ Conditions:
   # A customer managed KMS key was supplied to protect the secrets.
   HasKmsKey: !Not [!Equals [!Ref KmsKeyId, ""]]
 
-  ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
   # Instance type condition - use regional default when parameter is blank
