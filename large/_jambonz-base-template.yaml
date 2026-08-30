@@ -2445,7 +2445,10 @@ Resources:
                 fi
 
               # configure upload_recordings service
-              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
+              # upload_recordings only reads - it looks up the account bucket
+              # credentials - so point it at the reader. This host keeps the writer
+              # in JAMBONES_MYSQL_HOST because it initialises the database schema.
+              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${UPLOAD_RECORDINGS_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
@@ -2468,6 +2471,7 @@ Resources:
               echo "webserver user data script completed"
             - VPC_CIDR: !Ref VpcCidr
               JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.Endpoint.Address
+              UPLOAD_RECORDINGS_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
               JAMBONES_MYSQL_USER: !Ref MySQLUsername
               JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
               JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
