@@ -11,6 +11,84 @@
 
 AWSTemplateFormatVersion: 2010-09-09
 
+Metadata:
+  # Groups and labels the parameters in the CloudFormation console. Purely
+  # cosmetic - it changes nothing about how the stack deploys - but it keeps the
+  # compliance options in their own collapsible section so a deployer who does
+  # not need them never has to reason about them.
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Required"
+        Parameters:
+          - KeyName
+          - URLPortal
+      - Label:
+          default: "Compute"
+        Parameters:
+          - Architecture
+          - InstanceType
+      - Label:
+          default: "Networking"
+        Parameters:
+          - VpcCidr
+          - AllowedSshCidr
+          - AllowedHttpCidr
+          - AllowedSipCidr
+          - AllowedRtpCidr
+      - Label:
+          default: "Security and compliance (optional)"
+        Parameters:
+          - SecretsParameterPath
+          - KmsKeyId
+          - EnableEBSEncryption
+      - Label:
+          default: "Logging and monitoring"
+        Parameters:
+          - Cloudwatch
+          - CloudwatchLogRetention
+          - EnableOpenTelemetry
+      - Label:
+          default: "Third-party API keys (optional)"
+        Parameters:
+          - KrispApiKey
+          - AicApiKey
+    ParameterLabels:
+      KeyName:
+        default: "EC2 key pair"
+      URLPortal:
+        default: "Portal DNS name"
+      Architecture:
+        default: "CPU architecture"
+      InstanceType:
+        default: "Instance type (blank = optimized default)"
+      VpcCidr:
+        default: "VPC CIDR"
+      AllowedSshCidr:
+        default: "Allowed SSH source CIDR"
+      AllowedHttpCidr:
+        default: "Allowed HTTP/HTTPS source CIDR"
+      AllowedSipCidr:
+        default: "Allowed SIP source CIDR"
+      AllowedRtpCidr:
+        default: "Allowed RTP source CIDR"
+      SecretsParameterPath:
+        default: "SSM Parameter Store path for secrets (blank = AWS-generated secret)"
+      KmsKeyId:
+        default: "Customer managed KMS key ARN (blank = AWS-managed key)"
+      EnableEBSEncryption:
+        default: "Encrypt EBS volumes"
+      Cloudwatch:
+        default: "Ship logs to CloudWatch"
+      CloudwatchLogRetention:
+        default: "CloudWatch log retention (days)"
+      EnableOpenTelemetry:
+        default: "Enable OpenTelemetry tracing"
+      KrispApiKey:
+        default: "Krisp API key"
+      AicApiKey:
+        default: "ai-coustics API key"
+
 Parameters:
   Architecture:
     Description: "CPU architecture to deploy. amd64 is Intel/AMD x86_64; arm64 is AWS Graviton (lower cost per vCPU). Only architectures whose AMIs were copied by generate-cf.sh are offered. Any InstanceType you specify below must match this architecture."
