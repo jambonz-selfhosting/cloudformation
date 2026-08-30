@@ -164,11 +164,14 @@ Parameters:
     Description: 'the database username'
     Type: String
     Default: 'admin'
-  MySQLPassword: 
+  MySQLPassword:
     NoEcho: true
-    Description: 'The database admin account password'
+    Description: "The Aurora master password. No default: you must supply one. RDS accepts 8-41 printable ASCII characters and rejects / \" @ and space."
     Type: String
-    Default: 'JambonzR0ck$'  
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: '^[^/"@ ]+$'
+    ConstraintDescription: 'must be 8-41 characters and must not contain / " @ or a space'
   URLPortal:
     Type: String
     Description: "DNS name you will point to the jambonz webserver(s)"
