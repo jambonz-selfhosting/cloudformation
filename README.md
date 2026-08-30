@@ -184,6 +184,28 @@ If the copy exceeds 1 hour, the script will timeout with an error. You can also 
 aws ec2 describe-images --region <region> --owners self --filters "Name=name,Values=jambonz-*" --query 'Images[*].[Name,State]' --output table
 ```
 
+## Developing
+
+### Linting templates
+
+The base templates under `mini/`, `medium/` and `large/` are checked with
+[cfn-lint](https://github.com/aws-cloudformation/cfn-lint), which runs on every
+pull request via `.github/workflows/cfn-lint.yml`.
+
+```bash
+pipx install cfn-lint     # or: pip install cfn-lint
+cfn-lint                  # templates and ignored rules come from .cfnlintrc.yaml
+```
+
+Warnings are reported but only errors fail CI. `E1011` is suppressed: the base
+templates deliberately carry no `Mappings` section, since `generate-cf.sh`
+injects `Arch2AMI` and `ArchInstanceTypeDefaults` when it produces the
+deployable per-region template.
+
+Note that `aws cloudformation validate-template` cannot be used on the medium
+and large templates - they exceed the 51,200 byte limit for an inline template
+body - which is why cfn-lint is the check that matters here.
+
 ## Documentation
 
 - [jambonz Documentation](https://docs.jambonz.org)
