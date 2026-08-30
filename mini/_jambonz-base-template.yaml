@@ -13,23 +13,35 @@ AWSTemplateFormatVersion: 2010-09-09
 
 Metadata:
   # Groups and labels the parameters in the CloudFormation console. Purely
-  # cosmetic - it changes nothing about how the stack deploys - but it keeps the
-  # compliance options in their own collapsible section so a deployer who does
-  # not need them never has to reason about them.
+  # cosmetic - it changes nothing about how the stack deploys - but it makes the
+  # three kinds of parameter distinguishable at a glance:
+  #   REQUIRED  - no default, the stack will not create until you supply one
+  #   optional  - blank by default, fill in only to switch a feature on
+  #   (neither) - already carries a sensible default, change only with reason
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: "Required"
+          default: "REQUIRED - you must supply a value for these"
         Parameters:
           - KeyName
           - URLPortal
       - Label:
-          default: "Compute"
+          default: "Security and compliance - optional, leave blank for the standard setup"
+        Parameters:
+          - SecretsParameterPath
+          - KmsKeyId
+      - Label:
+          default: "Third-party API keys - optional, leave blank if unused"
+        Parameters:
+          - KrispApiKey
+          - AicApiKey
+      - Label:
+          default: "Compute - defaults suit most deployments"
         Parameters:
           - Architecture
           - InstanceType
       - Label:
-          default: "Networking"
+          default: "Networking - defaults suit most deployments"
         Parameters:
           - VpcCidr
           - AllowedSshCidr
@@ -37,31 +49,29 @@ Metadata:
           - AllowedSipCidr
           - AllowedRtpCidr
       - Label:
-          default: "Security and compliance (optional)"
-        Parameters:
-          - SecretsParameterPath
-          - KmsKeyId
-          - EnableEBSEncryption
-      - Label:
-          default: "Logging and monitoring"
+          default: "Logging, monitoring and encryption - defaults suit most deployments"
         Parameters:
           - Cloudwatch
           - CloudwatchLogRetention
           - EnableOpenTelemetry
-      - Label:
-          default: "Third-party API keys (optional)"
-        Parameters:
-          - KrispApiKey
-          - AicApiKey
+          - EnableEBSEncryption
     ParameterLabels:
       KeyName:
-        default: "EC2 key pair"
+        default: "REQUIRED - EC2 key pair for SSH access"
       URLPortal:
-        default: "Portal DNS name"
+        default: "REQUIRED - DNS name you will point at the web server"
+      SecretsParameterPath:
+        default: "optional - SSM Parameter Store path holding your secrets"
+      KmsKeyId:
+        default: "optional - customer managed KMS key ARN"
+      KrispApiKey:
+        default: "optional - Krisp API key"
+      AicApiKey:
+        default: "optional - ai-coustics API key"
+      InstanceType:
+        default: "optional - instance type (blank uses the optimized default)"
       Architecture:
         default: "CPU architecture"
-      InstanceType:
-        default: "Instance type (blank = optimized default)"
       VpcCidr:
         default: "VPC CIDR"
       AllowedSshCidr:
@@ -72,22 +82,14 @@ Metadata:
         default: "Allowed SIP source CIDR"
       AllowedRtpCidr:
         default: "Allowed RTP source CIDR"
-      SecretsParameterPath:
-        default: "SSM Parameter Store path for secrets (blank = AWS-generated secret)"
-      KmsKeyId:
-        default: "Customer managed KMS key ARN (blank = AWS-managed key)"
-      EnableEBSEncryption:
-        default: "Encrypt EBS volumes"
       Cloudwatch:
         default: "Ship logs to CloudWatch"
       CloudwatchLogRetention:
         default: "CloudWatch log retention (days)"
       EnableOpenTelemetry:
         default: "Enable OpenTelemetry tracing"
-      KrispApiKey:
-        default: "Krisp API key"
-      AicApiKey:
-        default: "ai-coustics API key"
+      EnableEBSEncryption:
+        default: "Encrypt EBS volumes"
 
 Parameters:
   Architecture:
@@ -100,7 +102,7 @@ Parameters:
     Type: String
     Default: ""
   KeyName:
-    Description: Name of an EC2 KeyPair to enable SSH access to the instance.
+    Description: "REQUIRED. Name of an EC2 KeyPair to enable SSH access to the instance."
     Type: 'AWS::EC2::KeyPair::KeyName'
     ConstraintDescription: must be the name of an existing EC2 KeyPair.
   AllowedSshCidr:
