@@ -60,17 +60,18 @@ Parameters:
     Type: String
     Default: true
     AllowedValues: [true, false]
-  ExistingEncryptionSecret:
-    Description: "OPTIONAL. Supply an existing encryption secret to reuse, for example when rebuilding an instance against an existing database. Leave BLANK and the stack generates one in Secrets Manager and creates an IAM role so the instance can read it. When supplied, no Secrets Manager secret and no IAM role are created, and CloudWatch log shipping is disabled because it requires that same role. Ignored when SecretsParameterPath is supplied."
-    Type: String
-    Default: ""
-    NoEcho: true
   SecretsParameterPath:
-    Description: "OPTIONAL. An SSM Parameter Store path (e.g. /jambonz/prod) under which you have pre-created SecureString parameters named ENCRYPTION_SECRET, JWT_SECRET, AUTHENTICATION_KEY, JAMBONZ_RECORD_WS_PASSWORD, and BASIC_AUTH_PASSWORD (they may all share the same value). When supplied, the apps fetch secrets from SSM at process start and no secret values are written into ecosystem.config.js or the upload_recordings unit file; no Secrets Manager secret is generated. Takes precedence over ExistingEncryptionSecret. Leave BLANK for the default behavior."
+    Description: "OPTIONAL. An SSM Parameter Store path (e.g. /jambonz/prod) holding the jambonz secrets. The parameters MUST be created as SecureStrings BEFORE this stack, because the instance reads them at first boot; CloudFormation cannot create SecureStrings itself. Every direct child of the path becomes an environment variable, so the path is a namespace, not a fixed schema; jambonz currently requires ENCRYPTION_SECRET, JWT_SECRET, AUTHENTICATION_KEY, JAMBONZ_RECORD_WS_PASSWORD and BASIC_AUTH_PASSWORD. Give each a DISTINCT value: ENCRYPTION_SECRET keys the encrypted database columns and can never be rotated without re-encrypting them, while the other four are credentials you can rotate freely. When supplied, the apps fetch secrets at process start, no secret values are written to ecosystem.config.js or the upload_recordings unit file, and no Secrets Manager secret is generated. Leave BLANK for the default behavior (a stack-generated secret in Secrets Manager)."
     Type: String
     Default: ""
     AllowedPattern: "^$|^/[a-zA-Z0-9_./-]*[a-zA-Z0-9_.-]$"
     ConstraintDescription: "must begin with / and must not end with /"
+  KmsKeyId:
+    Description: "OPTIONAL. ARN of a customer managed KMS key protecting the jambonz secrets - the SecureStrings under SecretsParameterPath, or the stack-generated Secrets Manager secret. Leave BLANK to use the AWS-managed default key (alias/aws/ssm or alias/aws/secretsmanager), which is sufficient for most deployments. Supply your own key when you need a second access-control boundary (a principal then needs both the SSM/Secrets Manager grant AND kms:Decrypt on this key), the ability to revoke access by disabling the key, or auditable automatic key rotation. Must be a full key ARN, not a key ID or alias."
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^arn:aws[a-zA-Z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/.+$"
+    ConstraintDescription: "must be a full KMS key ARN, e.g. arn:aws:kms:us-east-1:123456789012:key/1234abcd-..."
   CloudwatchLogRetention:
     Description: "Number of days to retain cloudwatch logs"
     Type: Number
@@ -115,20 +116,16 @@ Parameters:
       - "false"
 
 Conditions:
-  # SecretsParameterPath supplied => apps fetch secrets from SSM Parameter Store
-  # at process start; nothing is generated in Secrets Manager.
+  # Exactly two modes, selected by whether SecretsParameterPath is supplied:
+  #   set   => the apps fetch secrets from SSM Parameter Store at process start
+  #   blank => the stack generates a secret in Secrets Manager and the boot
+  #            script writes it into the app config
+  # Either way an IAM role is created, so CloudWatch log shipping always works.
   UseSsmSecrets: !Not [!Equals [!Ref SecretsParameterPath, ""]]
+  GenerateEncryptionSecret: !Equals [!Ref SecretsParameterPath, ""]
 
-  # Neither an existing secret nor an SSM path supplied => generate a secret in
-  # Secrets Manager. ExistingEncryptionSecret supplied (and no SSM path) => use
-  # it directly, with no IAM role, which also means no CloudWatch agent.
-  GenerateEncryptionSecret: !And
-    - !Equals [!Ref ExistingEncryptionSecret, ""]
-    - !Equals [!Ref SecretsParameterPath, ""]
-
-  # The IAM role is needed to read the generated Secrets Manager secret or the
-  # SSM parameters (and it also carries the CloudWatch agent permissions).
-  CreateIamRole: !Or [!Condition GenerateEncryptionSecret, !Condition UseSsmSecrets]
+  # A customer managed KMS key was supplied to protect the secrets.
+  HasKmsKey: !Not [!Equals [!Ref KmsKeyId, ""]]
 
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
@@ -143,6 +140,7 @@ Resources:
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Auto-generated encryption secret for jambonz"
+      KmsKeyId: !If [HasKmsKey, !Ref KmsKeyId, !Ref "AWS::NoValue"]
       GenerateSecretString:
         PasswordLength: 16
         ExcludeCharacters: "/?%,; \\[]&'\"$`"
@@ -150,7 +148,6 @@ Resources:
 
   IamRole:
     Type: AWS::IAM::Role
-    Condition: CreateIamRole
     Properties:
       Description: jambonz mini IAM role
       AssumeRolePolicyDocument:
@@ -198,6 +195,17 @@ Resources:
                     - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}'
                     - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}/*'
                 - !Ref 'AWS::NoValue'
+              # Decrypting a SecureString (or the Secrets Manager secret) needs
+              # kms:Decrypt when a customer managed key protects it. The
+              # AWS-managed default key grants this through the service itself,
+              # so no statement is needed in that case.
+              - !If
+                - HasKmsKey
+                - Effect: Allow
+                  Action:
+                    - 'kms:Decrypt'
+                  Resource: !Ref KmsKeyId
+                - !Ref 'AWS::NoValue'
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -211,7 +219,6 @@ Resources:
       CidrBlock: !Ref VpcCidr
   jambonzInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
-    Condition: CreateIamRole
     Properties:
       Path: /
       Roles:
@@ -223,7 +230,7 @@ Resources:
         - UseDefaultInstanceType
         - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, MiniDefault]
         - !Ref InstanceType
-      IamInstanceProfile: !If [CreateIamRole, !Ref jambonzInstanceProfile, !Ref "AWS::NoValue"]
+      IamInstanceProfile: !Ref jambonzInstanceProfile
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "MiniAmi"]
       KeyName: !Ref KeyName
       NetworkInterfaces:
@@ -244,21 +251,20 @@ Resources:
             - |
               #!/bin/bash -xe
 
-              # Resolve the encryption secret. Precedence:
-              #   1) SecretsParameterPath: SSM mode - the value fetched here is used
-              #      only for the systemd units below; the pm2 apps fetch their own
-              #      secrets at process start via the ssm-env preload
-              #   2) an encryption secret supplied as a stack parameter
-              #   3) the stack-generated one in Secrets Manager, which requires the
-              #      IAM role created alongside it
+              # Resolve the encryption secret.
+              #   SSM mode: nothing to fetch here. The pm2 apps load their secrets
+              #     at process start via the ssm-env preload and upload_recordings
+              #     via its ExecStartPre drop-in, so the value is never needed in
+              #     this script - and never traced into the cloud-init log.
+              #   default mode: read the stack-generated Secrets Manager secret.
+              #     Tracing is disabled around the fetch so the value does not land
+              #     in /var/log/cloud-init-output.log or the EC2 console output.
               if [ -n "${SecretsParameterPath}" ]; then
-                echo "Fetching encryption secret from SSM Parameter Store"
-                JWT_SECRET=$(aws ssm get-parameter --name "${SecretsParameterPath}/ENCRYPTION_SECRET" --with-decryption --region ${AWS::Region} --query 'Parameter.Value' --output text)
-              elif [ -n "${ProvidedEncryptionSecret}" ]; then
-                echo "Using encryption secret supplied as a stack parameter"
-                JWT_SECRET="${ProvidedEncryptionSecret}"
+                echo "secrets are sourced from SSM Parameter Store under ${SecretsParameterPath}"
               else
+                set +x
                 JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
+                set -x
               fi
 
               echo "update /etc/hosts file to include hostname: $(hostname)"
@@ -317,19 +323,24 @@ Resources:
               sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
               if [ -n "${SecretsParameterPath}" ]; then
-                # SSM mode: no secret values in the unit file. A drop-in fetches
-                # them into a root-only env file on tmpfs at every service start
-                # (EnvironmentFile values override the unit's empty Environment=
-                # entries because drop-ins are parsed after the main unit).
+                # SSM mode: no secret values in the unit file. Install the drop-in
+                # shipped in the image (its systemd syntax is owned by the packer
+                # repo alongside the unit itself) and fill in the two deploy-time
+                # values. It fetches the secrets into a root-only env file on
+                # tmpfs at every service start.
                 sudo mkdir -p /etc/systemd/system/upload_recordings.service.d
-                sudo tee /etc/systemd/system/upload_recordings.service.d/ssm-env.conf > /dev/null << EOF
-              [Service]
-              ExecStartPre=/opt/jambonz/ssm-env.sh ${SecretsParameterPath} ${AWS::Region} /run/jambonz/upload_recordings.env
-              EnvironmentFile=/run/jambonz/upload_recordings.env
-              EOF
+                sudo cp /opt/jambonz/upload_recordings-ssm.conf \
+                  /etc/systemd/system/upload_recordings.service.d/ssm-env.conf
+                sudo sed -i -e "s|__SSM_PATH__|${SecretsParameterPath}|g" \
+                  -e "s|__AWS_REGION__|${AWS::Region}|g" \
+                  /etc/systemd/system/upload_recordings.service.d/ssm-env.conf
               else
+                # tracing off: these seds expand the secret, and with -x bash would
+                # echo it into /var/log/cloud-init-output.log and the EC2 console
+                set +x
                 sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
                 sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                set -x
               fi
               # fix path for Debian package install
               sudo sed -i -e "s|/usr/local/bin/upload_recordings|/usr/bin/upload_recordings|g" /etc/systemd/system/upload_recordings.service
@@ -368,15 +379,34 @@ Resources:
               
               # replace JWT_SECRET
               if [ -n "${SecretsParameterPath}" ]; then
-                # SSM mode: no secret values in ecosystem.config.js. Blank the
-                # placeholders (the ssm-env preload only fills env vars that are
-                # unset or empty) and point the apps at the parameter path.
-                sudo sed -i -e "s/JWT-SECRET-GOES_HERE//g" $HOME/apps/ecosystem.config.js
-                sudo sed -i -e "s|node_args: ''|node_args: '-r /opt/jambonz/ssm-env.cjs'|g" $HOME/apps/ecosystem.config.js
-                sudo sed -i -e "s|JAMBONES_SSM_PARAMETER_PATH: ''|JAMBONES_SSM_PARAMETER_PATH: '${SecretsParameterPath}'|g" $HOME/apps/ecosystem.config.js
-                sudo sed -i -e "s|JAMBONES_SSM_REGION: ''|JAMBONES_SSM_REGION: '${AWS::Region}'|g" $HOME/apps/ecosystem.config.js
+                # SSM mode: no secret values in ecosystem.config.js.
+                #
+                # DELETE the placeholder lines rather than blanking them. pm2's
+                # ProcessContainer applies the app's declared env AFTER a -r
+                # preload has run, so a key left in the file as '' is written
+                # back over the value the preload fetched, and api-server dies on
+                # its `assert.ok(process.env.JWT_SECRET)`. A key that is absent
+                # from the file cannot be clobbered.
+                sudo sed -i -e "/JWT-SECRET-GOES_HERE/d" $HOME/apps/ecosystem.config.js
+
+                # node_args MUST be an array. pm2 passes it to cluster workers as
+                # execArgv, and a plain string is dropped - the preload then never
+                # runs at all for cluster-mode apps such as api-server.
+                sudo sed -i -e "s|node_args: \[\]|node_args: ['-r', '/opt/jambonz/ssm-env.cjs']|g" $HOME/apps/ecosystem.config.js
+
+                # The preload reads its path/region from this file, not from the
+                # app env: pm2 cluster workers have none of ecosystem.config.js
+                # in their environment at the time a -r preload executes.
+                sudo mkdir -p /etc/jambonz
+                sudo tee /etc/jambonz/ssm.conf > /dev/null <<SSMCONF
+              JAMBONES_SSM_PARAMETER_PATH=${SecretsParameterPath}
+              JAMBONES_SSM_REGION=${AWS::Region}
+              SSMCONF
+                sudo chmod 0644 /etc/jambonz/ssm.conf
               else
+                set +x
                 sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1${!JWT_SECRET}\2/g" $HOME/apps/ecosystem.config.js
+                set -x
               fi
 
               # reset the database
@@ -498,12 +528,9 @@ Resources:
               sudo /usr/local/bin/apiban/apiban-client-nftables FULL
               
             - URLPortal: !Ref URLPortal
-              # CloudWatch log shipping needs the IAM role, so force it off when
-              # the role is not created
-              Cloudwatch: !If [CreateIamRole, !Ref Cloudwatch, "false"]
+              Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
               JWT_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref EncryptionSecret, ""]
-              ProvidedEncryptionSecret: !Ref ExistingEncryptionSecret
               SecretsParameterPath: !Ref SecretsParameterPath
               KrispApiKey: !Ref KrispApiKey
               AicApiKey: !Ref AicApiKey
