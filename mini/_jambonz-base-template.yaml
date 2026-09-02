@@ -640,7 +640,13 @@ Resources:
               sed -i -e "\@</head>@i\ $TAG" $HOME/apps/webapp/dist/index.html
 
               # add row to system information table
-              mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+              # system_information.sip_domain_name has to be the name the certificate
+              # covers, or TLS registrations fail hostname validation. Deriving it from
+              # URLPortal made SipDomain and URLPortal two knobs that had to be kept in
+              # step with nothing enforcing it.
+              SIP_DOMAIN_DB="${SipDomain}"
+              [ -z "$SIP_DOMAIN_DB" ] && SIP_DOMAIN_DB="sip.${URLPortal}"
+              mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\'''"$SIP_DOMAIN_DB"''\'', '\''grafana.'"${URLPortal}"''\'')'
 
               sudo cat << EOF > $NGINX_CONFIG
               server {

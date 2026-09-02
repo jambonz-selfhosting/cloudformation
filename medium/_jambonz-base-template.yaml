@@ -1386,7 +1386,13 @@ Resources:
                 JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD} JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
 
                 # add row to system information table
-                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+                # system_information.sip_domain_name has to be the name the certificate
+                # covers, or TLS registrations fail hostname validation. Deriving it from
+                # URLPortal made SipDomain and URLPortal two knobs that had to be kept in
+                # step with nothing enforcing it.
+                SIP_DOMAIN_DB="${SipDomain}"
+                [ -z "$SIP_DOMAIN_DB" ] && SIP_DOMAIN_DB="sip.${URLPortal}"
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\'''"$SIP_DOMAIN_DB"''\'', '\''grafana.'"${URLPortal}"''\'')'
 
                 # record the schema version so upgrade-jambonz-db.js knows the DB is initialized
                 SCHEMA_VERSION=$(node -p "require('$HOME/apps/api-server/package.json').version")
@@ -1597,6 +1603,7 @@ Resources:
               AWS_REGION: !Ref AWS::Region
               JWT_SECRET_ARN: !Ref EncryptionSecret
               URLPortal: !Ref URLPortal
+              SipDomain: !Ref SipDomain
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS
               DeployRecordingCluster: !Ref DeployRecordingCluster

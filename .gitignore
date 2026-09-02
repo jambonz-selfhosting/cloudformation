@@ -16,3 +16,7 @@ make-snapshots-public.sh
 
 # Base templates use underscore prefix and should be committed
 # (no exclusion needed - underscore prefix makes them distinct)
+
+# Deploy logs written while testing (contain account ids and instance ids)
+deploy-*.log
+packer-build-*.log
