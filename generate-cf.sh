@@ -648,8 +648,8 @@ backup_file_if_exists "$OUTPUT_TEMPLATE"
     # Insert Mappings section
     echo -e "$MAPPINGS"
 
-    # Append the rest of the template (from line 13 onwards), narrowing the
-    # Architecture parameter to the architectures we actually copied AMIs for.
+    # Append the rest of the template (from line 13 onwards), narrowing the Architecture
+    # parameter to the architectures we actually copied AMIs for.
     tail -n +13 "$BASE_TEMPLATE" | awk \
         -v allowed="$(echo "$ARCHES" | tr ' ' ',' | sed 's/,/, /g')" \
         -v def="$DEFAULT_ARCH" '
@@ -673,6 +673,74 @@ if ! yq eval '.' "$OUTPUT_TEMPLATE" > /dev/null 2>&1; then
     exit 1
 fi
 echo "✓ Template is valid YAML"
+echo ""
+
+# EC2 rejects user data over 16 KB with InvalidUserData.Malformed, which surfaces as a
+# launch template that fails to create and takes the whole stack down with it. Check it
+# here, where it is cheap, rather than 20 minutes into a rollback. Runs after the YAML
+# check so a malformed template cannot slip through by yielding no rows.
+echo "Checking user data size..."
+UD_LIMIT=16384
+UD_FAIL=0
+UD_SEEN=0
+while IFS=$'\t' read -r UD_NAME UD_BODY; do
+    [ -z "$UD_NAME" ] && continue
+    UD_SEEN=$((UD_SEEN + 1))
+    # A matched resource with an empty body means the expression below stopped
+    # matching this one's shape - a short tag, or a single-string Fn::Sub. Scoring
+    # that as 0 bytes would wave through exactly the oversized user data this guard
+    # exists to catch, and UD_SEEN would not notice because other rows still match.
+    if [ -z "$UD_BODY" ]; then
+        echo "ERROR: $UD_NAME has user data the size guard cannot read."
+        echo "       Expected Fn::Base64 -> Fn::Sub -> [body, vars]; fix the"
+        echo "       expression in generate-cf.sh before trusting this template."
+        exit 1
+    fi
+    # Each ${Foo} is charged what it plausibly expands to, by name: ARNs are long,
+    # endpoints and hostnames middling, everything else short. ${!Foo} is skipped - it
+    # is the Fn::Sub escape for a shell variable and stays literal.
+    UD_LEN=$(printf '%s' "$UD_BODY" | awk '
+        { line = $0
+          total += length(line)
+          while (match(line, /\$\{[^!}][^}]*\}/)) {
+              name = substr(line, RSTART + 2, RLENGTH - 3)
+              if (name ~ /[Aa][Rr][Nn]/)                       est = 130
+              else if (name ~ /Host|HOST|Address|Endpoint/)    est = 90
+              else if (name ~ /^AWS::/)                        est = 30
+              else                                             est = 60
+              total += est - RLENGTH
+              line = substr(line, RSTART + RLENGTH)
+          }
+        }
+        END { print total }
+    ')
+    if [ "$UD_LEN" -gt "$UD_LIMIT" ]; then
+        echo "  ✗ $UD_NAME: up to $UD_LEN bytes once substituted, over the $UD_LIMIT byte EC2 limit"
+        UD_FAIL=1
+    elif [ "$UD_LEN" -gt $((UD_LIMIT * 85 / 100)) ]; then
+        echo "  ! $UD_NAME: up to $UD_LEN bytes, within 15% of the $UD_LIMIT byte limit"
+    fi
+done < <(yq eval '
+    .Resources | to_entries | .[]
+    | select(.value.Properties.UserData != null or .value.Properties.LaunchTemplateData.UserData != null)
+    | .key + "\t" + ((.value.Properties.UserData // .value.Properties.LaunchTemplateData.UserData)
+                      | .["Fn::Base64"] | .["Fn::Sub"] | .[0] | sub("\n"; " "))
+' "$OUTPUT_TEMPLATE")
+
+# Zero rows means the expression matched nothing at all; the per-row check above
+# catches the subtler case where only some resources stopped matching.
+if [ "$UD_SEEN" -eq 0 ]; then
+    echo "ERROR: found no user data to measure. The size guard is not working;"
+    echo "       fix it before trusting this template."
+    exit 1
+fi
+if [ "$UD_FAIL" -ne 0 ]; then
+    echo ""
+    echo "ERROR: user data exceeds the EC2 limit; the stack would fail to create."
+    echo "       Move whatever grew into the AMI (packer files/) rather than trimming prose."
+    exit 1
+fi
+echo "✓ All $UD_SEEN user data blocks are within the EC2 limit"
 echo ""
 
 # ============================================================
