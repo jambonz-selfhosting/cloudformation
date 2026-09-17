@@ -722,8 +722,8 @@ Resources:
           - IpProtocol: tcp
             FromPort: 80
             ToPort: 80
-            CidrIp: !Ref AllowedHttpCidr
-            Description: Allow HTTP access
+            SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
+            Description: Allow HTTP from feature servers only
         SecurityGroupEgress:
           - IpProtocol: -1
             FromPort: 0
@@ -852,7 +852,7 @@ Resources:
     Condition: DeployRecordingClusterCondition
     Properties:
       Name: !Sub "${AWS::StackName}-recording-alb"
-      Scheme: internet-facing
+      Scheme: internal
       Subnets: 
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
