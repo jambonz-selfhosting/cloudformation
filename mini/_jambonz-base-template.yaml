@@ -218,10 +218,34 @@ Resources:
     Condition: GenerateEncryptionSecret
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
-      Description: "Auto-generated encryption secret for jambonz"
+      Description: "Keys the encrypted columns in the jambonz database. This value can NOT be rotated without decrypting and re-encrypting every stored credential, so it is kept separate from the credentials below."
       KmsKeyId: !If [HasKmsKey, !Ref KmsKeyId, !Ref "AWS::NoValue"]
       GenerateSecretString:
         PasswordLength: 16
+        ExcludeCharacters: "/?%,; \\[]&'\"$`"
+        IncludeSpace: false
+
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: GenerateEncryptionSecret
+    Properties:
+      Name: !Sub "${AWS::StackName}-jwt-secret"
+      Description: "Signs API tokens. Safe to rotate at any time; rotating it invalidates issued tokens and nothing stored in the database depends on it."
+      KmsKeyId: !If [HasKmsKey, !Ref KmsKeyId, !Ref "AWS::NoValue"]
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludeCharacters: "/?%,; \\[]&'\"$`"
+        IncludeSpace: false
+
+  RecordingAuthSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: GenerateEncryptionSecret
+    Properties:
+      Name: !Sub "${AWS::StackName}-recording-auth-secret"
+      Description: "Shared password between the feature server and the recording service, presented over HTTP Basic. Safe to rotate; both ends read it at boot."
+      KmsKeyId: !If [HasKmsKey, !Ref KmsKeyId, !Ref "AWS::NoValue"]
+      GenerateSecretString:
+        PasswordLength: 32
         ExcludeCharacters: "/?%,; \\[]&'\"$`"
         IncludeSpace: false
 
@@ -262,7 +286,10 @@ Resources:
                 - Effect: Allow
                   Action:
                     - 'secretsmanager:GetSecretValue'
-                  Resource: !Ref EncryptionSecret
+                  Resource:
+                    - !Ref EncryptionSecret
+                    - !Ref JwtSecret
+                    - !Ref RecordingAuthSecret
                 - !Ref 'AWS::NoValue'
               - !If
                 - UseSsmSecrets
@@ -347,6 +374,8 @@ Resources:
               else
                 set +x
                 JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
+                ENCRYPTION_SECRET=$(aws secretsmanager get-secret-value --secret-id "${ENCRYPTION_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
+                RECORDING_AUTH_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${RECORDING_AUTH_SECRET_ARN}" --region ${AWS::Region} --query 'SecretString' --output text)
                 set -x
               fi
 
@@ -414,8 +443,8 @@ Resources:
                 # tracing off: these seds expand the secret, and with -x bash would
                 # echo it into /var/log/cloud-init-output.log and the EC2 console
                 set +x
-                sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-                sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!RECORDING_AUTH_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!ENCRYPTION_SECRET}/g" /etc/systemd/system/upload_recordings.service
                 set -x
               fi
               # fix path for Debian package install
@@ -469,6 +498,8 @@ Resources:
               else
                 set +x
                 sudo sed -i -e "s/\(.*\)JWT-SECRET-GOES_HERE\(.*\)/\1${!JWT_SECRET}\2/g" $HOME/apps/ecosystem.config.js
+                sudo sed -i -e "s/\(.*\)ENCRYPTION-SECRET-GOES_HERE\(.*\)/\1${!ENCRYPTION_SECRET}\2/g" $HOME/apps/ecosystem.config.js
+                sudo sed -i -e "s/\(.*\)RECORDING-AUTH-PASSWORD-GOES_HERE\(.*\)/\1${!RECORDING_AUTH_PASSWORD}\2/g" $HOME/apps/ecosystem.config.js
                 set -x
               fi
 
@@ -593,7 +624,9 @@ Resources:
             - URLPortal: !Ref URLPortal
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
-              JWT_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref EncryptionSecret, ""]
+              JWT_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref JwtSecret, ""]
+              ENCRYPTION_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref EncryptionSecret, ""]
+              RECORDING_AUTH_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref RecordingAuthSecret, ""]
               SecretsParameterPath: !Ref SecretsParameterPath
               KrispApiKey: !Ref KrispApiKey
               AicApiKey: !Ref AicApiKey
