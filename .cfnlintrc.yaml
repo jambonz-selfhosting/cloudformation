@@ -1,0 +1,27 @@
+# cfn-lint configuration
+#
+# Run locally with:   cfn-lint
+# CI runs the same command via .github/workflows/cfn-lint.yml
+#
+# Only the _jambonz-base-template.yaml files are linted. The deployable
+# jambonz-<size>-<region>-<arch>.yaml files are build artifacts produced by
+# generate-cf.sh and are gitignored.
+templates:
+  - mini/_jambonz-base-template.yaml
+  - medium/_jambonz-base-template.yaml
+  - large/_jambonz-base-template.yaml
+
+ignore_checks:
+  # E1011 - FindInMap references a mapping that does not exist.
+  #
+  # Expected here and not a defect: the base templates deliberately carry no
+  # Mappings section. generate-cf.sh builds Arch2AMI and ArchInstanceTypeDefaults
+  # from mappings/ami-mappings.yaml and mappings/instance-type-defaults.yaml and
+  # injects them when it produces the deployable per-region template. Linting the
+  # source therefore always sees the FindInMap without its mapping.
+  - E1011
+
+# Warnings are reported but do not fail the build; errors do. This is passed on
+# the command line rather than set here - cfn-lint 1.55 reads the key from the
+# config file but does not apply it, and still exits 4 on warnings:
+#     cfn-lint --non-zero-exit-code error
