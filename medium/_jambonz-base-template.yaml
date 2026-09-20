@@ -1451,6 +1451,7 @@ Resources:
                     max_memory_restart: '2G',
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
+                      JAMBONES_SERVER_CONTROL: 1,
                       JWT_SECRET: '${!JWT_SECRET}',
                       ENCRYPTION_SECRET: '${!ENCRYPTION_SECRET}',
                       RTPENGINE_PING_INTERVAL: 30000,
@@ -1595,6 +1596,7 @@ Resources:
                     max_memory_restart: '3G',
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
+                      JAMBONES_SERVER_CONTROL: 1,
                       JWT_SECRET: '${!JWT_SECRET}',
                       ENCRYPTION_SECRET: '${!ENCRYPTION_SECRET}',
                       AWS_REGION: '${AWS_REGION}',
