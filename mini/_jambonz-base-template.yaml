@@ -177,6 +177,10 @@ Resources:
   jambonzInstance:
     Type: 'AWS::EC2::Instance'
     Properties:
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
       InstanceType: !If
         - UseDefaultInstanceType
         - !FindInMap [ArchInstanceTypeDefaults, !Ref Architecture, MiniDefault]
@@ -284,10 +288,11 @@ Resources:
               # get instance metadata
               # this can take a few secs after the instance is created to attach EIP
               sleep 30
-              PRIVATE_IPV4="$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)" 
-              PUBLIC_IPV4="$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)" 
-              INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
-              AWS_REGION_NAME="$(curl -s http://169.254.169.254/latest/meta-data/placement/region)"
+              IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+              PRIVATE_IPV4="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)" 
+              PUBLIC_IPV4="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)" 
+              INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
+              AWS_REGION_NAME="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)"
 
               # update ecosystem.config.js with the new DB password
               sudo sed -i -e "s/\(.*\)JAMBONES_MYSQL_PASSWORD.*/\1JAMBONES_MYSQL_PASSWORD: '$NEW_DB_PASSWD',/g" $HOME/apps/ecosystem.config.js 

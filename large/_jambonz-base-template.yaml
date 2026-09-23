@@ -770,6 +770,12 @@ Resources:
     Properties:
       LaunchTemplateName: !Sub "${AWS::StackName}-recording-launch-template"
       LaunchTemplateData:
+        # IMDSv2 only: a customer-reachable SSRF (webhook, bucket endpoint) can then
+        # never read the instance role's credentials from 169.254.169.254.
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
         ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "RecordingServerAmi"]
         InstanceType: !If
           - UseDefaultRecordingInstanceType
@@ -1018,6 +1024,10 @@ Resources:
   MonitoringServerEC2:
     Type: 'AWS::EC2::Instance'
     Properties:
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
       SubnetId: !Ref PublicSubnet1
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "MonitoringServerAmi"]
       InstanceType: !If
@@ -1152,6 +1162,12 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
+        # IMDSv2 only: a customer-reachable SSRF (webhook, bucket endpoint) can then
+        # never read the instance role's credentials from 169.254.169.254.
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
         ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "SbcSipAmi"]
         InstanceType: !If
           - UseDefaultSbcSipInstanceType
@@ -1213,13 +1229,14 @@ Resources:
                 fi
 
                 if [ -f "/usr/local/bin/auto-assign-elastic-ip.sh" ]; then
-                    PRE_PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+                    PRE_PUBLIC_IP=`curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4`
                     echo "before retrieving EIP for SIP server, public IP is $PRE_PUBLIC_IP"
 
                     /usr/local/bin/auto-assign-elastic-ip.sh
                     sleep 20
 
-                    PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    PUBLIC_IP=`curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4`
                     echo "after retrieving EIP for SIP server, public IP is $PUBLIC_IP"
                 else
                     echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
@@ -1436,7 +1453,8 @@ Resources:
 
                 # get an apiban key
                 echo "installing apiban key"
-                INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)" 
+                IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+                INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)" 
                 APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
                 sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
                 sudo /usr/local/bin/apiban/apiban-client-nftables FULL
@@ -1581,6 +1599,12 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
+        # IMDSv2 only: a customer-reachable SSRF (webhook, bucket endpoint) can then
+        # never read the instance role's credentials from 169.254.169.254.
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
         ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "FsAmi"]
         InstanceType: !If
           - UseDefaultFeatureServerInstanceType
@@ -1902,6 +1926,12 @@ Resources:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateData:
+        # IMDSv2 only: a customer-reachable SSRF (webhook, bucket endpoint) can then
+        # never read the instance role's credentials from 169.254.169.254.
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
         ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "SbcRtpAmi"]
         InstanceType: !If
           - UseDefaultSbcRtpInstanceType
@@ -1961,13 +1991,14 @@ Resources:
                 fi
 
                 if [ -f "/usr/local/bin/auto-assign-elastic-ip.sh" ]; then
-                    PRE_PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+                    PRE_PUBLIC_IP=`curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4`
                     echo "before retrieving EIP for RTP server, public IP is $PRE_PUBLIC_IP"
 
                     /usr/local/bin/auto-assign-elastic-ip.sh
                     sleep 20
 
-                    PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+                    PUBLIC_IP=`curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4`
                     echo "after retrieving EIP for RTP server, public IP is $PUBLIC_IP"
                 else
                     echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
@@ -2184,6 +2215,10 @@ Resources:
       - ElastiCacheCluster
     Type: 'AWS::EC2::Instance'
     Properties:
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
       SubnetId: !Ref PublicSubnet1
       IamInstanceProfile: !Ref WebServerInstanceProfile
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "WebserverAmi"]
@@ -2254,12 +2289,13 @@ Resources:
               fi
 
               # EIP is assigned via CloudFormation EIPAssociation, no need to run auto-assign script
-              PUBLIC_IP=`curl -s http://169.254.169.254/latest/meta-data/public-ipv4`
+              IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+              PUBLIC_IP=`curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4`
               echo "webserver public IP is $PUBLIC_IP"
 
               echo "running jambonz web and monitoring server user data script"
 
-              INSTANCE_ID="$(curl -s http://169.254.169.254/latest/meta-data/instance-id)"
+              INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
 
               # check if database already has tables (i.e. not a fresh deployment)
               TABLE_COUNT=$(mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -p${JAMBONES_MYSQL_PASSWORD} -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='jambones'")
