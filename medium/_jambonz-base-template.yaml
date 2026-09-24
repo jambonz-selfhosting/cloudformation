@@ -1647,7 +1647,7 @@ Resources:
                 if [[ "${EnablePcaps}" == "true" ]]; then
                   echo "enabling PCAPs"
                   sudo sed -i -e "s/--delete-delay 0/--delete-delay 0 --homer=${WebMonitoringServerPrivateIP}:9060 --homer-protocol=udp --homer-id=11/g"  /etc/systemd/system/rtpengine.service
-                  sudo sed -i -e "s/--address 0.0.0.0 --port 9022/--address 0.0.0.0 --port 9022 --homer ${WebMonitoringServerPrivateIP}:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
+                  sudo sed -i -e "s/--port 9022/--port 9022 --homer ${WebMonitoringServerPrivateIP}:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
                 fi
 
                 # point drachtio to the HEP endpoint on the monitoring server

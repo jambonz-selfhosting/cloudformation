@@ -556,7 +556,7 @@ Resources:
               mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e 'delete from sbc_addresses'
 
               # point drachtio and rtpengine to the HEP endpoint on the localhost
-              sudo sed -i -e "s/--address 0.0.0.0 --port 9022/--address 0.0.0.0 --port 9022 --homer 127.0.0.1:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
+              sudo sed -i -e "s/--port 9022/--port 9022 --homer 127.0.0.1:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
               sudo sed -i -e "s/--delete-delay 0/--delete-delay 0 --homer=127.0.0.1:9060 --homer-protocol=udp --homer-id=11/g"  /etc/systemd/system/rtpengine.service
               sudo systemctl daemon-reload
               sudo systemctl restart rtpengine
