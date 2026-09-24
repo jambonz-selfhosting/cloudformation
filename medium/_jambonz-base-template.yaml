@@ -774,7 +774,6 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Condition: DeployRecordingClusterCondition
     Properties:
-      Name: !Sub "${AWS::StackName}-recording-alb"
       Scheme: internal
       Subnets: 
         - !Ref PublicSubnet1
@@ -792,7 +791,6 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Condition: DeployRecordingClusterCondition
     Properties:
-      Name: !Sub "${AWS::StackName}-recording-tg"
       Port: 3000
       Protocol: HTTP
       VpcId: !Ref VPC
