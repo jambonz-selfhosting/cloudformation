@@ -136,12 +136,6 @@ Parameters:
     ConstraintDescription: must be a valid network CIDR
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
     Default: 0.0.0.0/0
-  AllowedSmppCidr:
-    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address smpp access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
-    Type: String
-    ConstraintDescription: must be a valid network CIDR
-    AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
-    Default: 0.0.0.0/0
   AllowedRtpCidr:
     Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address to send RTP traffic, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
     Type: String
@@ -164,11 +158,14 @@ Parameters:
     Description: 'the database username'
     Type: String
     Default: 'admin'
-  MySQLPassword: 
+  MySQLPassword:
     NoEcho: true
-    Description: 'The database admin account password'
+    Description: "The Aurora master password. No default: you must supply one. RDS accepts 8-41 printable ASCII characters and rejects / \" @ and space."
     Type: String
-    Default: 'JambonzR0ck$'  
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: '^[^/"@ ]+$'
+    ConstraintDescription: 'must be 8-41 characters and must not contain / " @ or a space'
   URLPortal:
     Type: String
     Description: "DNS name you will point to the jambonz webserver(s)"
@@ -256,9 +253,29 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
-      Description: "Auto-generated encryption secret for jambonz"
+      Description: "Keys the encrypted columns in the jambonz database. This value can NOT be rotated without decrypting and re-encrypting every stored credential, so it is kept separate from the credentials below."
       GenerateSecretString:
         PasswordLength: 16
+        ExcludeCharacters: "/?%,; \\[]&'\"$`"
+        IncludeSpace: false
+
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${AWS::StackName}-jwt-secret"
+      Description: "Signs API tokens. Safe to rotate at any time; rotating it invalidates issued tokens and signs everyone out, and nothing stored in the database depends on it."
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludeCharacters: "/?%,; \\[]&'\"$`"
+        IncludeSpace: false
+
+  RecordingAuthSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${AWS::StackName}-recording-auth-secret"
+      Description: "Shared password the feature servers present to the recording cluster over HTTP Basic. Safe to rotate, but both sides read it at boot, so replace the instances together."
+      GenerateSecretString:
+        PasswordLength: 32
         ExcludeCharacters: "/?%,; \\[]&'\"$`"
         IncludeSpace: false
 
@@ -297,7 +314,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
-                Resource: !Ref EncryptionSecret
+                Resource:
+                  - !Ref EncryptionSecret
+                  - !Ref JwtSecret
+                  - !Ref RecordingAuthSecret
       ManagedPolicyArns:
       - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -725,8 +745,8 @@ Resources:
           - IpProtocol: tcp
             FromPort: 80
             ToPort: 80
-            CidrIp: !Ref AllowedHttpCidr
-            Description: Allow HTTP access
+            SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
+            Description: Allow HTTP from feature servers only
         SecurityGroupEgress:
           - IpProtocol: -1
             FromPort: 0
@@ -818,8 +838,10 @@ Resources:
                     echo "Warning: No SSH keys found for $DEFAULT_USER"
                 fi
 
-                # Fetch JWT_SECRET from Secrets Manager
+                # Fetch the jambonz secrets from Secrets Manager
                 JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+                ENCRYPTION_SECRET=$(aws secretsmanager get-secret-value --secret-id "${ENCRYPTION_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+                RECORDING_AUTH_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${RECORDING_AUTH_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
                 # configure upload_recordings service
                 echo "Configuring upload_recordings service"
@@ -828,8 +850,8 @@ Resources:
                 sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
                 sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
                 sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-                sudo sed -i -e "s|BASIC_AUTH_PASSWORD=|BASIC_AUTH_PASSWORD=${!JWT_SECRET}|g" /etc/systemd/system/upload_recordings.service
-                sudo sed -i -e "s|ENCRYPTION_SECRET=|ENCRYPTION_SECRET=${!JWT_SECRET}|g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s|BASIC_AUTH_PASSWORD=|BASIC_AUTH_PASSWORD=${!RECORDING_AUTH_PASSWORD}|g" /etc/systemd/system/upload_recordings.service
+                sudo sed -i -e "s|ENCRYPTION_SECRET=|ENCRYPTION_SECRET=${!ENCRYPTION_SECRET}|g" /etc/systemd/system/upload_recordings.service
                 sudo sed -i -e "s/--port 3017/--port 3000/g" /etc/systemd/system/upload_recordings.service
 
                 # Insert the LD_LIBRARY_PATH environment variable into the [Service] section
@@ -847,15 +869,16 @@ Resources:
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
                 JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
-                JWT_SECRET_ARN: !Ref EncryptionSecret
+                JWT_SECRET_ARN: !Ref JwtSecret
+                ENCRYPTION_SECRET_ARN: !Ref EncryptionSecret
+                RECORDING_AUTH_SECRET_ARN: !Ref RecordingAuthSecret
                 AWS_REGION: !Ref AWS::Region
 
   RecordingApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Condition: DeployRecordingClusterCondition
     Properties:
-      Name: !Sub "${AWS::StackName}-recording-alb"
-      Scheme: internet-facing
+      Scheme: internal
       Subnets: 
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
@@ -872,7 +895,6 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Condition: DeployRecordingClusterCondition
     Properties:
-      Name: !Sub "${AWS::StackName}-recording-tg"
       Port: 3000
       Protocol: HTTP
       VpcId: !Ref VPC
@@ -1138,7 +1160,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
-                Resource: !Ref EncryptionSecret
+                Resource:
+                  - !Ref EncryptionSecret
+                  - !Ref JwtSecret
+                  - !Ref RecordingAuthSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -1197,8 +1222,10 @@ Resources:
                 #!/bin/bash
                 echo "running jambonz user data script"
 
-                # Fetch JWT_SECRET from Secrets Manager
+                # Fetch the jambonz secrets from Secrets Manager
                 JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+                ENCRYPTION_SECRET=$(aws secretsmanager get-secret-value --secret-id "${ENCRYPTION_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+                RECORDING_AUTH_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${RECORDING_AUTH_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
                 # Detecting the Linux distribution
                 if grep -q 'ID="rhel"' /etc/os-release; then
@@ -1261,6 +1288,7 @@ Resources:
                     instance_var: 'INSTANCE_ID',
                     out_file: '$HOME/.pm2/logs/sbc-sip-sidecar.log',
                     err_file: '$HOME/.pm2/logs/sbc-sip-sidecar.log',
+                    merge_logs: true,
                     exec_mode: 'fork',
                     instances: 1,
                     autorestart: true,
@@ -1268,7 +1296,9 @@ Resources:
                     max_memory_restart: '2G',
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
+                      JAMBONES_SERVER_CONTROL: 1,
                       JWT_SECRET: '${!JWT_SECRET}',
+                      ENCRYPTION_SECRET: '${!ENCRYPTION_SECRET}',
                       RTPENGINE_PING_INTERVAL: 30000,
                       DRACHTIO_HOST: '127.0.0.1',
                       DRACHTIO_PORT: 9022,
@@ -1302,6 +1332,7 @@ Resources:
                     instance_var: 'INSTANCE_ID',
                     out_file: '$HOME/.pm2/logs/sbc-call-router.log',
                     err_file: '$HOME/.pm2/logs/sbc-call-router.log',
+                    merge_logs: true,
                     exec_mode: 'fork',
                     instances: 1,
                     autorestart: true,
@@ -1337,6 +1368,7 @@ Resources:
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
                       JWT_SECRET: '${!JWT_SECRET}',
+                      ENCRYPTION_SECRET: '${!ENCRYPTION_SECRET}',
                       JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
                       JAMBONES_RTPENGINE_INJECT_DTMF_ALWAYS: 0,
                       JAMBONES_RTPENGINE_UDP_PORT: 6000,
@@ -1379,7 +1411,9 @@ Resources:
                     max_memory_restart: '3G',
                     env: {
                       JAMBONES_LOGLEVEL: 'info',
+                      JAMBONES_SERVER_CONTROL: 1,
                       JWT_SECRET: '${!JWT_SECRET}',
+                      ENCRYPTION_SECRET: '${!ENCRYPTION_SECRET}',
                       AWS_REGION: '${AWS_REGION}',
                       JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
                       JAMBONES_RTPENGINE_INJECT_DTMF_ALWAYS: 0,
@@ -1429,7 +1463,7 @@ Resources:
 
                 if [[ "${EnablePcaps}" == "true" ]]; then
                   echo "enabling HEP and restarting drachtio server"
-                  sudo sed -i -e "s/--address 0.0.0.0 --port 9022/--address 0.0.0.0 --port 9022 --homer ${MONITORING_SERVER_IP}:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
+                  sudo sed -i -e "s/--port 9022/--port 9022 --homer ${MONITORING_SERVER_IP}:9060 --homer-id 10/g"  /etc/systemd/system/drachtio.service
                 fi
                 sudo systemctl daemon-reload
                 sudo systemctl restart drachtio
@@ -1470,7 +1504,9 @@ Resources:
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
                 AWS_SNS_TOPIC_ARN: !Ref SbcSipSNSTopic
                 JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
-                JWT_SECRET_ARN: !Ref EncryptionSecret
+                JWT_SECRET_ARN: !Ref JwtSecret
+                ENCRYPTION_SECRET_ARN: !Ref EncryptionSecret
+                RECORDING_AUTH_SECRET_ARN: !Ref RecordingAuthSecret
                 AWS_REGION: !Ref AWS::Region
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
@@ -1581,7 +1617,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
-                Resource: !Ref EncryptionSecret
+                Resource:
+                  - !Ref EncryptionSecret
+                  - !Ref JwtSecret
+                  - !Ref RecordingAuthSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -1636,8 +1675,10 @@ Resources:
                 # Cache a bucket name on this host
                 echo "running jambonz user data script"
 
-                # Fetch JWT_SECRET from Secrets Manager
+                # Fetch the jambonz secrets from Secrets Manager
                 JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+                ENCRYPTION_SECRET=$(aws secretsmanager get-secret-value --secret-id "${ENCRYPTION_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+                RECORDING_AUTH_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${RECORDING_AUTH_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
                 # Detecting the Linux distribution
                 if grep -q 'ID="rhel"' /etc/os-release; then
@@ -1705,6 +1746,7 @@ Resources:
                       JAMBONES_LOGLEVEL: 'info',
                       JAMBONES_TTS_TRIM_SILENCE: 1,
                       JWT_SECRET: '${!JWT_SECRET}',
+                      ENCRYPTION_SECRET: '${!ENCRYPTION_SECRET}',
                       AWS_REGION: '${AWS_REGION}',
                       JAMBONES_API_BASE_URL: 'http://${URLPortal}/v1',
                       ENABLE_METRICS: 1,
@@ -1739,7 +1781,7 @@ Resources:
                       JAMBONES_MEDIAJAM: '127.0.0.1:8021',
                       AUTHENTICATION_KEY: '${!JWT_SECRET}',
                       JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
-                      JAMBONZ_RECORD_WS_PASSWORD: '${!JWT_SECRET}',
+                      JAMBONZ_RECORD_WS_PASSWORD: '${!RECORDING_AUTH_PASSWORD}',
                       JAMBONZ_RECORD_WS_BASE_URL: '${RecordingWsBaseUrl}'
                     }
                   }]
@@ -1780,7 +1822,9 @@ Resources:
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
                 URLPortal: !Ref URLPortal
                 JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
-                JWT_SECRET_ARN: !Ref EncryptionSecret
+                JWT_SECRET_ARN: !Ref JwtSecret
+                ENCRYPTION_SECRET_ARN: !Ref EncryptionSecret
+                RECORDING_AUTH_SECRET_ARN: !Ref RecordingAuthSecret
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 WebServerPrivateIP: !GetAtt WebServerEC2.PrivateIp
@@ -1907,7 +1951,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
-                Resource: !Ref EncryptionSecret
+                Resource:
+                  - !Ref EncryptionSecret
+                  - !Ref JwtSecret
+                  - !Ref RecordingAuthSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -2015,6 +2062,7 @@ Resources:
                     instance_var: 'INSTANCE_ID',
                     out_file: '$HOME/.pm2/logs/sbc-rtpengine-sidecar.log',
                     err_file: '$HOME/.pm2/logs/sbc-rtpengine-sidecar.log',
+                    merge_logs: true,
                     exec_mode: 'fork',
                     instances: 1,
                     autorestart: true,
@@ -2195,7 +2243,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
-                Resource: !Ref EncryptionSecret
+                Resource:
+                  - !Ref EncryptionSecret
+                  - !Ref JwtSecret
+                  - !Ref RecordingAuthSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2FullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -2252,8 +2303,10 @@ Resources:
 
               echo "running jambonz user data script"
 
-              # Fetch JWT_SECRET from Secrets Manager
+              # Fetch the jambonz secrets from Secrets Manager
               JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+              ENCRYPTION_SECRET=$(aws secretsmanager get-secret-value --secret-id "${ENCRYPTION_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
+              RECORDING_AUTH_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${RECORDING_AUTH_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
               # Detecting the Linux distribution
               if grep -q 'ID="rhel"' /etc/os-release; then
@@ -2349,6 +2402,7 @@ Resources:
                   env: {
                     JAMBONES_LOGLEVEL: 'info',
                     JWT_SECRET: '${!JWT_SECRET}',
+                    ENCRYPTION_SECRET: '${!ENCRYPTION_SECRET}',
                     AWS_REGION: '${AWS_REGION}',
                     AUTHENTICATION_KEY: '${!JWT_SECRET}',
                     JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
@@ -2373,7 +2427,7 @@ Resources:
                     HOMER_USERNAME: 'admin',
                     HOMER_PASSWORD: 'sipcapture',
                     JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
-                    JAMBONZ_RECORD_WS_PASSWORD: '${!JWT_SECRET}',
+                    JAMBONZ_RECORD_WS_PASSWORD: '${!RECORDING_AUTH_PASSWORD}',
                     JAMBONZ_UPDATE_CLIENT_TOKEN: '__JAMBONZ_UPDATE_CLIENT_TOKEN__',
                     JAMBONZ_UPDATE_CLIENT_URL: 'http://127.0.0.1:3201'
                     },
@@ -2489,8 +2543,8 @@ Resources:
               sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
               sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!JWT_SECRET}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!RECORDING_AUTH_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
+              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!ENCRYPTION_SECRET}/g" /etc/systemd/system/upload_recordings.service
               
               sudo systemctl daemon-reload
               sudo systemctl enable upload_recordings
@@ -2515,7 +2569,9 @@ Resources:
               MONITORING_SERVER_IP:  !GetAtt MonitoringServerEC2.PrivateIp
               AWS_REGION: !Ref AWS::Region
               JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
-              JWT_SECRET_ARN: !Ref EncryptionSecret
+              JWT_SECRET_ARN: !Ref JwtSecret
+              ENCRYPTION_SECRET_ARN: !Ref EncryptionSecret
+              RECORDING_AUTH_SECRET_ARN: !Ref RecordingAuthSecret
               URLPortal: !Ref URLPortal
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS
