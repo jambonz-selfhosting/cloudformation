@@ -319,7 +319,6 @@ Resources:
                   - !Ref JwtSecret
                   - !Ref RecordingAuthSecret
       ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
       - arn:aws:iam::aws:policy/AmazonEC2FullAccess
 
@@ -497,11 +496,6 @@ Resources:
           CidrIp: !Ref VpcCidr
           Description: Allow HTTP from sbc/api server
         - IpProtocol: tcp
-          FromPort: 3010
-          ToPort: 3019
-          CidrIp:   !Ref AllowedHttpCidr
-          Description: Allow http access from AWS SNS
-        - IpProtocol: tcp
           FromPort: 5060
           ToPort: 5060
           CidrIp: !Ref VpcCidr
@@ -574,11 +568,6 @@ Resources:
           CidrIp: !Ref VpcCidr
           Description: Allow HTTP from sbc/api server
         - IpProtocol: tcp
-          FromPort: 3010
-          ToPort: 3019
-          CidrIp:   !Ref AllowedHttpCidr
-          Description: Allow http access from AWS SNS
-        - IpProtocol: tcp
           FromPort: 5060
           ToPort: 5061
           CidrIp:  !Ref AllowedSipCidr
@@ -618,11 +607,6 @@ Resources:
           ToPort: 8080
           CidrIp:  !Ref VpcCidr
           Description: rtpengine ws protocol from VPC
-        - IpProtocol: tcp
-          FromPort: 3001
-          ToPort: 3001
-          CidrIp:   !Ref AllowedHttpCidr
-          Description: Allow http access from AWS SNS
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
@@ -664,11 +648,6 @@ Resources:
           ToPort: 8080
           CidrIp:  !Ref VpcCidr
           Description: rtpengine ws protocol from VPC
-        - IpProtocol: tcp
-          FromPort: 3001
-          ToPort: 3001
-          CidrIp:   !Ref AllowedHttpCidr
-          Description: Allow http access from AWS SNS
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
@@ -1153,10 +1132,19 @@ Resources:
                 Action:
                   - 'ssm:GetParameter'
                 Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              # Scale-in drain (inbound): at startup the app looks up its own ASG and
+              # terminate lifecycle hook, and completes the hook once its calls have ended.
+              # The Describe actions have no resource-level permissions.
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeAutoScalingInstances'
+                  - 'autoscaling:DescribeLifecycleHooks'
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-sbc-sip-autoscaling-group'
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
@@ -1165,7 +1153,6 @@ Resources:
                   - !Ref JwtSecret
                   - !Ref RecordingAuthSecret
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
         - arn:aws:iam::aws:policy/AmazonEC2FullAccess
 
@@ -1421,11 +1408,9 @@ Resources:
                       DRACHTIO_HOST: '127.0.0.1',
                       DRACHTIO_PORT: 9022,
                       DRACHTIO_SECRET: 'cymru',
-                      AWS_SNS_TOPIC_ARN: '${AWS_SNS_TOPIC_ARN}',
+                      AWS_LIFECYCLE_DRAIN: 1,
                       HTTP_PORT: 3000,
                       HTTP_PORT_MAX: 3009,
-                      AWS_SNS_PORT: 3010,
-                      AWS_SNS_PORT_MAX: 3019,
                       JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
                       JAMBONES_MYSQL_WRITE_HOST: '${JAMBONES_MYSQL_WRITE_HOST}',
                       JAMBONES_MYSQL_WRITE_USER: '${JAMBONES_MYSQL_USER}',
@@ -1502,7 +1487,6 @@ Resources:
                 JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
                 JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
-                AWS_SNS_TOPIC_ARN: !Ref SbcSipSNSTopic
                 JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
                 JWT_SECRET_ARN: !Ref JwtSecret
                 ENCRYPTION_SECRET_ARN: !Ref EncryptionSecret
@@ -1542,34 +1526,12 @@ Resources:
           Value: !Sub '${AWS::StackName}-sbc-sip'
           PropagateAtLaunch: 'true'
 
-  SbcSipSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub '${AWS::StackName}-${AWS::Region}-sip-lifecycle-events'
-  
-  SbcSipSNSPublishRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - autoscaling.amazonaws.com
-            Action:
-              - "sts:AssumeRole"
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
-                
   SbcSipLifecycleHook: 
     Type: AWS::AutoScaling::LifecycleHook
     Properties:
       LifecycleHookName: !Sub '${AWS::StackName}-sip-scale-in'
       AutoScalingGroupName: !Ref SbcSipAutoScalingGroup
       LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
-      NotificationTargetARN: !Ref SbcSipSNSTopic
-      RoleARN: !GetAtt SbcSipSNSPublishRole.Arn
 
 
 ###########################################
@@ -1610,10 +1572,19 @@ Resources:
                 Action:
                   - 'ssm:GetParameter'
                 Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              # Scale-in drain (feature-server): at startup the app looks up its own ASG and
+              # terminate lifecycle hook, and completes the hook once its calls have ended.
+              # The Describe actions have no resource-level permissions.
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeAutoScalingInstances'
+                  - 'autoscaling:DescribeLifecycleHooks'
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-feature-server-autoscaling-group'
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
@@ -1622,7 +1593,6 @@ Resources:
                   - !Ref JwtSecret
                   - !Ref RecordingAuthSecret
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
 
   # --- Feature server EC2 Role Instance profile
@@ -1759,7 +1729,7 @@ Resources:
                       OTEL_EXPORTER_JAEGER_ENDPOINT: 'http://${MONITORING_SERVER_IP}:14268/api/traces',
                       OTEL_EXPORTER_OTLP_METRICS_INSECURE: 1,
                       OTEL_EXPORTER_JAEGER_GRPC_INSECURE: 1,
-                      AWS_SNS_TOPIC_ARN: '${AWS_SNS_TOPIC_ARN}',
+                      AWS_LIFECYCLE_DRAIN: 1,
                       JAMBONES_NETWORK_CIDR: '${VPC_CIDR}',
                       JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
                       JAMBONES_MYSQL_HOST: '${JAMBONES_MYSQL_HOST}',
@@ -1772,8 +1742,6 @@ Resources:
                       JAMBONES_TIME_SERIES_HOST: '${JAMBONES_TIME_SERIES_HOST}',
                       HTTP_PORT: 3000,
                       HTTP_PORT_MAX: 3009,
-                      AWS_SNS_PORT: 3010,
-                      AWS_SNS_PORT_MAX: 3019,
                       DRACHTIO_HOST: '127.0.0.1',
                       DRACHTIO_PORT: 9022,
                       DRACHTIO_SECRET: 'cymru',
@@ -1816,7 +1784,6 @@ Resources:
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
                 JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
                 JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
-                AWS_SNS_TOPIC_ARN: !Ref FeatureServerSNSTopic
                 AWS_REGION: !Ref AWS::Region
                 JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
@@ -1862,34 +1829,12 @@ Resources:
           Value: !Sub '${AWS::StackName}-feature-server'
           PropagateAtLaunch: 'true'
 
-  FeatureServerSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub '${AWS::StackName}-${AWS::Region}-fs-lifecycle-events'
-  
-  FeatureServerSNSPublishRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - autoscaling.amazonaws.com
-            Action:
-              - "sts:AssumeRole"
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
-                
   FeatureServerLifecycleHook: 
     Type: AWS::AutoScaling::LifecycleHook
     Properties:
       LifecycleHookName: !Sub '${AWS::StackName}-fs-scale-in'
       AutoScalingGroupName: !Ref FeatureServerAutoScalingGroup
       LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
-      NotificationTargetARN: !Ref FeatureServerSNSTopic
-      RoleARN: !GetAtt FeatureServerSNSPublishRole.Arn
 
 
 ###########################################
@@ -1944,10 +1889,19 @@ Resources:
                 Action:
                   - 'ssm:GetParameter'
                 Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
+              # Scale-in drain (sbc-rtpengine-sidecar): at startup the app looks up its own ASG
+              # and terminate lifecycle hook, and completes the hook once its calls have ended.
+              # The Describe actions have no resource-level permissions.
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeAutoScalingInstances'
+                  - 'autoscaling:DescribeLifecycleHooks'
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - 'autoscaling:CompleteLifecycleAction'
-                Resource: '*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-sbc-rtp-autoscaling-group'
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
@@ -1956,7 +1910,6 @@ Resources:
                   - !Ref JwtSecret
                   - !Ref RecordingAuthSecret
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
         - arn:aws:iam::aws:policy/AmazonEC2FullAccess
 
@@ -2071,11 +2024,10 @@ Resources:
                     env: {
                       LOGLEVEL: 'info',
                       RTPENGINE_DTMF_LOG_PORT: 22223,
-                      AWS_SNS_TOPIC_ARN: '${AWS_SNS_TOPIC_ARN}',
+                      AWS_LIFECYCLE_DRAIN: 1,
                       AWS_REGION: '${AWS_REGION}',
                       JAMBONES_REDIS_HOST: '${JAMBONES_REDIS_HOST}',
                       JAMBONES_REDIS_PORT: 6379,
-                      AWS_SNS_PORT: 3001,
                       ENABLE_METRICS: 1,
                       STATS_HOST: '127.0.0.1',
                       STATS_PORT: 8125,
@@ -2113,7 +2065,6 @@ Resources:
                 JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
                 JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
                 JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
-                AWS_SNS_TOPIC_ARN: !Ref SbcRtpServerSNSTopic
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 EnablePcaps: !Ref EnablePcaps
@@ -2148,34 +2099,12 @@ Resources:
           Value: !Sub '${AWS::StackName}-sbc-rtp'
           PropagateAtLaunch: 'true'
 
-  SbcRtpServerSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub '${AWS::StackName}-${AWS::Region}-rtp-lifecycle-events'
-  
-  SbcRtpServerSNSPublishRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - autoscaling.amazonaws.com
-            Action:
-              - "sts:AssumeRole"
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/service-role/AutoScalingNotificationAccessRole"
-                
   SbcRtpServerLifecycleHook: 
     Type: AWS::AutoScaling::LifecycleHook
     Properties:
       LifecycleHookName: !Sub '${AWS::StackName}-rtp-scale-in'
       AutoScalingGroupName: !Ref SbcRtpServerAutoScalingGroup
       LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
-      NotificationTargetARN: !Ref SbcRtpServerSNSTopic
-      RoleARN: !GetAtt SbcRtpServerSNSPublishRole.Arn
 
 
 
