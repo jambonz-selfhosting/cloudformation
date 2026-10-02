@@ -515,6 +515,8 @@ Resources:
               # add row to system information table
               mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
 
+              # nginx sets X-Forwarded-For to the client address; the api-server trusts
+              # this one hop (JAMBONES_TRUST_PROXY=1 in the image's ecosystem.config.js)
               sudo cat << EOF > $NGINX_CONFIG
               server {
                   listen 80;
@@ -523,10 +525,12 @@ Resources:
                       rewrite ^/api/(.*)$ /\$1 break;
                       proxy_pass http://127.0.0.1:3002;
                       proxy_set_header Host \$host;
+                      proxy_set_header X-Forwarded-For \$remote_addr;
                   }
                   location / {
                       proxy_pass http://127.0.0.1:3001;
                       proxy_set_header Host \$host;
+                      proxy_set_header X-Forwarded-For \$remote_addr;
                   }
               }
               server {
@@ -535,6 +539,7 @@ Resources:
                 location / {
                   proxy_pass http://127.0.0.1:3002;
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Forwarded-For \$remote_addr;
                 }
               }
               server {
@@ -546,6 +551,7 @@ Resources:
                   proxy_set_header Upgrade \$http_upgrade;
                   proxy_set_header Connection 'upgrade';
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Forwarded-For \$remote_addr;
                   proxy_cache_bypass \$http_upgrade;
                 }
               }
