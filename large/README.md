@@ -13,7 +13,7 @@ The large deployment creates:
 - **SBC SIP Auto Scaling Group** - Handles SIP signaling with drachtio
 - **SBC RTP Auto Scaling Group** - Handles RTP media with rtpengine
 - **Feature Server Auto Scaling Group** - Runs jambonz application logic with FreeSWITCH
-- **Web Server** - Hosts the portal, API, and public apps
+- **Web Server** - Hosts the portal, API, and public apps. Either a single instance with an Elastic IP, or an Auto Scaling group (1-4 instances) behind an internet-facing ALB - see [Web server deployment](#web-server-deployment)
 - **Monitoring Server** - Hosts Grafana, Homer, Jaeger, InfluxDB, and Cassandra
 - **Aurora Serverless v2** - MySQL database cluster
 - **ElastiCache** - Redis cluster for caching and pub/sub
@@ -33,6 +33,8 @@ The large deployment creates:
 | `Architecture` | CPU architecture: `amd64` (x86_64) or `arm64` (Graviton). Allowed values are limited to the architectures whose AMIs were copied | amd64 |
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
 | `URLPortal` | DNS name for the portal | (required) |
+| `WebServerDeployment` | `single-instance` or `autoscaling-alb` - see [Web server deployment](#web-server-deployment) | single-instance |
+| `WebCertificateArn` | ACM certificate ARN for the web ALB; required for `autoscaling-alb` | (none) |
 | `EnablePcaps` | Enable PCAPs for SIP traffic | (required) |
 | `InstanceTypeSbcSip` | EC2 instance type for SBC SIP servers | c5n.xlarge |
 | `InstanceTypeSbcRtp` | EC2 instance type for SBC RTP servers | c5n.xlarge |
@@ -69,6 +71,25 @@ The large deployment creates:
 > recording servers on the burstable `t4g` tier. If you set an instance type explicitly, match
 > it to the selected architecture. arm64 availability is region-dependent — see the top-level
 > README.
+
+## Web server deployment
+
+`WebServerDeployment` chooses how the web tier (portal, API, public apps) is deployed:
+
+- **`single-instance`** (default) - one EC2 instance with an Elastic IP. nginx on the
+  instance serves HTTP; add TLS after deploy with certbot (see
+  [Enable HTTPS](#enable-https-for-the-portal)).
+- **`autoscaling-alb`** - an Auto Scaling group of web servers (min 1, max 4, starting at 1,
+  scaling on 60% average CPU) behind an internet-facing Application Load Balancer. The ALB
+  terminates TLS with the ACM certificate in `WebCertificateArn` and redirects HTTP to HTTPS,
+  so there is no certbot step and the portal is configured for `https://` from the start.
+  Instances are replaced one at a time on stack updates.
+
+For `autoscaling-alb`, request or import the certificate in ACM **in the same region** before
+creating the stack. It must cover `URLPortal` and its `api.`, `grafana.` and `public-apps.`
+subdomains, e.g. `my-domain.example.com` plus `*.my-domain.example.com`. The initial admin
+password is generated into Secrets Manager (`<stack-name>-web-admin-initial-password`)
+instead of being the instance ID.
 
 ## Generate and Deploy
 
@@ -124,11 +145,12 @@ aws cloudformation describe-stacks \
 
 Outputs include:
 - **WebPortalURL** - URL to access the jambonz web portal
-- **WebServerIP** - Public IP address of the Web server (for DNS records)
+- **WebServerIP** - Public IP address of the Web server (for DNS records; `single-instance` only)
+- **WebLoadBalancerDnsName** - DNS name of the web ALB (for DNS records; `autoscaling-alb` only)
 - **SipServerIP** - Public IP address of the SBC SIP server (for SIP traffic)
 - **RtpServerIP** - Public IP address of the SBC RTP server (for RTP traffic)
 - **WebPortalUsername** - Admin username (always `admin`)
-- **WebPortalPassword** - Initial admin password (the Web server EC2 instance ID)
+- **WebPortalPassword** - Initial admin password (the Web server EC2 instance ID, or for `autoscaling-alb` the name of the Secrets Manager secret holding it)
 - **GrafanaUsername** - Grafana username (always `admin`)
 - **GrafanaPassword** - Initial Grafana password (always `admin`)
 
@@ -145,11 +167,16 @@ After the stack is created, create the following DNS A records:
 - `homer.my-domain.example.com`
 - `public-apps.my-domain.example.com`
 
+With `autoscaling-alb`, point the same names at **WebLoadBalancerDnsName** instead: a
+Route 53 alias record for the domain itself (or a CNAME if it is a subdomain of a zone you
+manage elsewhere), and CNAME records for the subdomains.
+
 **Pointing to SipServerIP:**
 - `sip.my-domain.example.com`
 
 ### Enable HTTPS for the portal
 
+`single-instance` only - with `autoscaling-alb` the load balancer already serves HTTPS.
 SSH into the Web server and install TLS certificates:
 
 1. `ssh -i <yuour-ssh-keypair> jambonz@<WebServerIP>` - ssh into the server
