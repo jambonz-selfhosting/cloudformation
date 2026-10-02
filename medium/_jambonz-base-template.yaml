@@ -183,13 +183,6 @@ Parameters:
       - 90
       - 120
       - 150
-  DeployRecordingCluster:
-    Description: "Do you want to deploy the recording server cluster?"
-    Type: String
-    AllowedValues:
-      - true
-      - false
-    Default: true
   EnableEBSEncryption:
     Description: "Do you want to encrypt all EBS volumes?"
     Type: String
@@ -219,7 +212,6 @@ Parameters:
     MinValue: 100
 
 Conditions:
-  DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
@@ -575,11 +567,6 @@ Resources:
           SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
           Description: Allow HTTP access from feature servers
         - IpProtocol: tcp
-          FromPort: 3017
-          ToPort: 3017
-          SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
-          Description: Allow Feature servers to access upload_recordings process
-        - IpProtocol: tcp
           FromPort: 3000
           ToPort: 3000
           CidrIp: !Ref AllowedHttpCidr
@@ -630,12 +617,11 @@ Resources:
 
 ###########################################
 #
-#      Recording server cluster (if requested)
+#      Recording server cluster
 #
 ###########################################   
   RecordingALBSecurityGroup:
       Type: AWS::EC2::SecurityGroup
-      Condition: DeployRecordingClusterCondition
       Properties:
         GroupName: !Sub '${AWS::StackName}-recording-alb-sg'
         GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server ALB'
@@ -657,7 +643,6 @@ Resources:
 
   RecordingInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
-    Condition: DeployRecordingClusterCondition
     Properties:
       GroupName: !Sub '${AWS::StackName}-recording-instance-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server instances'
@@ -685,7 +670,6 @@ Resources:
 
   RecordingLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
-    Condition: DeployRecordingClusterCondition
     Properties:
       LaunchTemplateName: !Sub "${AWS::StackName}-recording-launch-template"
       LaunchTemplateData:
@@ -772,7 +756,6 @@ Resources:
 
   RecordingApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Condition: DeployRecordingClusterCondition
     Properties:
       Scheme: internal
       Subnets: 
@@ -789,7 +772,6 @@ Resources:
 
   RecordingTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Condition: DeployRecordingClusterCondition
     Properties:
       Port: 3000
       Protocol: HTTP
@@ -804,7 +786,6 @@ Resources:
 
   RecordingALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
-    Condition: DeployRecordingClusterCondition
     Properties:
       DefaultActions:
         - Type: forward
@@ -815,7 +796,6 @@ Resources:
 
   RecordingAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
-    Condition: DeployRecordingClusterCondition
     Properties:
       AutoScalingGroupName: !Sub "${AWS::StackName}-recording-asg"
       VPCZoneIdentifier: 
@@ -1007,7 +987,6 @@ Resources:
               # Fetch the jambonz secrets from Secrets Manager
               JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
               ENCRYPTION_SECRET=$(aws secretsmanager get-secret-value --secret-id "${ENCRYPTION_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
-              RECORDING_AUTH_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${RECORDING_AUTH_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
               # Detecting the Linux distribution
               if grep -q 'ID="rhel"' /etc/os-release; then
@@ -1123,12 +1102,11 @@ Resources:
                     STATS_TELEGRAF: 1,
                     STATS_SAMPLE_RATE: 1,
                     HTTP_PORT:  3000,
+                    JAMBONES_TRUST_PROXY: 1,
                     JAEGER_BASE_URL: 'http://127.0.0.1:16686',
                     HOMER_BASE_URL: 'http://127.0.0.1:9080',
                     HOMER_USERNAME: 'admin',
                     HOMER_PASSWORD: 'sipcapture',
-                    JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
-                    JAMBONZ_RECORD_WS_PASSWORD: '${!RECORDING_AUTH_PASSWORD}',
                     JAMBONES_DISABLE_TTS_STREAMING: true,
                     JAMBONZ_UPDATE_CLIENT_TOKEN: '__JAMBONZ_UPDATE_CLIENT_TOKEN__',
                     JAMBONZ_UPDATE_CLIENT_URL: 'http://127.0.0.1:3201'
@@ -1169,7 +1147,12 @@ Resources:
               sudo -u $USER bash -c "pm2 save"
               sudo systemctl enable pm2-$USER.service
 
+              # nginx is the one proxy hop the api-server trusts (JAMBONES_TRUST_PROXY=1);
+              # it replaces X-Forwarded-For with the client address so it cannot be spoofed
               sudo cat << EOF > $NGINX_CONFIG
+              set_real_ip_from ${VPC_CIDR};
+              real_ip_header X-Forwarded-For;
+              real_ip_recursive on;
               server {
                   listen 80;
                   server_name ${URLPortal};
@@ -1177,10 +1160,12 @@ Resources:
                       rewrite ^/api/(.*)$ /\$1 break;
                       proxy_pass http://localhost:3000;
                       proxy_set_header Host \$host;
+                      proxy_set_header X-Forwarded-For \$remote_addr;
                   }
                   location / {
                       proxy_pass http://localhost:3001;
                       proxy_set_header Host \$host;
+                      proxy_set_header X-Forwarded-For \$remote_addr;
                   }
               }
               server {
@@ -1189,6 +1174,7 @@ Resources:
                   location / {
                       proxy_pass http://localhost:3000;
                       proxy_set_header Host \$host;
+                      proxy_set_header X-Forwarded-For \$remote_addr;
                   }
               }
               server {
@@ -1200,6 +1186,7 @@ Resources:
                   proxy_set_header Upgrade \$http_upgrade;
                   proxy_set_header Connection 'upgrade';
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Forwarded-For \$remote_addr;
                   proxy_cache_bypass \$http_upgrade;
                 }
               }
@@ -1212,6 +1199,7 @@ Resources:
                   proxy_set_header Upgrade \$http_upgrade;
                   proxy_set_header Connection 'upgrade';
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Forwarded-For \$remote_addr;
                   proxy_cache_bypass \$http_upgrade;
                 }
               }
@@ -1249,44 +1237,18 @@ Resources:
                 sudo systemctl disable jaeger-query.service
               fi
 
-              # configure upload_recordings service
-              # upload_recordings only reads - it looks up the account bucket
-              # credentials - so point it at the reader. This host keeps the writer
-              # in JAMBONES_MYSQL_HOST because it initialises the database schema.
-              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${UPLOAD_RECORDINGS_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!RECORDING_AUTH_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!ENCRYPTION_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              
-              sudo systemctl daemon-reload
-              sudo systemctl enable upload_recordings
-              sudo systemctl start upload_recordings
-
-              # Check if recording cluster is deployed
-              if [[ "${DeployRecordingCluster}" == "true" ]]; then
-                echo "DeployRecordingCluster is set to true, disabling upload_recordings service"
-                sudo systemctl stop upload_recordings 2>/dev/null || true
-                sudo systemctl disable upload_recordings 2>/dev/null || true
-              fi
-
               echo "web + monitoring server user data script completed"
             - VPC_CIDR: !Ref VpcCidr
               JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.Endpoint.Address
-              UPLOAD_RECORDINGS_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
               JAMBONES_MYSQL_USER: !Ref MySQLUsername
               JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
               JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
               AWS_REGION: !Ref AWS::Region
               JWT_SECRET_ARN: !Ref JwtSecret
               ENCRYPTION_SECRET_ARN: !Ref EncryptionSecret
-              RECORDING_AUTH_SECRET_ARN: !Ref RecordingAuthSecret
               URLPortal: !Ref URLPortal
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS
-              DeployRecordingCluster: !Ref DeployRecordingCluster
               EnableOpenTelemetry: !Ref EnableOpenTelemetry
 
       Tags:
@@ -1956,12 +1918,7 @@ Resources:
                 KrispApiKey: !Ref KrispApiKey
                 AicApiKey: !Ref AicApiKey
                 EnableOpenTelemetry: !Ref EnableOpenTelemetry
-                RecordingWsBaseUrl:
-                  !If [
-                    DeployRecordingClusterCondition,
-                    !Sub "ws://${RecordingApplicationLoadBalancer.DNSName}",
-                    !Sub "ws://${WebMonitoringServerEC2.PrivateIp}:3017"
-                  ]
+                RecordingWsBaseUrl: !Sub "ws://${RecordingApplicationLoadBalancer.DNSName}"
 
 
   FeatureServerPlacementGroup:
@@ -2065,7 +2022,6 @@ Outputs:
     Description: Webserver IP address - create a DNS record for this domain as well as subdomains grafana, homer, and jaeger
 
   RecordingLoadBalancerDnsName:
-      Condition: DeployRecordingClusterCondition
       Description: DNS name of the Recording Server Application Load Balancer
       Value: !GetAtt RecordingApplicationLoadBalancer.DNSName
       Export:
