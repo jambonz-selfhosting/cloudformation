@@ -199,14 +199,6 @@ Parameters:
       - 120
       - 150
 
-  DeployRecordingCluster:
-    Description: "Do you want to deploy the recording server cluster?"
-    Type: String
-    AllowedValues:
-      - true
-      - false
-    Default: true
-
   EnableEBSEncryption:
     Description: "Do you want to encrypt all EBS volumes?"
     Type: String
@@ -236,7 +228,6 @@ Parameters:
     MinValue: 100
 
 Conditions:
-  DeployRecordingClusterCondition: !Equals [!Ref DeployRecordingCluster, "true"]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
@@ -547,11 +538,6 @@ Resources:
           ToPort: 3000
           SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
           Description: Allow HTTPS access
-        - IpProtocol: tcp
-          FromPort: 3017
-          ToPort: 3017
-          SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
-          Description: Allow Feature servers to access upload_recordings process
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
@@ -731,12 +717,11 @@ Resources:
 
 ###########################################
 #
-#      Recording server cluster (if requested)
+#      Recording server cluster
 #
 ###########################################   
   RecordingALBSecurityGroup:
       Type: AWS::EC2::SecurityGroup
-      Condition: DeployRecordingClusterCondition
       Properties:
         GroupName: !Sub '${AWS::StackName}-recording-alb-sg'
         GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server ALB'
@@ -758,7 +743,6 @@ Resources:
 
   RecordingInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
-    Condition: DeployRecordingClusterCondition
     Properties:
       GroupName: !Sub '${AWS::StackName}-recording-instance-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server instances'
@@ -786,7 +770,6 @@ Resources:
 
   RecordingLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
-    Condition: DeployRecordingClusterCondition
     Properties:
       LaunchTemplateName: !Sub "${AWS::StackName}-recording-launch-template"
       LaunchTemplateData:
@@ -876,7 +859,6 @@ Resources:
 
   RecordingApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Condition: DeployRecordingClusterCondition
     Properties:
       Scheme: internal
       Subnets: 
@@ -893,7 +875,6 @@ Resources:
 
   RecordingTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Condition: DeployRecordingClusterCondition
     Properties:
       Port: 3000
       Protocol: HTTP
@@ -908,7 +889,6 @@ Resources:
 
   RecordingALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
-    Condition: DeployRecordingClusterCondition
     Properties:
       DefaultActions:
         - Type: forward
@@ -919,7 +899,6 @@ Resources:
 
   RecordingAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
-    Condition: DeployRecordingClusterCondition
     Properties:
       AutoScalingGroupName: !Sub "${AWS::StackName}-recording-asg"
       VPCZoneIdentifier: 
@@ -1831,12 +1810,7 @@ Resources:
                 KrispApiKey: !Ref KrispApiKey
                 AicApiKey: !Ref AicApiKey
                 EnableOpenTelemetry: !Ref EnableOpenTelemetry
-                RecordingWsBaseUrl:
-                  !If [
-                    DeployRecordingClusterCondition,
-                    !Sub "ws://${RecordingApplicationLoadBalancer.DNSName}",
-                    !Sub "ws://${WebServerEC2.PrivateIp}:3017"
-                  ]
+                RecordingWsBaseUrl: !Sub "ws://${RecordingApplicationLoadBalancer.DNSName}"
 
   FeatureServerAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -2246,7 +2220,6 @@ Resources:
                 Resource:
                   - !Ref EncryptionSecret
                   - !Ref JwtSecret
-                  - !Ref RecordingAuthSecret
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2FullAccess
         - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
@@ -2306,7 +2279,6 @@ Resources:
               # Fetch the jambonz secrets from Secrets Manager
               JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id "${JWT_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
               ENCRYPTION_SECRET=$(aws secretsmanager get-secret-value --secret-id "${ENCRYPTION_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
-              RECORDING_AUTH_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${RECORDING_AUTH_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
 
               # Detecting the Linux distribution
               if grep -q 'ID="rhel"' /etc/os-release; then
@@ -2426,8 +2398,6 @@ Resources:
                     HOMER_BASE_URL: 'http://${MONITORING_SERVER_IP}:9080',
                     HOMER_USERNAME: 'admin',
                     HOMER_PASSWORD: 'sipcapture',
-                    JAMBONZ_RECORD_WS_USERNAME: 'jambonz',
-                    JAMBONZ_RECORD_WS_PASSWORD: '${!RECORDING_AUTH_PASSWORD}',
                     JAMBONZ_UPDATE_CLIENT_TOKEN: '__JAMBONZ_UPDATE_CLIENT_TOKEN__',
                     JAMBONZ_UPDATE_CLIENT_URL: 'http://127.0.0.1:3201'
                     },
@@ -2534,34 +2504,9 @@ Resources:
                   sudo systemctl disable amazon-cloudwatch-agent
                 fi
 
-              # configure upload_recordings service
-              # upload_recordings only reads - it looks up the account bucket
-              # credentials - so point it at the reader. This host keeps the writer
-              # in JAMBONES_MYSQL_HOST because it initialises the database schema.
-              sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${UPLOAD_RECORDINGS_MYSQL_HOST}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_USER=/MYSQL_USER=${JAMBONES_MYSQL_USER}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_PASSWORD=/MYSQL_PASSWORD=${JAMBONES_MYSQL_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/MYSQL_DATABASE=/MYSQL_DATABASE=jambones/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_USERNAME=/BASIC_AUTH_USERNAME=jambonz/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/BASIC_AUTH_PASSWORD=/BASIC_AUTH_PASSWORD=${!RECORDING_AUTH_PASSWORD}/g" /etc/systemd/system/upload_recordings.service
-              sudo sed -i -e "s/ENCRYPTION_SECRET=/ENCRYPTION_SECRET=${!ENCRYPTION_SECRET}/g" /etc/systemd/system/upload_recordings.service
-              
-              sudo systemctl daemon-reload
-              sudo systemctl enable upload_recordings
-              sudo systemctl start upload_recordings
-
-
-              # Check if recording cluster is deployed
-              if [[ "${DeployRecordingCluster}" == "true" ]]; then
-                echo "DeployRecordingCluster is set to true, disabling upload_recordings service"
-                sudo systemctl stop upload_recordings 2>/dev/null || true
-                sudo systemctl disable upload_recordings 2>/dev/null || true
-              fi
-
               echo "webserver user data script completed"
             - VPC_CIDR: !Ref VpcCidr
               JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.Endpoint.Address
-              UPLOAD_RECORDINGS_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
               JAMBONES_MYSQL_USER: !Ref MySQLUsername
               JAMBONES_MYSQL_PASSWORD: !Ref MySQLPassword
               JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
@@ -2571,11 +2516,9 @@ Resources:
               JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
               JWT_SECRET_ARN: !Ref JwtSecret
               ENCRYPTION_SECRET_ARN: !Ref EncryptionSecret
-              RECORDING_AUTH_SECRET_ARN: !Ref RecordingAuthSecret
               URLPortal: !Ref URLPortal
               CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
               DbCachingTTS: !Ref DbCachingTTS
-              DeployRecordingCluster: !Ref DeployRecordingCluster
 
 Outputs: 
   WebPortalURL:
@@ -2649,7 +2592,6 @@ Outputs:
       Name: !Sub "${AWS::StackName}-PublicSubnet2"
 
   RecordingLoadBalancerDnsName:
-      Condition: DeployRecordingClusterCondition
       Description: DNS name of the Recording Server Application Load Balancer
       Value: !GetAtt RecordingApplicationLoadBalancer.DNSName
       Export:

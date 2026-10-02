@@ -17,7 +17,7 @@ The large deployment creates:
 - **Monitoring Server** - Hosts Grafana, Homer, Jaeger, InfluxDB, and Cassandra
 - **Aurora Serverless v2** - MySQL database cluster
 - **ElastiCache** - Redis cluster for caching and pub/sub
-- **Optional Recording Cluster** - Auto-scaling recording servers behind an ALB
+- **Recording Cluster** - Auto-scaling recording servers behind an internal ALB (always deployed)
 
 ## Prerequisites
 
@@ -53,7 +53,6 @@ The large deployment creates:
 | `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
-| `DeployRecordingCluster` | Deploy optional recording cluster | yes |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
