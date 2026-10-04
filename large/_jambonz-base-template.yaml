@@ -1290,6 +1290,7 @@ Resources:
                       DRACHTIO_HOST: '127.0.0.1',
                       DRACHTIO_PORT: 9022,
                       DRACHTIO_SECRET: 'cymru',
+                      AWS_LIFECYCLE_DRAIN: 1,
                       JAMBONES_MYSQL_REFRESH_TTL: ${DbCachingTTS},
                       JAMBONES_MYSQL_WRITE_HOST: '${JAMBONES_MYSQL_WRITE_HOST}',
                       JAMBONES_MYSQL_WRITE_USER: '${JAMBONES_MYSQL_USER}',
