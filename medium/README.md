@@ -42,7 +42,6 @@ The medium deployment creates:
 | `AllowedSmppCidr` | CIDR for SMPP access | 0.0.0.0/0 |
 | `VpcCidr` | CIDR range for the VPC | 172.20.0.0/16 |
 | `MySQLUsername` | Database username | admin |
-| `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
@@ -61,6 +60,27 @@ The medium deployment creates:
 > recording servers on the burstable `t4g` tier. If you set an instance type explicitly, match
 > it to the selected architecture. arm64 availability is region-dependent — see the top-level
 > README.
+
+## Secrets
+
+The stack generates every secret it needs: the database master password, the JWT and
+encryption secrets, and the credential the feature servers present to the recording servers.
+It keeps them in Secrets Manager and copies them into SSM Parameter Store as SecureString
+parameters:
+
+| Path | Read by |
+|---|---|
+| `/jambonz/<stack-name>/common` | every server |
+| `/jambonz/<stack-name>/fs` | feature servers |
+| `/jambonz/<stack-name>/recording` | recording servers |
+
+No secret is written to an instance's disk or to its user data. The jambonz apps, drachtio and
+the recording uploader fetch their values from Parameter Store each time they start. The instance role can read only this stack's paths.
+The parameters are deleted with the stack.
+
+To change a value, update the parameter, then restart the processes that read it. **Never
+change `ENCRYPTION_SECRET` once the system holds data.** It encrypts the vendor credentials
+stored in the database, and changing it makes them unreadable.
 
 ## Generate and Deploy
 
