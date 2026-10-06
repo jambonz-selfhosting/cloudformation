@@ -257,6 +257,10 @@ Conditions:
 Resources:
   EncryptionSecret:
     Type: AWS::SecretsManager::Secret
+    # Kept when the stack is deleted, like the database snapshot: without it the snapshot's
+    # stored vendor credentials can never be decrypted again.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Name: !Sub "${AWS::StackName}-encryption-secret"
       Description: "Keys the encrypted columns in the jambonz database. This value can NOT be rotated without decrypting and re-encrypting every stored credential, so it is kept separate from the credentials below."
@@ -1102,6 +1106,10 @@ Resources:
 
   DatabaseCluster:
     Type: AWS::RDS::DBCluster
+    # Keep the data if the stack is deleted, and if an update ever replaces the cluster:
+    # CloudFormation takes a final snapshot first (the default replace behaviour is delete).
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
     Properties:
       DBClusterIdentifier: !Sub '${AWS::StackName}-aurora-mysql-cluster'
       Engine: aurora-mysql
@@ -1112,7 +1120,8 @@ Resources:
       MasterUsername: !Ref MySQLUsername
       MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbPasswordSecret}}}'
       DatabaseName: 'jambones'
-      BackupRetentionPeriod: 5
+      BackupRetentionPeriod: 30
+      StorageEncrypted: true
       PreferredBackupWindow: 07:00-09:00
       DBSubnetGroupName: !Ref DatabaseSubnetGroup
       VpcSecurityGroupIds:
@@ -1243,6 +1252,7 @@ Resources:
   SbcSipEIP1:
     Type: AWS::EC2::EIP
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Domain: vpc
       Tags:
@@ -1993,6 +2003,7 @@ Resources:
   SbcRtpEIP1:
     Type: AWS::EC2::EIP
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Domain: vpc
       Tags:
@@ -2268,6 +2279,7 @@ Resources:
     Type: AWS::EC2::EIP
     Condition: UseSingleWebServer
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Domain: vpc
       Tags:
