@@ -232,6 +232,8 @@ Note that the RDS cluster has delete protection enabled, so you will need to dis
   the `<stack-name>-encryption-secret` Secrets Manager secret with it. A restored snapshot needs
   that secret to read the stored vendor credentials. Delete both once you no longer need the data.
   The secret also blocks creating a new stack with the same name until it is deleted.
+- The database audit log group (`/aws/rds/cluster/<stack-name>-aurora-mysql-cluster/audit`, connections
+  only) is also kept, and expires on the `CloudwatchLogRetention` schedule.
 
 ## SSH Access
 
