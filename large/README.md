@@ -16,7 +16,8 @@ The large deployment creates:
 - **Web Server** - Hosts the portal, API, and public apps. Either a single instance with an Elastic IP, or an Auto Scaling group (1-4 instances) behind an internet-facing ALB - see [Web server deployment](#web-server-deployment)
 - **Monitoring Server** - Hosts Grafana, Homer, Jaeger, InfluxDB, and Cassandra
 - **Aurora Serverless v2** - MySQL database cluster
-- **ElastiCache** - Redis cluster for caching and pub/sub
+- **ElastiCache** - Redis for caching and pub/sub: a primary and a replica in two availability zones,
+  with automatic failover (two nodes, so twice the cost of one)
 - **Recording Cluster** - Auto-scaling recording servers behind an internal ALB (always deployed)
 
 ## Prerequisites
@@ -42,7 +43,7 @@ The large deployment creates:
 | `InstanceTypeWebserver` | EC2 instance type for Web server | c5n.xlarge |
 | `InstanceTypeMonitoringServer` | EC2 instance type for Monitoring server | c5n.xlarge |
 | `RecordingInstanceType` | EC2 instance type for Recording servers | t2.xlarge |
-| `ElastiCacheNodeType` | ElastiCache node type | cache.t3.medium |
+| `ElastiCacheNodeType` | ElastiCache node type, for each of the two Redis nodes | cache.t3.medium |
 | `AuroraDBMinCapacity` | Aurora Serverless min ACU | 0.5 |
 | `AuroraDBMaxCapacity` | Aurora Serverless max ACU | 8 |
 | `AllowedSshCidr` | **Required.** CIDR allowed to SSH to the instances: your admin IP as `x.x.x.x/32`, or your VPN range | (none) |

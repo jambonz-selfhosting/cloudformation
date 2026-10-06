@@ -62,8 +62,6 @@ Parameters:
       - cache.t3.micro
       - cache.t3.small
       - cache.t3.medium
-      - cache.t2.small
-      - cache.t2.medium
       - cache.m6g.large
       - cache.m6g.xlarge
       - cache.m6g.2xlarge
@@ -1162,17 +1160,23 @@ Resources:
       Properties:
         maxmemory-policy: allkeys-lru
 
-  ElastiCacheCluster:
-    Type: AWS::ElastiCache::CacheCluster
+  # Primary plus one replica in the other AZ. If the primary or its AZ fails, ElastiCache
+  # promotes the replica and moves the primary endpoint to it; clients reconnect to the
+  # same DNS name. Needs a node type with Multi-AZ support (no cache.t2).
+  ElastiCacheReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
     Properties:
+      ReplicationGroupId: !Sub '${AWS::StackName}-redis'
+      ReplicationGroupDescription: !Sub '${AWS::StackName} redis, primary and replica across two AZs'
       Engine: redis
       EngineVersion: "7.1"
       CacheNodeType: !Ref ElastiCacheNodeType
-      ClusterName : !Sub '${AWS::StackName}-redis'
-      NumCacheNodes: 1
+      NumCacheClusters: 2
+      MultiAZEnabled: true
+      AutomaticFailoverEnabled: true
       CacheSubnetGroupName: !Ref ElastiCacheSubnetGroup
       CacheParameterGroupName: !Ref ElastiCacheParameterGroup
-      VpcSecurityGroupIds:
+      SecurityGroupIds:
         - !GetAtt RedisSecurityGroup.GroupId
       Port: 6379
       Tags:
@@ -1673,7 +1677,7 @@ Resources:
                 JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
                 JAMBONES_MYSQL_WRITE_HOST: !GetAtt DatabaseCluster.Endpoint.Address
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
-                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheReplicationGroup.PrimaryEndPoint.Address
                 JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
                 JAMBONES_TIME_SERIES_HOST: !GetAtt MonitoringServerEC2.PrivateIp
@@ -1687,7 +1691,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     DependsOn:
       - DatabaseInstance 
-      - ElastiCacheCluster
+      - ElastiCacheReplicationGroup
       - SbcSipEIP1
       - SsmSecrets
     Properties:
@@ -1950,7 +1954,7 @@ Resources:
               - VPC_CIDR: !Ref VpcCidr
                 JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
-                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheReplicationGroup.PrimaryEndPoint.Address
                 AWS_REGION: !Ref AWS::Region
                 JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
@@ -1966,7 +1970,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     DependsOn:
       - DatabaseInstance 
-      - ElastiCacheCluster
+      - ElastiCacheReplicationGroup
       - SsmSecrets
     Properties:
       AutoScalingGroupName: !Sub '${AWS::StackName}-feature-server-autoscaling-group'
@@ -2226,7 +2230,7 @@ Resources:
                 JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
                 JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
-                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheReplicationGroup.PrimaryEndPoint.Address
                 MONITORING_SERVER_IP: !GetAtt MonitoringServerEC2.PrivateIp
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 EnablePcaps: !Ref EnablePcaps
@@ -2236,7 +2240,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     DependsOn:
       - DatabaseInstance 
-      - ElastiCacheCluster
+      - ElastiCacheReplicationGroup
       - SbcRtpEIP1
     Properties:
       AutoScalingGroupName: !Sub '${AWS::StackName}-sbc-rtp-autoscaling-group'
@@ -2352,7 +2356,7 @@ Resources:
   WebLaunchTemplate:
     DependsOn:
       - DatabaseInstance
-      - ElastiCacheCluster
+      - ElastiCacheReplicationGroup
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateName: !Sub "${AWS::StackName}-webserver-launch-template"
@@ -2653,7 +2657,7 @@ Resources:
               - VPC_CIDR: !Ref VpcCidr
                 JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.Endpoint.Address
                 JAMBONES_MYSQL_USER: !Ref MySQLUsername
-                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+                JAMBONES_REDIS_HOST: !GetAtt ElastiCacheReplicationGroup.PrimaryEndPoint.Address
                 JAMBONES_SAMPLE_RATE: !Ref StatsSampleRate
                 MONITORING_SERVER_IP:  !GetAtt MonitoringServerEC2.PrivateIp
                 AWS_REGION: !Ref AWS::Region
