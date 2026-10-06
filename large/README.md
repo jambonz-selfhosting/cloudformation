@@ -326,3 +326,19 @@ aws autoscaling set-desired-capacity \
   --desired-capacity 2 \
   --region us-west-2
 ```
+
+## Redis failover
+
+Redis runs as a primary and a replica in two availability zones. If the primary or its zone
+fails, ElastiCache promotes the replica, and the jambonz servers reconnect to it on their own.
+
+A planned failover is different: AWS maintenance, a node type change, or a manual test. There,
+the old primary can stay reachable as a replica, and in this release the apps may keep sending
+writes to it, which fail. If the jambonz logs show Redis `READONLY` errors after a failover, restart the apps on the
+SIP, RTP, feature and web servers:
+
+```bash
+sudo -u jambonz pm2 restart all
+```
+
+The next release reconnects automatically.
