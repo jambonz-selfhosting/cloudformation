@@ -390,10 +390,36 @@ Resources:
         - Name: recording/MYSQL_PASSWORD
           SecretArn: !Ref DbPasswordSecret
 
-  IamRole:
+  # The CloudWatch agent on every instance: metrics, log shipping, and the retention it
+  # applies at boot (CloudwatchLogRetention). Attached to each tier's role below.
+  InstanceAgentPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: CloudWatch agent on the jambonz instances
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'cloudwatch:PutMetricData'
+              - 'ec2:DescribeVolumes'
+              - 'ec2:DescribeTags'
+              - 'logs:PutLogEvents'
+              - 'logs:DescribeLogStreams'
+              - 'logs:DescribeLogGroups'
+              - 'logs:CreateLogStream'
+              - 'logs:CreateLogGroup'
+              - 'logs:PutRetentionPolicy'
+            Resource: '*'
+          - Effect: Allow
+            Action: 'ssm:GetParameter'
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:*:*:parameter/AmazonCloudWatch-*'
+
+  SbcIamRole:
     Type: AWS::IAM::Role
-    Properties: 
-      Description: IAM role needed to ship logs to Cloudwatch
+    Properties:
+      Description: jambonz SBC servers (SIP and RTP)
+      RoleName: !Sub '${AWS::StackName}-sbc-ec2-role'
       AssumeRolePolicyDocument:
         Statement:
         - Effect: Allow
@@ -401,54 +427,150 @@ Resources:
             Service: [ec2.amazonaws.com]
           Action: ['sts:AssumeRole']
       Path: /
+      ManagedPolicyArns:
+        - !Ref InstanceAgentPolicy
       Policies:
-        - PolicyName: root 
-          PolicyDocument: 
+        - PolicyName: jambonz
+          PolicyDocument:
             Version: "2012-10-17"
-            Statement: 
-              - Effect: Allow
-                Action: 
-                  - 'cloudwatch:PutMetricData'
-                  - 'ec2:DescribeVolumes'
-                  - 'ec2:DescribeTags'
-                  - 'logs:PutLogEvents'
-                  - 'logs:DescribeLogStreams'
-                  - 'logs:DescribeLogGroups'
-                  - 'logs:CreateLogStream'
-                  - 'logs:CreateLogGroup'
-                  - 'logs:PutRetentionPolicy'
-                  - 'logs:FilterLogEvents'
-                Resource: '*'
-              - Effect: Allow
-                Action:
-                  - 'ssm:GetParameter'
-                Resource: 'arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*'
-              # Scale-in drain (inbound on the SBC, feature-server): at startup the app looks up
-              # its own ASG and terminate lifecycle hook, and completes the hook once its calls
-              # have ended. This role is shared, so the grant covers both drain-capable ASGs.
-              # The Describe actions have no resource-level permissions.
+            Statement:
+              # scale-in drain (inbound): finds its own ASG and terminate hook at startup and
+              # completes the hook once its calls have ended. Describe actions have no
+              # resource-level permissions; DescribeAutoScalingGroups serves the SIGHUP status dump.
               - Effect: Allow
                 Action:
                   - 'autoscaling:DescribeAutoScalingInstances'
                   - 'autoscaling:DescribeLifecycleHooks'
+                  - 'autoscaling:DescribeAutoScalingGroups'
                 Resource: '*'
               - Effect: Allow
-                Action:
-                  - 'autoscaling:CompleteLifecycleAction'
+                Action: 'autoscaling:CompleteLifecycleAction'
+                Resource: !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-sbc-sip-autoscaling-group'
+              # Elastic IP (auto-assign-elastic-ip.sh): claim a free EIP tagged with this tier's
+              # Environment. Association is allowed only when the EIP and the instance both carry it.
+              - Effect: Allow
+                Action: 'ec2:DescribeAddresses'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'ec2:AssociateAddress'
                 Resource:
-                  - !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-sbc-sip-autoscaling-group'
-                  - !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-feature-server-autoscaling-group'
-              # The jambonz secrets (see SsmSecrets). This role is shared by every
-              # tier, so it reads all of the stack's paths.
+                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:elastic-ip/*'
+                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceTag/Environment': !Sub '${AWS::StackName}-sbc'
+              # the jambonz secrets (see SsmSecrets): the SBC reads common
               - Effect: Allow
                 Action:
                   - 'ssm:GetParameter'
                   - 'ssm:GetParametersByPath'
                 Resource:
-                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common/*'
+
+  FeatureServerIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: jambonz feature servers
+      RoleName: !Sub '${AWS::StackName}-feature-server-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
       ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/AutoScalingReadOnlyAccess
-      - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - !Ref InstanceAgentPolicy
+      Policies:
+        - PolicyName: jambonz
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # scale-in drain (feature-server): finds its own ASG and terminate hook at startup and
+              # completes the hook once its calls have ended. Describe actions have no
+              # resource-level permissions; DescribeAutoScalingGroups serves the SIGHUP status dump.
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeAutoScalingInstances'
+                  - 'autoscaling:DescribeLifecycleHooks'
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'autoscaling:CompleteLifecycleAction'
+                Resource: !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-feature-server-autoscaling-group'
+              # the jambonz secrets (see SsmSecrets): the feature servers reads common and fs
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                  - 'ssm:GetParametersByPath'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common/*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/fs'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/fs/*'
+
+  WebMonitoringIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: jambonz web and monitoring server
+      RoleName: !Sub '${AWS::StackName}-web-monitoring-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+        - !Ref InstanceAgentPolicy
+      Policies:
+        - PolicyName: jambonz
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # the jambonz secrets (see SsmSecrets): the web tier reads common
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                  - 'ssm:GetParametersByPath'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common/*'
+              # the portal's per-call log view (api-server recent-calls) reads the feature server log group
+              - Effect: Allow
+                Action: 'logs:FilterLogEvents'
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:jambonz-feature_server:*'
+
+  RecordingIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: jambonz recording servers
+      RoleName: !Sub '${AWS::StackName}-recording-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+        - !Ref InstanceAgentPolicy
+      Policies:
+        - PolicyName: jambonz
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # the jambonz secrets (see SsmSecrets): the recording tier reads common and recording
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                  - 'ssm:GetParametersByPath'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common/*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/recording'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/recording/*'
 
   VPC:
     Type: AWS::EC2::VPC
@@ -801,7 +923,7 @@ Resources:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
-        - !Ref IamRole
+        - !Ref RecordingIamRole
 
   RecordingLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -1079,7 +1201,7 @@ Resources:
       InstanceProfileName:  !Sub '${AWS::StackName}-web-monitoring-ec2-role'
       Path: /
       Roles:
-        - !Ref IamRole
+        - !Ref WebMonitoringIamRole
 
   WebMonitoringServerEC2:
     Type: AWS::EC2::Instance
@@ -1433,7 +1555,7 @@ Resources:
       InstanceProfileName:  !Sub '${AWS::StackName}-sbc-ec2-role'
       Path: /
       Roles:
-        - !Ref IamRole
+        - !Ref SbcIamRole
 
   SbcLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -1842,7 +1964,7 @@ Resources:
       InstanceProfileName: !Sub '${AWS::StackName}-feature-server-ec2-role'
       Path: /
       Roles:
-        - !Ref IamRole
+        - !Ref FeatureServerIamRole
 
   FeatureServerLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
