@@ -75,7 +75,7 @@ parameters:
 | `/jambonz/<stack-name>/recording` | recording servers |
 
 No secret is written to an instance's disk or to its user data. The jambonz apps, drachtio and
-the recording uploader fetch their values from Parameter Store each time they start. The instance role can read only this stack's paths.
+the recording uploader fetch their values from Parameter Store each time they start. Each tier's instance role can read only the paths for its tier.
 The parameters are deleted with the stack.
 
 To change a value, update the parameter, then restart the processes that read it. **Never
