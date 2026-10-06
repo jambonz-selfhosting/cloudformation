@@ -190,6 +190,11 @@ Parameters:
       - true
       - false
     Default: true
+  ApibanKey:
+    Description: "Optional apiban.org API key for the SIP blocklist on the SBC (get one at https://www.apiban.org). Leave blank to run without apiban."
+    Type: String
+    NoEcho: true
+    Default: ""
   KrispApiKey:
     Description: "Optional Krisp API key for noise isolation and turn taking"
     Type: String
@@ -1628,16 +1633,20 @@ Resources:
                   sudo systemctl disable amazon-cloudwatch-agent
                 fi
 
-                # get an apiban key
-                echo "installing apiban key"
-                IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
-                INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)" 
-                APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
-                sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
-                sudo /usr/local/bin/apiban/apiban-client-nftables FULL
+                # apiban SIP blocklist: install the customer's own key (ApibanKey parameter).
+                # Without one the SBC runs without the blocklist and the 4-minute refresh cron is removed.
+                if [ -n "${ApibanKey}" ]; then
+                  echo "installing apiban key"
+                  sudo sed -i -e "s|API-KEY-HERE|${ApibanKey}|g" /usr/local/bin/apiban/config.json
+                  sudo /usr/local/bin/apiban/apiban-client-nftables FULL || echo "WARNING: apiban initial sync failed"
+                else
+                  echo "WARNING: no ApibanKey supplied; running without the apiban SIP blocklist"
+                  sudo rm -f /etc/cron.d/apiban-client
+                fi
   
                 echo "user data script completed"
-              - VPC_CIDR: !Ref VpcCidr
+              - ApibanKey: !Ref ApibanKey
+                VPC_CIDR: !Ref VpcCidr
                 AWS_REGION: !Ref AWS::Region
                 JAMBONES_MYSQL_HOST: !GetAtt DatabaseCluster.ReadEndpoint.Address
                 JAMBONES_MYSQL_WRITE_HOST: !GetAtt DatabaseCluster.Endpoint.Address
