@@ -36,7 +36,7 @@ The medium deployment creates:
 | `ElastiCacheNodeType` | ElastiCache node type | cache.t3.medium |
 | `AuroraDBMinCapacity` | Aurora Serverless min ACU | 0.5 |
 | `AuroraDBMaxCapacity` | Aurora Serverless max ACU | 4 |
-| `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
+| `AllowedSshCidr` | **Required.** CIDR allowed to SSH to the instances: your admin IP as `x.x.x.x/32`, or your VPN range | (none) |
 | `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
 | `AllowedSbcCidr` | CIDR for SIP/RTP access | 0.0.0.0/0 |
 | `AllowedSmppCidr` | CIDR for SMPP access | 0.0.0.0/0 |
@@ -88,6 +88,7 @@ aws cloudformation create-stack \
   --region us-west-2 \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
+    ParameterKey=AllowedSshCidr,ParameterValue=203.0.113.10/32 \
     ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
 
