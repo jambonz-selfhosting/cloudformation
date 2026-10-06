@@ -36,7 +36,6 @@ Metadata:
         Parameters:
           - ApibanKey
           - KrispApiKey
-          - AicApiKey
       - Label:
           default: "Compute - defaults suit most deployments"
         Parameters:
@@ -69,8 +68,6 @@ Metadata:
         default: "optional - apiban.org API key (SIP blocklist)"
       KrispApiKey:
         default: "optional - Krisp API key"
-      AicApiKey:
-        default: "optional - ai-coustics API key"
       InstanceType:
         default: "optional - instance type (blank uses the optimized default)"
       Architecture:
@@ -192,10 +189,7 @@ Parameters:
   KrispApiKey:
     Description: "Optional Krisp API key for noise isolation and turn taking"
     Type: String
-    Default: ""
-  AicApiKey:
-    Description: "Optional ai-coustics API key for the aicoustics noise isolation and VAD vendors"
-    Type: String
+    NoEcho: true
     Default: ""
   EnableOpenTelemetry:
     Description: "Install OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage."
@@ -472,7 +466,6 @@ Resources:
               # /etc/default/mediajam ships with empty KRISP_API_KEY + commented
               # redis vars; fill them in for this deployment.
               sudo sed -i -e "s|^KRISP_API_KEY=.*|KRISP_API_KEY=${KrispApiKey}|" /etc/default/mediajam
-              sudo sed -i -e "s|^AIC_SDK_LICENSE=.*|AIC_SDK_LICENSE=${AicApiKey}|" /etc/default/mediajam
               sudo sed -i -e "s|^#\?JAMBONES_REDIS_HOST=.*|JAMBONES_REDIS_HOST=127.0.0.1|" /etc/default/mediajam
               sudo sed -i -e "s|^#\?JAMBONES_REDIS_PORT=.*|JAMBONES_REDIS_PORT=6379|" /etc/default/mediajam
 
@@ -652,7 +645,6 @@ Resources:
               RECORDING_AUTH_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref RecordingAuthSecret, ""]
               SecretsParameterPath: !Ref SecretsParameterPath
               KrispApiKey: !Ref KrispApiKey
-              AicApiKey: !Ref AicApiKey
               EnableOpenTelemetry: !Ref EnableOpenTelemetry
 
   jambonzSecurityGroup:
