@@ -319,6 +319,7 @@ Resources:
                   - 'logs:DescribeLogGroups'
                   - 'logs:CreateLogStream'
                   - 'logs:CreateLogGroup'
+                  - 'logs:PutRetentionPolicy'
                   - 'logs:FilterLogEvents'
                 Resource: '*'
               - Effect: Allow
@@ -1139,6 +1140,7 @@ Resources:
                   - 'logs:DescribeLogGroups'
                   - 'logs:CreateLogStream'
                   - 'logs:CreateLogGroup'
+                  - 'logs:PutRetentionPolicy'
                 Resource: '*'
               - Effect: Allow
                 Action:
@@ -1584,6 +1586,7 @@ Resources:
                   - 'logs:DescribeLogGroups'
                   - 'logs:CreateLogStream'
                   - 'logs:CreateLogGroup'
+                  - 'logs:PutRetentionPolicy'
                 Resource: '*'
               - Effect: Allow
                 Action:
@@ -1893,6 +1896,7 @@ Resources:
                   - 'logs:DescribeLogGroups'
                   - 'logs:CreateLogStream'
                   - 'logs:CreateLogGroup'
+                  - 'logs:PutRetentionPolicy'
                 Resource: '*'
               - Effect: Allow
                 Action:
@@ -2171,6 +2175,7 @@ Resources:
                   - 'logs:DescribeLogGroups'
                   - 'logs:CreateLogStream'
                   - 'logs:CreateLogGroup'
+                  - 'logs:PutRetentionPolicy'
                 Resource: '*'
               - Effect: Allow
                 Action:

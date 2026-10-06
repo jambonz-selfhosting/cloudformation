@@ -281,6 +281,7 @@ Resources:
                   - 'logs:DescribeLogGroups'
                   - 'logs:CreateLogStream'
                   - 'logs:CreateLogGroup'
+                  - 'logs:PutRetentionPolicy'
                   - 'logs:FilterLogEvents'
                 Resource: '*'
               - Effect: Allow
