@@ -18,7 +18,7 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `Architecture` | CPU architecture: `amd64` (x86_64) or `arm64` (Graviton). Allowed values are limited to the architectures whose AMIs were copied | amd64 |
 | `InstanceType` | EC2 instance type | c5n.large |
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
-| `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
+| `AllowedSshCidr` | **Required.** CIDR allowed to SSH to the instances: your admin IP as `x.x.x.x/32`, or your VPN range | (none) |
 | `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
 | `AllowedSipCidr` | CIDR for SIP access | 0.0.0.0/0 |
 | `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
@@ -60,6 +60,7 @@ aws cloudformation create-stack \
   --region us-west-2 \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
+    ParameterKey=AllowedSshCidr,ParameterValue=203.0.113.10/32 \
     ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
 
