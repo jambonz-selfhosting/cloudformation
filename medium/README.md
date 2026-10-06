@@ -44,7 +44,7 @@ The medium deployment creates:
 | `MySQLUsername` | Database username | admin |
 | `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
-| `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
+| `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
