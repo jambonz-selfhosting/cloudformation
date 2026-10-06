@@ -33,6 +33,7 @@ Metadata:
       - Label:
           default: "Third-party API keys - optional, leave blank if unused"
         Parameters:
+          - ApibanKey
           - KrispApiKey
           - AicApiKey
       - Label:
@@ -64,6 +65,8 @@ Metadata:
         default: "optional - SSM Parameter Store path holding your secrets"
       KmsKeyId:
         default: "optional - customer managed KMS key ARN"
+      ApibanKey:
+        default: "optional - apiban.org API key (SIP blocklist)"
       KrispApiKey:
         default: "optional - Krisp API key"
       AicApiKey:
@@ -179,6 +182,11 @@ Parameters:
       - true
       - false
     Default: true
+  ApibanKey:
+    Description: "Optional apiban.org API key for the SIP blocklist on the SBC (get one at https://www.apiban.org). Leave blank to run without apiban."
+    Type: String
+    NoEcho: true
+    Default: ""
   KrispApiKey:
     Description: "Optional Krisp API key for noise isolation and turn taking"
     Type: String
@@ -616,12 +624,19 @@ Resources:
               # KRISP_API_KEY / redis env just written to /etc/default/mediajam
               sudo systemctl restart mediajam
 
-              # get an apiban key and install it
-              APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
-              sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
-              sudo /usr/local/bin/apiban/apiban-client-nftables FULL
+              # apiban SIP blocklist: install the customer's own key (ApibanKey parameter).
+              # Without one the SBC runs without the blocklist and the 4-minute refresh cron is removed.
+              if [ -n "${ApibanKey}" ]; then
+                echo "installing apiban key"
+                sudo sed -i -e "s|API-KEY-HERE|${ApibanKey}|g" /usr/local/bin/apiban/config.json
+                sudo /usr/local/bin/apiban/apiban-client-nftables FULL || echo "WARNING: apiban initial sync failed"
+              else
+                echo "WARNING: no ApibanKey supplied; running without the apiban SIP blocklist"
+                sudo rm -f /etc/cron.d/apiban-client
+              fi
               
-            - URLPortal: !Ref URLPortal
+            - ApibanKey: !Ref ApibanKey
+              URLPortal: !Ref URLPortal
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
               JWT_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref JwtSecret, ""]
