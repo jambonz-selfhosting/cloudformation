@@ -195,9 +195,9 @@ Parameters:
     Default: true
     AllowedValues: [true, false]
   CloudwatchLogRetention:
-    Description: "Number of days to retain cloudwatch logs"
+    Description: "Days to keep jambonz logs in CloudWatch. Applied to the log groups at boot: a shorter value deletes older log events. SOC 2 typically expects 90 days or more."
     Type: Number
-    Default: 3
+    Default: 90
     AllowedValues:
       - 1
       - 3
@@ -209,6 +209,8 @@ Parameters:
       - 90
       - 120
       - 150
+      - 180
+      - 365
 
   EnableEBSEncryption:
     Description: "Do you want to encrypt all EBS volumes?"

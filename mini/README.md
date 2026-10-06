@@ -24,7 +24,7 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
 | `VpcCidr` | CIDR range for the VPC | 10.0.0.0/16 |
 | `Cloudwatch` | Enable CloudWatch logging | true |
-| `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
+| `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `URLPortal` | DNS name for the portal | (required) |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | true |
