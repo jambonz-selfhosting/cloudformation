@@ -13,7 +13,7 @@ The medium deployment creates:
 - **Web/Monitoring Server** - Hosts the portal, API, Grafana, Homer, and Jaeger
 - **Aurora Serverless v2** - MySQL database cluster
 - **ElastiCache** - Redis cluster for caching and pub/sub
-- **Optional Recording Cluster** - Auto-scaling recording servers behind an ALB
+- **Recording Cluster** - Auto-scaling recording servers behind an internal ALB (always deployed)
 
 ## Prerequisites
 
@@ -45,7 +45,6 @@ The medium deployment creates:
 | `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
-| `DeployRecordingCluster` | Deploy optional recording cluster | yes |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
