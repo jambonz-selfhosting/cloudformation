@@ -444,7 +444,10 @@ Resources:
                   - 'autoscaling:DescribeAutoScalingGroups'
                 Resource: '*'
               - Effect: Allow
-                Action: 'autoscaling:CompleteLifecycleAction'
+                Action:
+                  - 'autoscaling:CompleteLifecycleAction'
+                  # fail-closed EIP: an instance that cannot take its published address marks itself unhealthy
+                  - 'autoscaling:SetInstanceHealth'
                 Resource: !Sub 'arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-sbc-sip-autoscaling-group'
               # Elastic IP (auto-assign-elastic-ip.sh): claim a free EIP tagged with this tier's
               # Environment. Association is allowed only when the EIP and the instance both carry it.
@@ -1623,19 +1626,35 @@ Resources:
                 sudo systemctl stop rtpengine
                 sudo systemctl stop drachtio
 
-                if [ -f "/usr/local/bin/auto-assign-elastic-ip.sh" ]; then
-                    IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
-                    PRE_PUBLIC_IP=`curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4`
-                    echo "before retrieving EIP for jambonz SBC, public IP is $PRE_PUBLIC_IP"
+                # Elastic IP, fail-closed: carriers and customers allow-list the published SBC address, so
+                # this box never serves from an ephemeral one. Wait until a tagged EIP is free (during a
+                # replacement the old box still holds it); any other failure marks the instance unhealthy so
+                # the ASG replaces it. drachtio and the apps are started only after this.
+                md() { local T; T=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60"); curl -s -H "X-aws-ec2-metadata-token: $T" http://169.254.169.254/latest/meta-data/$1; }
+                INSTANCE_ID=$(md instance-id)
+                fatal() {
+                    echo "FATAL: $*; marking instance unhealthy and refusing to enter service"
+                    aws autoscaling set-instance-health --instance-id $INSTANCE_ID --health-status Unhealthy --region ${AWS_REGION}
+                    exit 1
+                }
 
-                    /usr/local/bin/auto-assign-elastic-ip.sh
-                    sleep 20
-
-                    PUBLIC_IP=`curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4`
-                    echo "after retrieving EIP for SIP server, public IP is $PUBLIC_IP"
-                else
-                    echo "Warning: /usr/local/bin/auto-assign-elastic-ip.sh not found, skipping EIP assignment"
-                fi
+                [ -x /usr/local/bin/auto-assign-elastic-ip.sh ] || fatal "auto-assign-elastic-ip.sh missing from the image"
+                PRE_PUBLIC_IP=$(md public-ipv4)
+                echo "before retrieving EIP for the SBC, public IP is $PRE_PUBLIC_IP"
+                ATTEMPT=0
+                until /usr/local/bin/auto-assign-elastic-ip.sh; do
+                    ATTEMPT=$((ATTEMPT+1))
+                    echo "no free tagged EIP yet (attempt $ATTEMPT); waiting 15s"
+                    sleep 15
+                done
+                # metadata lags the association by a few seconds; confirm it before anything advertises an address
+                for i in $(seq 1 12); do
+                    PUBLIC_IP=$(md public-ipv4)
+                    if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "$PRE_PUBLIC_IP" ]; then break; fi
+                    sleep 5
+                done
+                [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "$PRE_PUBLIC_IP" ] || fatal "metadata never reflected the EIP association"
+                echo "after retrieving EIP for the SBC, public IP is $PUBLIC_IP"
 
                 # configure drachtio service
                 sudo sed -i -e "s/MYSQL_HOST=/MYSQL_HOST=${JAMBONES_MYSQL_HOST}/g" /etc/systemd/system/drachtio.service
@@ -1870,7 +1889,7 @@ Resources:
 
                 # the apps' secrets come from Parameter Store at every start (ssm-env preload)
                 sudo /opt/jambonz/apply-ssm-secrets.sh "/jambonz/${AWS::StackName}/common" ${AWS_REGION} \
-                  $HOME/apps/ecosystem.config.js "JWT_SECRET ENCRYPTION_SECRET JAMBONES_MYSQL_PASSWORD JAMBONES_MYSQL_WRITE_PASSWORD" || exit 1
+                  $HOME/apps/ecosystem.config.js "JWT_SECRET ENCRYPTION_SECRET JAMBONES_MYSQL_PASSWORD JAMBONES_MYSQL_WRITE_PASSWORD" || fatal "apply-ssm-secrets.sh failed"
 
                 sudo systemctl daemon-reload
                 sudo systemctl restart rtpengine

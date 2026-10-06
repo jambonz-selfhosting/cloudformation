@@ -230,6 +230,18 @@ ssh -i /path/to/keypair.pem jambonz@<SbcServerIP>
 
 ## Scaling
 
+**Each SBC server needs its own Elastic IP.** Carriers and customers allow-list these
+addresses, so a server never serves from a temporary public IP. The stack creates one. Before scaling the
+SBC above one server, allocate another EIP with the SBC's `Environment` tag:
+
+```bash
+aws ec2 allocate-address --domain vpc --region us-west-2 \
+  --tag-specifications 'ResourceType=elastic-ip,Tags=[{Key=Environment,Value=jambonz-medium-sbc}]'
+```
+
+The tag value is `<stack-name>-sbc`. Publish the new address to your carriers and customers. A new
+SBC that finds no free EIP waits, out of service, until one is free.
+
 The SBC and Feature Server Auto Scaling Groups can be scaled manually or configured with scaling policies:
 
 ```bash
