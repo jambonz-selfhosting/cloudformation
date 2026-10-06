@@ -228,6 +228,10 @@ Note that the RDS cluster has delete protection enabled, so you will need to dis
 **Note:**
 - The Elastic IPs have a `Retain` deletion policy and will not be deleted with the stack. You can manually release them after the stack is deleted.
 - The Aurora database has deletion protection enabled. You must disable it before deleting the stack.
+- CloudFormation takes a final snapshot of the Aurora cluster when the stack is deleted, and keeps
+  the `<stack-name>-encryption-secret` Secrets Manager secret with it. A restored snapshot needs
+  that secret to read the stored vendor credentials. Delete both once you no longer need the data.
+  The secret also blocks creating a new stack with the same name until it is deleted.
 
 ## SSH Access
 
