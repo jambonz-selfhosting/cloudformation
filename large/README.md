@@ -52,7 +52,6 @@ The large deployment creates:
 | `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
 | `VpcCidr` | CIDR range for the VPC | 172.20.0.0/16 |
 | `MySQLUsername` | Database username | admin |
-| `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
@@ -90,6 +89,27 @@ creating the stack. It must cover `URLPortal` and its `api.`, `grafana.` and `pu
 subdomains, e.g. `my-domain.example.com` plus `*.my-domain.example.com`. The initial admin
 password is generated into Secrets Manager (`<stack-name>-web-admin-initial-password`)
 instead of being the instance ID.
+
+## Secrets
+
+The stack generates every secret it needs: the database master password, the JWT and
+encryption secrets, and the credential the feature servers present to the recording servers.
+It keeps them in Secrets Manager and copies them into SSM Parameter Store as SecureString
+parameters:
+
+| Path | Read by |
+|---|---|
+| `/jambonz/<stack-name>/common` | every server |
+| `/jambonz/<stack-name>/fs` | feature servers |
+| `/jambonz/<stack-name>/recording` | recording servers |
+
+No secret is written to an instance's disk or to its user data. The jambonz apps, drachtio and
+the recording uploader fetch their values from Parameter Store each time they start. Each tier's instance role can read only the paths for its tier.
+The parameters are deleted with the stack.
+
+To change a value, update the parameter, then restart the processes that read it. **Never
+change `ENCRYPTION_SECRET` once the system holds data.** It encrypts the vendor credentials
+stored in the database, and changing it makes them unreadable.
 
 ## Generate and Deploy
 
