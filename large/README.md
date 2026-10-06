@@ -285,6 +285,21 @@ ssh -i /path/to/keypair.pem jambonz@<RtpServerIP>
 
 ## Scaling
 
+**Each SIP and RTP server needs its own Elastic IP.** Carriers and customers allow-list these
+addresses, so a server never serves from a temporary public IP. The stack creates one EIP per
+tier. Before scaling a tier above one server, allocate another EIP with that tier's
+`Environment` tag:
+
+```bash
+aws ec2 allocate-address --domain vpc --region us-west-2 \
+  --tag-specifications 'ResourceType=elastic-ip,Tags=[{Key=Environment,Value=jambonz-large-sbc-sip}]'
+```
+
+Use `<stack-name>-sbc-sip` for a SIP server and `<stack-name>-sbc-rtp` for an RTP server, and
+publish the new address to your carriers and customers. A new SIP server that finds no free EIP
+waits, out of service, until one is free. A new RTP server in that state marks itself unhealthy
+and is replaced, again and again, until one is free.
+
 The SBC SIP, SBC RTP, and Feature Server Auto Scaling Groups can be scaled manually or configured with scaling policies:
 
 ```bash
