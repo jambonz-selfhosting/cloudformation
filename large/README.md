@@ -35,7 +35,8 @@ The large deployment creates:
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
 | `URLPortal` | DNS name for the portal | (required) |
 | `WebServerDeployment` | `single-instance` or `autoscaling-alb` - see [Web server deployment](#web-server-deployment) | single-instance |
-| `WebCertificateArn` | ACM certificate ARN for the web ALB; required for `autoscaling-alb` | (none) |
+| `HostedZoneId` | `autoscaling-alb`: Route 53 zone containing `URLPortal`; the stack issues the ALB certificate and creates the web DNS records | (none) |
+| `WebCertificateArn` | `autoscaling-alb`: your own ACM certificate for the ALB, instead of `HostedZoneId` | (none) |
 | `EnablePcaps` | Enable PCAPs for SIP traffic | (required) |
 | `InstanceTypeSbcSip` | EC2 instance type for SBC SIP servers | c5n.xlarge |
 | `InstanceTypeSbcRtp` | EC2 instance type for SBC RTP servers | c5n.xlarge |
@@ -81,15 +82,29 @@ The large deployment creates:
   [Enable HTTPS](#enable-https-for-the-portal)).
 - **`autoscaling-alb`** - an Auto Scaling group of web servers (min 1, max 4, starting at 1,
   scaling on 60% average CPU) behind an internet-facing Application Load Balancer. The ALB
-  terminates TLS with the ACM certificate in `WebCertificateArn` and redirects HTTP to HTTPS,
-  so there is no certbot step and the portal is configured for `https://` from the start.
-  Instances are replaced one at a time on stack updates.
+  terminates TLS with an ACM certificate and redirects HTTP to HTTPS, so there is no certbot
+  step and the portal is configured for `https://` from the start. Instances are replaced one
+  at a time on stack updates.
 
-For `autoscaling-alb`, request or import the certificate in ACM **in the same region** before
-creating the stack. It must cover `URLPortal` and its `api.`, `grafana.` and `public-apps.`
-subdomains, e.g. `my-domain.example.com` plus `*.my-domain.example.com`. The initial admin
-password is generated into Secrets Manager (`<stack-name>-web-admin-initial-password`)
-instead of being the instance ID.
+For `autoscaling-alb`, the load balancer needs a certificate. There are two ways to provide one:
+
+- **Let the stack do it (recommended): set `HostedZoneId`** to the Route 53 public hosted zone
+  that contains `URLPortal`. The stack requests an ACM certificate for `URLPortal` and its
+  `api.`, `grafana.` and `public-apps.` subdomains, validates it through DNS in that zone, and
+  creates those four records pointing at the load balancer. ACM renews the certificate
+  automatically. Stack creation waits for the certificate to be issued, usually a few minutes.
+  ACM's validation records (CNAMEs beginning with `_`) may stay in the zone after the stack is
+  deleted.
+- **Bring your own: set `WebCertificateArn`** to a certificate you requested or imported in ACM
+  **in the same region**. It must cover `URLPortal` and its `api.`, `grafana.` and
+  `public-apps.` subdomains, e.g. `my-domain.example.com` plus `*.my-domain.example.com`. Then
+  point those names at the `WebLoadBalancerDnsName` output yourself.
+
+If you set both, the stack uses your certificate and still creates the DNS records.
+`HostedZoneId` is rejected with `single-instance`.
+
+The initial admin password is generated into Secrets Manager
+(`<stack-name>-web-admin-initial-password`) instead of being the instance ID.
 
 ## Secrets
 

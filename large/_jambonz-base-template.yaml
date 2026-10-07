@@ -160,16 +160,22 @@ Parameters:
     Description: "DNS name you will point to the jambonz webserver(s)"
     AllowedPattern : ".+"
   WebServerDeployment:
-    Description: "single-instance: one web server with an Elastic IP (add TLS afterwards with certbot). autoscaling-alb: 1-4 web servers in an Auto Scaling group behind an internet-facing Application Load Balancer that terminates TLS; requires WebCertificateArn."
+    Description: "single-instance: one web server with an Elastic IP (add TLS afterwards with certbot). autoscaling-alb: 1-4 web servers in an Auto Scaling group behind an internet-facing Application Load Balancer that terminates TLS; requires HostedZoneId or WebCertificateArn."
     Type: String
     AllowedValues:
       - single-instance
       - autoscaling-alb
     Default: single-instance
   WebCertificateArn:
-    Description: "autoscaling-alb only: ARN of an ACM certificate in this region for the web load balancer. It must cover URLPortal and its api., grafana. and public-apps. subdomains (e.g. example.com plus *.example.com)."
+    Description: "autoscaling-alb only, if HostedZoneId is blank: ARN of an ACM certificate in this region for the web load balancer. It must cover URLPortal and its api., grafana. and public-apps. subdomains (e.g. example.com plus *.example.com). Leave blank to have the stack issue one through HostedZoneId."
     Type: String
     Default: ""
+  HostedZoneId:
+    Description: "autoscaling-alb only, optional: ID of the Route 53 public hosted zone that contains URLPortal (e.g. Z0123456789ABCDEFGHIJ). When set, the stack issues the load balancer's ACM certificate, validated by DNS in this zone, and creates the URLPortal, api., grafana. and public-apps. records pointing at the load balancer. When blank, supply WebCertificateArn and create those records yourself."
+    Type: String
+    Default: ""
+    AllowedPattern: '^(Z[A-Z0-9]{1,31})?$'
+    ConstraintDescription: 'must be a Route 53 hosted zone ID (Z followed by letters and digits), or blank'
   StatsSampleRate: 
     Type: Number
     Description: sampling rate for metrics, a number between 0 and 1 inclusive
@@ -235,12 +241,21 @@ Rules:
   WebCertificateRequiredForAutoscaling:
     RuleCondition: !Equals [!Ref WebServerDeployment, autoscaling-alb]
     Assertions:
-      - Assert: !Not [!Equals [!Ref WebCertificateArn, ""]]
-        AssertDescription: "WebCertificateArn is required when WebServerDeployment is autoscaling-alb: the load balancer terminates TLS."
+      - Assert: !Or
+          - !Not [!Equals [!Ref WebCertificateArn, ""]]
+          - !Not [!Equals [!Ref HostedZoneId, ""]]
+        AssertDescription: "autoscaling-alb needs a certificate for the load balancer: set HostedZoneId (the stack issues one through Route 53) or WebCertificateArn."
+  HostedZoneOnlyForAutoscaling:
+    RuleCondition: !Equals [!Ref WebServerDeployment, single-instance]
+    Assertions:
+      - Assert: !Equals [!Ref HostedZoneId, ""]
+        AssertDescription: "HostedZoneId is used only with autoscaling-alb. For single-instance, leave it blank and point DNS at the WebServerIP output."
 
 Conditions:
   UseWebAsg: !Equals [!Ref WebServerDeployment, autoscaling-alb]
   UseSingleWebServer: !Not [!Condition UseWebAsg]
+  CreateWebDnsRecords: !And [!Condition UseWebAsg, !Not [!Equals [!Ref HostedZoneId, ""]]]
+  CreateWebCertificate: !And [!Condition CreateWebDnsRecords, !Equals [!Ref WebCertificateArn, ""]]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
@@ -2762,6 +2777,60 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-web-tg"
 
+  # Issued by the stack when HostedZoneId is set and no WebCertificateArn is given.
+  # CloudFormation writes the DNS validation records into the zone and waits for ACM
+  # to issue the certificate (usually a few minutes); ACM renews it automatically.
+  WebCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateWebCertificate
+    Properties:
+      DomainName: !Ref URLPortal
+      SubjectAlternativeNames:
+        - !Sub 'api.${URLPortal}'
+        - !Sub 'grafana.${URLPortal}'
+        - !Sub 'public-apps.${URLPortal}'
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref URLPortal
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub 'api.${URLPortal}'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub 'grafana.${URLPortal}'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub 'public-apps.${URLPortal}'
+          HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-web-certificate"
+
+  # The portal and its api., grafana. and public-apps. names, as alias records on the ALB.
+  WebDnsRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: CreateWebDnsRecords
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !Ref URLPortal
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt WebApplicationLoadBalancer.DNSName
+            HostedZoneId: !GetAtt WebApplicationLoadBalancer.CanonicalHostedZoneID
+        - Name: !Sub 'api.${URLPortal}'
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt WebApplicationLoadBalancer.DNSName
+            HostedZoneId: !GetAtt WebApplicationLoadBalancer.CanonicalHostedZoneID
+        - Name: !Sub 'grafana.${URLPortal}'
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt WebApplicationLoadBalancer.DNSName
+            HostedZoneId: !GetAtt WebApplicationLoadBalancer.CanonicalHostedZoneID
+        - Name: !Sub 'public-apps.${URLPortal}'
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt WebApplicationLoadBalancer.DNSName
+            HostedZoneId: !GetAtt WebApplicationLoadBalancer.CanonicalHostedZoneID
+
   WebHttpsListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Condition: UseWebAsg
@@ -2771,7 +2840,7 @@ Resources:
       Protocol: HTTPS
       SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
       Certificates:
-        - CertificateArn: !Ref WebCertificateArn
+        - CertificateArn: !If [CreateWebCertificate, !Ref WebCertificate, !Ref WebCertificateArn]
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref WebTargetGroup
@@ -2873,7 +2942,7 @@ Outputs:
   WebLoadBalancerDnsName:
     Condition: UseWebAsg
     Value: !GetAtt WebApplicationLoadBalancer.DNSName
-    Description: Web load balancer DNS name - point the portal domain (Route 53 alias, or CNAME if it is a subdomain) and its api, grafana and public-apps subdomains (CNAME) at this name
+    Description: Web load balancer DNS name. With HostedZoneId the stack has already pointed the portal and its api, grafana and public-apps names at it; otherwise point them here yourself (Route 53 alias, or CNAME)
 
   SipServerIP:
     Value: !GetAtt
