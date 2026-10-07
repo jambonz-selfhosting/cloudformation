@@ -764,6 +764,7 @@ Resources:
     Properties:
       Domain: vpc
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
   EIPAssociation:
     Type: 'AWS::EC2::EIPAssociation'
     Properties:
