@@ -221,6 +221,49 @@ SSH into the Web server and install TLS certificates:
 3. `cd ~/apps/webapp && vi .env` - edit the VITE_API_BASE_URL param to use https
 4. `npm run build && pm2 restart webapp` - restart the webapp under https
 
+### Enable SIP over TLS and WSS
+
+SIP over TLS (port 5061) and SIP over secure WebSocket (WSS, port 8443) need a certificate for the
+name your carriers and SIP clients connect to, for example `sip.<URLPortal>`. Get it from any
+source (certbot, your CA), then store it in SSM Parameter Store, in the stack's region, as three
+SecureString parameters:
+
+```bash
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-large/sbc/TLS_PRIVKEY --value file://privkey.pem
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-large/sbc/TLS_CERT --value file://cert.pem
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-large/sbc/TLS_CHAIN --value file://chain.pem
+```
+
+The path is `/jambonz/<stack-name>/sbc`; you can create the parameters before the stack. At boot,
+each SIP server installs the certificate and turns on TLS and WSS. Without the parameters, SIP runs over UDP
+and TCP only. If they are incomplete, the key does not match the certificate, or the certificate
+has expired, each SIP server logs the reason in `/var/log/cloud-init-output.log` and starts without TLS.
+A value over 4 KB needs `--tier Advanced`.
+
+To add or renew the certificate on a running stack, update the parameters (add `--overwrite`),
+then either:
+
+- **Replace the SIP server instances one at a time.** The Auto Scaling group lets the instance's
+  calls in progress finish before terminating it, and its replacement installs the new certificate.
+  While an instance drains it turns away new calls, so with a single SIP server, new calls fail until
+  the replacement takes over its Elastic IP:
+
+  ```bash
+  aws autoscaling terminate-instance-in-auto-scaling-group --region us-west-2 \
+    --instance-id <instance-id> --no-should-decrement-desired-capacity
+  ```
+
+- **Or apply it in place** on each SIP server. This drops the calls in progress on that server:
+
+  ```bash
+  sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/jambonz-large/sbc us-west-2 && sudo systemctl restart drachtio
+  ```
+
+The parameters are yours: deleting the stack does not delete them.
+
 ## First time login
 
 Now log into the portal for the first time.
