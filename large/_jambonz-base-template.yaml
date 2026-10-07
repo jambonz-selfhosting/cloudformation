@@ -1117,14 +1117,42 @@ Resources:
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
 
+  # Database audit log: connections only (logins, logouts, failed logins). Query and table
+  # events are left off on purpose: on a busy cluster they cost a lot of CloudWatch ingestion.
+  DatabaseClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      DBClusterParameterGroupName: !Sub '${AWS::StackName}-aurora-mysql-cluster-params'
+      Description: Aurora MySQL cluster parameters (connection audit logging)
+      Family: aurora-mysql8.0
+      Parameters:
+        server_audit_logging: 1
+        server_audit_events: 'CONNECT'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cluster-parameter-group'
+
+  # Created here so the exported audit log gets CloudwatchLogRetention; left to RDS, the
+  # group would be created on first export and never expire. Kept after the stack is deleted,
+  # like the snapshot: the audit trail outlives the system it audits, for its retention period.
+  DatabaseAuditLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub '/aws/rds/cluster/${AWS::StackName}-aurora-mysql-cluster/audit'
+      RetentionInDays: !Ref CloudwatchLogRetention
+
   DatabaseCluster:
     Type: AWS::RDS::DBCluster
+    DependsOn: DatabaseAuditLogGroup
     # Keep the data if the stack is deleted, and if an update ever replaces the cluster:
     # CloudFormation takes a final snapshot first (the default replace behaviour is delete).
     DeletionPolicy: Snapshot
     UpdateReplacePolicy: Snapshot
     Properties:
       DBClusterIdentifier: !Sub '${AWS::StackName}-aurora-mysql-cluster'
+      DBClusterParameterGroupName: !Ref DatabaseClusterParameterGroup
       Engine: aurora-mysql
       EngineVersion: "8.0.mysql_aurora.3.04.0"
       ServerlessV2ScalingConfiguration:
@@ -1140,6 +1168,8 @@ Resources:
       VpcSecurityGroupIds:
         - !Ref MySQLSecurityGroup
       DeletionProtection: true
+      EnableCloudwatchLogsExports:
+        - audit
 
   DatabaseInstance:
     Type: AWS::RDS::DBInstance
