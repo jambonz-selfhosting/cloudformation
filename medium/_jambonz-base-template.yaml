@@ -466,7 +466,7 @@ Resources:
                 Condition:
                   StringEquals:
                     'aws:ResourceTag/Environment': !Sub '${AWS::StackName}-sbc'
-              # the jambonz secrets (see SsmSecrets): the SBC reads common
+              # the jambonz secrets (see SsmSecrets): the SBC reads common, and sbc for its SIP TLS certificate
               - Effect: Allow
                 Action:
                   - 'ssm:GetParameter'
@@ -474,6 +474,8 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common'
                   - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/common/*'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc/*'
 
   FeatureServerIamRole:
     Type: AWS::IAM::Role
@@ -1900,6 +1902,11 @@ Resources:
                 # the apps' secrets come from Parameter Store at every start (ssm-env preload)
                 sudo /opt/jambonz/apply-ssm-secrets.sh "/jambonz/${AWS::StackName}/common" ${AWS_REGION} \
                   $HOME/apps/ecosystem.config.js "JWT_SECRET ENCRYPTION_SECRET JAMBONES_MYSQL_PASSWORD JAMBONES_MYSQL_WRITE_PASSWORD" || fatal "apply-ssm-secrets.sh failed"
+
+                # SIP over TLS (5061) and WSS (8443): installs the certificate from /jambonz/<stack>/sbc
+                # in Parameter Store if one is there (see the README); otherwise they stay off
+                sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/${AWS::StackName}/sbc ${AWS_REGION} \
+                  || echo "WARNING: SIP over TLS and WSS not enabled, see the message above"
 
                 sudo systemctl daemon-reload
                 sudo systemctl restart rtpengine

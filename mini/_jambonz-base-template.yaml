@@ -306,6 +306,14 @@ Resources:
                     - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}'
                     - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}/*'
                 - !Ref 'AWS::NoValue'
+              # the SIP TLS certificate, if the operator stored one (see jambonz-sip-tls.sh)
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                  - 'ssm:GetParametersByPath'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc/*'
               # Decrypting a SecureString (or the Secrets Manager secret) needs
               # kms:Decrypt when a customer managed key protects it. The
               # AWS-managed default key grants this through the service itself,
@@ -619,6 +627,11 @@ Resources:
 
               sudo systemctl enable upload_recordings
               sudo systemctl start upload_recordings
+
+              # SIP over TLS (5061) and WSS (8443): installs the certificate from /jambonz/<stack>/sbc
+              # in Parameter Store if one is there (see the README); otherwise they stay off
+              sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/${AWS::StackName}/sbc ${AWS::Region} \
+                || echo "WARNING: SIP over TLS and WSS not enabled, see the message above"
 
               sudo systemctl restart rtpengine
               sudo systemctl restart drachtio
