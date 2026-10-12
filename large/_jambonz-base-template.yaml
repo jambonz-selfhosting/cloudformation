@@ -2999,11 +2999,11 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-VPC"
 
-  SelfiepopVpcCidr:
+  VpcCidrBlock:
     Description: "A reference to the created VPC/CIDR"
     Value: !Ref "VpcCidr"
     Export:
-      Name: !Sub "${AWS::StackName}-SelfiepopVpcCidr"
+      Name: !Sub "${AWS::StackName}-VpcCidrBlock"
 
   PublicSubnets:
     Description: "A list of the public subnets"
