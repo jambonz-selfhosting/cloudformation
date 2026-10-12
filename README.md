@@ -129,7 +129,7 @@ After deploying any stack:
 
 1. Create DNS A records pointing to the output IP addresses
 2. SSH into the web server and run `sudo certbot --nginx` for HTTPS
-3. Log into the portal (user: `admin`, password: instance ID)
+3. Log into the portal (user: `admin`, password: the `Password` / `PortalPassword` / `WebPortalPassword` stack output)
 4. Obtain a license at [licensing.jambonz.org](https://licensing.jambonz.org)
 
 ## FAQ

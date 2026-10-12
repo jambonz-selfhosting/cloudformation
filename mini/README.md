@@ -91,7 +91,7 @@ Outputs include:
 - **PortalURL** - URL to access the jambonz web portal
 - **ServerIP** - Public IP address of the instance
 - **User** - Admin username (always `admin`)
-- **Password** - Initial admin password (the EC2 instance ID)
+- **Password** - Initial admin password (the stack's unique ID, the last part of its stack ID)
 
 ## Post-install steps
 
@@ -149,7 +149,7 @@ The parameters are yours: deleting the stack does not delete them.
 
 Now log into the portal for the first time.  
 
-The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the instance id).  You will be prompted to change the password on first login.
+The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the stack's unique ID, the last part of its stack ID).  You will be prompted to change the password on first login.
 
 ## Acquiring a license
 

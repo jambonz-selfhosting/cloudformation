@@ -140,7 +140,7 @@ Outputs include:
 - **WebServerIP** - Public IP address of the Web/Monitoring server (for DNS records)
 - **SbcServerIP** - Public IP address of the SBC server (for SIP traffic)
 - **PortalUsername** - Admin username (always `admin`)
-- **PortalPassword** - Initial admin password (the Web/Monitoring EC2 instance ID)
+- **PortalPassword** - Initial admin password (the stack's unique ID, the last part of its stack ID)
 - **GrafanaURL** - URL to access Grafana
 - **GrafanaUsername** - Grafana username (always `admin`)
 - **GrafanaPassword** - Initial Grafana password (always `admin`)
@@ -217,7 +217,7 @@ The parameters are yours: deleting the stack does not delete them.
 
 Now log into the portal for the first time.
 
-The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the Web/Monitoring instance ID). You will be prompted to change the password on first login.
+The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the stack's unique ID, the last part of its stack ID). You will be prompted to change the password on first login.
 
 ## Acquiring a license
 

@@ -484,7 +484,8 @@ Resources:
               IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
               PRIVATE_IPV4="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)" 
               PUBLIC_IPV4="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)" 
-              INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
+              # initial admin password: the stack's unique id (shown in the Password output)
+              ADMIN_INITIAL_PASSWORD="$(basename "${AWS::StackId}")"
               AWS_REGION_NAME="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)"
 
               # update ecosystem.config.js with the new DB password
@@ -516,7 +517,7 @@ Resources:
               fi
 
               # reset the database
-              JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
+              JAMBONES_ADMIN_INITIAL_PASSWORD=$ADMIN_INITIAL_PASSWORD JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
 
               # configure webapp with DNS name
               echo "VITE_API_BASE_URL=http://${URLPortal}/api/v1" > "$HOME/apps/webapp/.env"
@@ -806,5 +807,5 @@ Outputs:
     Value: admin
     Description: Login username for the jambonz portal
   Password:
-    Value: !Ref jambonzInstance
+    Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
     Description: Initial password for jambonz portal.  You will be forced to change it once you log in for the first time.
