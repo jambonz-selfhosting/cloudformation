@@ -103,8 +103,8 @@ For `autoscaling-alb`, the load balancer needs a certificate. There are two ways
 If you set both, the stack uses your certificate and still creates the DNS records.
 `HostedZoneId` is rejected with `single-instance`.
 
-The initial admin password is generated into Secrets Manager
-(`<stack-name>-web-admin-initial-password`) instead of being the instance ID.
+The initial admin password is the same in both modes: the stack's unique ID, shown in the
+`WebPortalPassword` output.
 
 ## Secrets
 
@@ -187,7 +187,7 @@ Outputs include:
 - **SipServerIP** - Public IP address of the SBC SIP server (for SIP traffic)
 - **RtpServerIP** - Public IP address of the SBC RTP server (for RTP traffic)
 - **WebPortalUsername** - Admin username (always `admin`)
-- **WebPortalPassword** - Initial admin password (the Web server EC2 instance ID, or for `autoscaling-alb` the name of the Secrets Manager secret holding it)
+- **WebPortalPassword** - Initial admin password (the stack's unique ID, the last part of its stack ID)
 - **GrafanaUsername** - Grafana username (always `admin`)
 - **GrafanaPassword** - Initial Grafana password (always `admin`)
 
@@ -268,7 +268,7 @@ The parameters are yours: deleting the stack does not delete them.
 
 Now log into the portal for the first time.
 
-The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the Web server instance ID). You will be prompted to change the password on first login.
+The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the stack's unique ID, the last part of its stack ID). You will be prompted to change the password on first login.
 
 ## Acquiring a license
 

@@ -2469,13 +2469,6 @@ Resources:
               - Effect: Allow
                 Action: 'logs:FilterLogEvents'
                 Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:jambonz-feature_server:*'
-              # behind the ALB the seeding instance takes the initial admin password from here
-              - !If
-                - UseWebAsg
-                - Effect: Allow
-                  Action: 'secretsmanager:GetSecretValue'
-                  Resource: !Ref WebAdminPasswordSecret
-                - !Ref AWS::NoValue
 
   # --- Webserver EC2 Role Instance profile
   WebServerInstanceProfile:
@@ -2578,19 +2571,10 @@ Resources:
 
                 echo "running jambonz web and monitoring server user data script"
 
-                INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
-
-                # initial admin password: the instance id of a standalone web server; an
-                # autoscaling web tier has no single instance id to report in the stack
-                # outputs, so it uses a generated secret instead (read with tracing off, as above)
-                set +x
-                if [[ "${WEB_ASG}" == "true" ]]; then
-                  JAMBONES_ADMIN_INITIAL_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${ADMIN_PASSWORD_SECRET_ARN}" --region ${AWS_REGION} --query 'SecretString' --output text)
-                else
-                  JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID
-                fi
+                # initial admin password: the stack's unique id, shown in the WebPortalPassword
+                # output; the same value on every web instance, single or autoscaling
+                JAMBONES_ADMIN_INITIAL_PASSWORD="$(basename "${AWS::StackId}")"
                 export JAMBONES_ADMIN_INITIAL_PASSWORD
-                set -x
 
                 # check if database already has tables (i.e. not a fresh deployment)
                 TABLE_COUNT=$(mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='jambones'")
@@ -2803,7 +2787,6 @@ Resources:
                 DbCachingTTS: !Ref DbCachingTTS
                 WEB_ASG: !If [UseWebAsg, "true", "false"]
                 WEB_SCHEME: !If [UseWebAsg, https, http]
-                ADMIN_PASSWORD_SECRET_ARN: !If [UseWebAsg, !Ref WebAdminPasswordSecret, ""]
                 # fewer connections per process: an autoscaling tier multiplies them by
                 # instance count (x pm2 workers)
                 MYSQL_CONNECTION_LIMIT: !If [UseWebAsg, 5, 10]
@@ -2824,17 +2807,6 @@ Resources:
           Value: !Sub '${AWS::StackName}-webserver'
 
   # --- Autoscaling web tier (WebServerDeployment=autoscaling-alb)
-  WebAdminPasswordSecret:
-    Type: AWS::SecretsManager::Secret
-    Condition: UseWebAsg
-    Properties:
-      Name: !Sub "${AWS::StackName}-web-admin-initial-password"
-      Description: "Initial password for the jambonz portal admin user; you are forced to change it on first login."
-      GenerateSecretString:
-        PasswordLength: 16
-        ExcludeCharacters: "/?%,; \\[]&'\"$`"
-        IncludeSpace: false
-
   WebAlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Condition: UseWebAsg
@@ -3039,10 +3011,7 @@ Outputs:
     Description: Login username for the jambonz portal
 
   WebPortalPassword:
-    Value: !If
-      - UseWebAsg
-      - !Sub "stored in Secrets Manager as ${AWS::StackName}-web-admin-initial-password"
-      - !Ref WebServerEC2
+    Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
     Description: Initial password for jambonz portal; you will be forced to change it on first login.
 
   GrafanaUsername:

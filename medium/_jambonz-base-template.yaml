@@ -1368,7 +1368,8 @@ Resources:
 
               echo "running jambonz web and monitoring server user data script"
 
-              INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
+              # initial admin password: the stack's unique id (shown in the PortalPassword output)
+              ADMIN_INITIAL_PASSWORD="$(basename "${AWS::StackId}")"
 
               # check if database already has tables (i.e. not a fresh deployment)
               TABLE_COUNT=$(mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='jambones'")
@@ -1382,7 +1383,7 @@ Resources:
                 mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones < $HOME/apps/api-server/db/jambones-sql.sql
                 sudo sed -i 's/public-apps.jambonz.cloud/public-apps.${URLPortal}/g' $HOME/apps/api-server/db/seed-production-database-open-source.sql
                 mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones < $HOME/apps/api-server/db/seed-production-database-open-source.sql
-                JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
+                JAMBONES_ADMIN_INITIAL_PASSWORD=$ADMIN_INITIAL_PASSWORD JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
 
                 # add row to system information table
                 mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
@@ -2302,7 +2303,7 @@ Outputs:
     Value: admin
     Description: Login username for the jambonz portal
   PortalPassword:
-    Value: !Ref WebMonitoringServerEC2
+    Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
     Description: Initial password for jambonz portal; you will be forced to change it on first login.
   GrafanaURL:
     Value: !Join 
