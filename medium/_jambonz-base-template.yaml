@@ -11,6 +11,74 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 
+Metadata:
+  # Groups and labels the parameters in the CloudFormation console. Purely
+  # cosmetic - it changes nothing about how the stack deploys - but it makes the
+  # three kinds of parameter distinguishable at a glance:
+  #   REQUIRED  - no default, the stack will not create until you supply one
+  #   optional  - blank by default, fill in only to switch a feature on
+  #   (neither) - already carries a sensible default, change only with reason
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "REQUIRED - you must supply a value for these"
+        Parameters:
+          - KeyName
+          - URLPortal
+          - AllowedSshCidr
+      - Label:
+          default: "Third-party API keys - optional, leave blank if unused"
+        Parameters:
+          - ApibanKey
+          - KrispApiKey
+      - Label:
+          default: "Compute - defaults suit most deployments"
+        Parameters:
+          - Architecture
+          - InstanceTypeSbc
+          - InstanceTypeFeatureServer
+          - InstanceTypeWebMonitoring
+          - RecordingInstanceType
+          - WebMonitoringDiskSize
+      - Label:
+          default: "Database and cache - defaults suit most deployments"
+        Parameters:
+          - MySQLUsername
+          - AuroraDBMinCapacity
+          - AuroraDBMaxCapacity
+          - ElastiCacheNodeType
+      - Label:
+          default: "Networking - defaults suit most deployments"
+        Parameters:
+          - VpcCidr
+          - PublicSubnetCIDR
+          - PublicSubnetCIDR2
+          - AllowedHttpCidr
+          - AllowedSbcCidr
+      - Label:
+          default: "Features - defaults suit most deployments"
+        Parameters:
+          - EnablePcaps
+          - DbCachingTTS
+      - Label:
+          default: "Logging, monitoring and encryption - defaults suit most deployments"
+        Parameters:
+          - Cloudwatch
+          - CloudwatchLogRetention
+          - EnableOpenTelemetry
+          - EnableEBSEncryption
+    ParameterLabels:
+      KeyName:
+        default: "REQUIRED - EC2 key pair for SSH access"
+      URLPortal:
+        default: "REQUIRED - DNS name you will point at the web server"
+      AllowedSshCidr:
+        default: "REQUIRED - SSH source CIDR (your IP /32 or VPN range)"
+      ApibanKey:
+        default: "optional - apiban.org API key (SIP blocklist)"
+      KrispApiKey:
+        default: "optional - Krisp API key"
+
 Parameters:
   Architecture:
     Description: "CPU architecture to deploy. amd64 is Intel/AMD x86_64; arm64 is AWS Graviton (lower cost per vCPU). Only architectures whose AMIs were copied by generate-cf.sh are offered. Any instance type you specify below must match this architecture."
