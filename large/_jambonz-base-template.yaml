@@ -11,6 +11,90 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 
+Metadata:
+  # Groups and labels the parameters in the CloudFormation console. Purely
+  # cosmetic - it changes nothing about how the stack deploys - but it makes the
+  # three kinds of parameter distinguishable at a glance:
+  #   REQUIRED  - no default, the stack will not create until you supply one
+  #   optional  - blank by default, fill in only to switch a feature on
+  #   (neither) - already carries a sensible default, change only with reason
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "REQUIRED - you must supply a value for these"
+        Parameters:
+          - KeyName
+          - URLPortal
+          - AllowedSshCidr
+      - Label:
+          default: "Web tier - single instance by default; set these to put it behind a load balancer"
+        Parameters:
+          - WebServerDeployment
+          - HostedZoneId
+          - WebCertificateArn
+      - Label:
+          default: "Third-party API keys - optional, leave blank if unused"
+        Parameters:
+          - ApibanKey
+          - KrispApiKey
+      - Label:
+          default: "Compute - defaults suit most deployments"
+        Parameters:
+          - Architecture
+          - InstanceTypeSbcSip
+          - InstanceTypeSbcRtp
+          - InstanceTypeFeatureServer
+          - InstanceTypeWebserver
+          - InstanceTypeMonitoringServer
+          - RecordingInstanceType
+          - WebMonitoringDiskSize
+      - Label:
+          default: "Database and cache - defaults suit most deployments"
+        Parameters:
+          - MySQLUsername
+          - AuroraDBMinCapacity
+          - AuroraDBMaxCapacity
+          - ElastiCacheNodeType
+      - Label:
+          default: "Networking - defaults suit most deployments"
+        Parameters:
+          - VpcCidr
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - AllowedHttpCidr
+          - AllowedSipCidr
+          - AllowedRtpCidr
+      - Label:
+          default: "Features - defaults suit most deployments"
+        Parameters:
+          - EnablePcaps
+          - DbCachingTTS
+          - StatsSampleRate
+      - Label:
+          default: "Logging, monitoring and encryption - defaults suit most deployments"
+        Parameters:
+          - Cloudwatch
+          - CloudwatchLogRetention
+          - EnableOpenTelemetry
+          - EnableEBSEncryption
+    ParameterLabels:
+      KeyName:
+        default: "REQUIRED - EC2 key pair for SSH access"
+      URLPortal:
+        default: "REQUIRED - DNS name you will point at the web server"
+      AllowedSshCidr:
+        default: "REQUIRED - SSH source CIDR (your IP /32 or VPN range)"
+      ApibanKey:
+        default: "optional - apiban.org API key (SIP blocklist)"
+      KrispApiKey:
+        default: "optional - Krisp API key"
+      WebServerDeployment:
+        default: "Web tier deployment (single-instance or autoscaling-alb)"
+      HostedZoneId:
+        default: "optional - Route 53 hosted zone ID (autoscaling-alb: issues the certificate and DNS)"
+      WebCertificateArn:
+        default: "optional - ACM certificate ARN (autoscaling-alb, if no hosted zone)"
+
 Parameters:
 
   Architecture:
