@@ -966,6 +966,11 @@ Resources:
           ToPort: 14269
           CidrIp:  !Ref VpcCidr
           Description: jaeger-collector (jaeger-thrift, health check)
+        - IpProtocol: tcp
+          FromPort: 4318
+          ToPort: 4318
+          CidrIp: !Ref VpcCidr
+          Description: jaeger-collector OTLP/HTTP (feature-server traces)
       SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: 0
@@ -2033,7 +2038,7 @@ Resources:
                       STATS_TELEGRAF: 1,
                       STATS_SAMPLE_RATE: ${JAMBONES_SAMPLE_RATE},
                       JAMBONES_OTEL_ENABLED: '$OTEL_ENABLED',
-                      OTEL_EXPORTER_JAEGER_ENDPOINT: 'http://${MONITORING_SERVER_IP}:14268/api/traces',
+                      OTEL_EXPORTER_JAEGER_ENDPOINT: 'http://${MONITORING_SERVER_IP}:4318/v1/traces',
                       OTEL_EXPORTER_OTLP_METRICS_INSECURE: 1,
                       OTEL_EXPORTER_JAEGER_GRPC_INSECURE: 1,
                       AWS_LIFECYCLE_DRAIN: 1,
