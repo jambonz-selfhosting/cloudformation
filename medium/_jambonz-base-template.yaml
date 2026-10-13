@@ -1434,20 +1434,13 @@ Resources:
                     JAMBONE_API_VERSION: 'v1',
                     JAMBONES_TIME_SERIES_HOST: '127.0.0.1',
                     ENABLE_METRICS: 1,
-                    STATS_HOST: '127.0.0.1',
-                    STATS_PORT: 8125,
-                    STATS_PROTOCOL: 'tcp',
-                    STATS_TELEGRAF: 1,
-                    STATS_SAMPLE_RATE: 1,
                     HTTP_PORT:  3000,
                     JAMBONES_TRUST_PROXY: 1,
                     JAEGER_BASE_URL: 'http://127.0.0.1:16686',
                     HOMER_BASE_URL: 'http://127.0.0.1:9080',
                     HOMER_USERNAME: 'admin',
                     HOMER_PASSWORD: 'sipcapture',
-                    JAMBONES_DISABLE_TTS_STREAMING: true,
-                    JAMBONZ_UPDATE_CLIENT_TOKEN: '__JAMBONZ_UPDATE_CLIENT_TOKEN__',
-                    JAMBONZ_UPDATE_CLIENT_URL: 'http://127.0.0.1:3201'
+                    JAMBONES_DISABLE_TTS_STREAMING: true
                     },
                 },
                 {
@@ -2139,7 +2132,7 @@ Resources:
                 if [[ "${EnableOpenTelemetry}" == "true" ]]; then
                   OTEL_ENABLED=1
                 else
-                  OTEL_ENABLED=0
+                  OTEL_ENABLED=
                 fi
 
                 echo "writing $HOME/apps/ecosystem.config.js.."
@@ -2164,14 +2157,14 @@ Resources:
                       JAMBONES_LOGLEVEL: 'info',
                       JAMBONES_TTS_TRIM_SILENCE: 1,
                       AWS_REGION: '${AWS_REGION}',
-                      JAMBONES_API_BASE_URL: 'http://${URLPortal}/v1',
+                      JAMBONES_API_BASE_URL: 'http://${URLPortal}/api/v1',
                       ENABLE_METRICS: 1,
                       STATS_HOST: '127.0.0.1',
                       STATS_PORT: 8125,
                       STATS_PROTOCOL: 'tcp',
                       STATS_TELEGRAF: 1,
                       STATS_SAMPLE_RATE: 1,
-                      JAMBONES_OTEL_ENABLED: $OTEL_ENABLED,
+                      JAMBONES_OTEL_ENABLED: '$OTEL_ENABLED',
                       OTEL_EXPORTER_JAEGER_ENDPOINT: 'http://${WebMonitoringServerPrivateIP}:14268/api/traces',
                       OTEL_EXPORTER_OTLP_METRICS_INSECURE: 1,
                       OTEL_EXPORTER_JAEGER_GRPC_INSECURE: 1,
