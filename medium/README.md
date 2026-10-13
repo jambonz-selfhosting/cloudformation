@@ -13,7 +13,7 @@ The medium deployment creates:
 - **Web/Monitoring Server** - Hosts the portal, API, Grafana, Homer, and Jaeger
 - **Aurora Serverless v2** - MySQL database cluster
 - **ElastiCache** - Redis cluster for caching and pub/sub
-- **Optional Recording Cluster** - Auto-scaling recording servers behind an ALB
+- **Recording Cluster** - Auto-scaling recording servers behind an internal ALB (always deployed)
 
 ## Prerequisites
 
@@ -36,16 +36,14 @@ The medium deployment creates:
 | `ElastiCacheNodeType` | ElastiCache node type | cache.t3.medium |
 | `AuroraDBMinCapacity` | Aurora Serverless min ACU | 0.5 |
 | `AuroraDBMaxCapacity` | Aurora Serverless max ACU | 4 |
-| `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
+| `AllowedSshCidr` | **Required.** CIDR allowed to SSH to the instances: your admin IP as `x.x.x.x/32`, or your VPN range | (none) |
 | `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
 | `AllowedSbcCidr` | CIDR for SIP/RTP access | 0.0.0.0/0 |
 | `AllowedSmppCidr` | CIDR for SMPP access | 0.0.0.0/0 |
 | `VpcCidr` | CIDR range for the VPC | 172.20.0.0/16 |
 | `MySQLUsername` | Database username | admin |
-| `MySQLPassword` | Database password | JambonzR0ck$ |
 | `Cloudwatch` | Enable CloudWatch logging | true |
-| `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
-| `DeployRecordingCluster` | Deploy optional recording cluster | yes |
+| `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
@@ -62,6 +60,27 @@ The medium deployment creates:
 > recording servers on the burstable `t4g` tier. If you set an instance type explicitly, match
 > it to the selected architecture. arm64 availability is region-dependent — see the top-level
 > README.
+
+## Secrets
+
+The stack generates every secret it needs: the database master password, the JWT and
+encryption secrets, and the credential the feature servers present to the recording servers.
+It keeps them in Secrets Manager and copies them into SSM Parameter Store as SecureString
+parameters:
+
+| Path | Read by |
+|---|---|
+| `/jambonz/<stack-name>/common` | every server |
+| `/jambonz/<stack-name>/fs` | feature servers |
+| `/jambonz/<stack-name>/recording` | recording servers |
+
+No secret is written to an instance's disk or to its user data. The jambonz apps, drachtio and
+the recording uploader fetch their values from Parameter Store each time they start. Each tier's instance role can read only the paths for its tier.
+The parameters are deleted with the stack.
+
+To change a value, update the parameter, then restart the processes that read it. **Never
+change `ENCRYPTION_SECRET` once the system holds data.** It encrypts the vendor credentials
+stored in the database, and changing it makes them unreadable.
 
 ## Generate and Deploy
 
@@ -89,6 +108,7 @@ aws cloudformation create-stack \
   --region us-west-2 \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
+    ParameterKey=AllowedSshCidr,ParameterValue=203.0.113.10/32 \
     ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
 
@@ -120,7 +140,7 @@ Outputs include:
 - **WebServerIP** - Public IP address of the Web/Monitoring server (for DNS records)
 - **SbcServerIP** - Public IP address of the SBC server (for SIP traffic)
 - **PortalUsername** - Admin username (always `admin`)
-- **PortalPassword** - Initial admin password (the Web/Monitoring EC2 instance ID)
+- **PortalPassword** - Initial admin password (the stack's unique ID, the last part of its stack ID)
 - **GrafanaURL** - URL to access Grafana
 - **GrafanaUsername** - Grafana username (always `admin`)
 - **GrafanaPassword** - Initial Grafana password (always `admin`)
@@ -150,11 +170,54 @@ SSH into the Web/Monitoring server and install TLS certificates:
 3. `cd ~/apps/webapp && vi .env` - edit the VITE_API_BASE_URL param to use https
 4. `npm run build && pm2 restart webapp` - restart the webapp under https
 
+### Enable SIP over TLS and WSS
+
+SIP over TLS (port 5061) and SIP over secure WebSocket (WSS, port 8443) need a certificate for the
+name your carriers and SIP clients connect to, for example `sip.<URLPortal>`. Get it from any
+source (certbot, your CA), then store it in SSM Parameter Store, in the stack's region, as three
+SecureString parameters:
+
+```bash
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-medium/sbc/TLS_PRIVKEY --value file://privkey.pem
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-medium/sbc/TLS_CERT --value file://cert.pem
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-medium/sbc/TLS_CHAIN --value file://chain.pem
+```
+
+The path is `/jambonz/<stack-name>/sbc`; you can create the parameters before the stack. At boot,
+each SBC installs the certificate and turns on TLS and WSS. Without the parameters, SIP runs over UDP
+and TCP only. If they are incomplete, the key does not match the certificate, or the certificate
+has expired, each SBC logs the reason in `/var/log/cloud-init-output.log` and starts without TLS.
+A value over 4 KB needs `--tier Advanced`.
+
+To add or renew the certificate on a running stack, update the parameters (add `--overwrite`),
+then either:
+
+- **Replace the SBC instances one at a time.** The Auto Scaling group lets the instance's
+  calls in progress finish before terminating it, and its replacement installs the new certificate.
+  While an instance drains it turns away new calls, so with a single SBC, new calls fail until
+  the replacement takes over its Elastic IP:
+
+  ```bash
+  aws autoscaling terminate-instance-in-auto-scaling-group --region us-west-2 \
+    --instance-id <instance-id> --no-should-decrement-desired-capacity
+  ```
+
+- **Or apply it in place** on each SBC. This drops the calls in progress on that server:
+
+  ```bash
+  sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/jambonz-medium/sbc us-west-2 && sudo systemctl restart drachtio
+  ```
+
+The parameters are yours: deleting the stack does not delete them.
+
 ## First time login
 
 Now log into the portal for the first time.
 
-The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the Web/Monitoring instance ID). You will be prompted to change the password on first login.
+The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the stack's unique ID, the last part of its stack ID). You will be prompted to change the password on first login.
 
 ## Acquiring a license
 
@@ -173,6 +236,10 @@ Note that the RDS cluster has delete protection enabled, so you will need to dis
 **Note:**
 - The Elastic IPs have a `Retain` deletion policy and will not be deleted with the stack. You can manually release them after the stack is deleted.
 - The Aurora database has deletion protection enabled. You must disable it before deleting the stack.
+- CloudFormation takes a final snapshot of the Aurora cluster when the stack is deleted, and keeps
+  the `<stack-name>-encryption-secret` Secrets Manager secret with it. A restored snapshot needs
+  that secret to read the stored vendor credentials. Delete both once you no longer need the data.
+  The secret also blocks creating a new stack with the same name until it is deleted.
 
 ## SSH Access
 
@@ -209,6 +276,18 @@ ssh -i /path/to/keypair.pem jambonz@<SbcServerIP>
 | 9080 | TCP | Homer |
 
 ## Scaling
+
+**Each SBC server needs its own Elastic IP.** Carriers and customers allow-list these
+addresses, so a server never serves from a temporary public IP. The stack creates one. Before scaling the
+SBC above one server, allocate another EIP with the SBC's `Environment` tag:
+
+```bash
+aws ec2 allocate-address --domain vpc --region us-west-2 \
+  --tag-specifications 'ResourceType=elastic-ip,Tags=[{Key=Environment,Value=jambonz-medium-sbc}]'
+```
+
+The tag value is `<stack-name>-sbc`. Publish the new address to your carriers and customers. A new
+SBC that finds no free EIP waits, out of service, until one is free.
 
 The SBC and Feature Server Auto Scaling Groups can be scaled manually or configured with scaling policies:
 

@@ -25,6 +25,7 @@ Metadata:
         Parameters:
           - KeyName
           - URLPortal
+          - AllowedSshCidr
       - Label:
           default: "Security and compliance - optional, leave blank for the standard setup"
         Parameters:
@@ -33,8 +34,8 @@ Metadata:
       - Label:
           default: "Third-party API keys - optional, leave blank if unused"
         Parameters:
+          - ApibanKey
           - KrispApiKey
-          - AicApiKey
       - Label:
           default: "Compute - defaults suit most deployments"
         Parameters:
@@ -44,7 +45,6 @@ Metadata:
           default: "Networking - defaults suit most deployments"
         Parameters:
           - VpcCidr
-          - AllowedSshCidr
           - AllowedHttpCidr
           - AllowedSipCidr
           - AllowedRtpCidr
@@ -64,10 +64,10 @@ Metadata:
         default: "optional - SSM Parameter Store path holding your secrets"
       KmsKeyId:
         default: "optional - customer managed KMS key ARN"
+      ApibanKey:
+        default: "optional - apiban.org API key (SIP blocklist)"
       KrispApiKey:
         default: "optional - Krisp API key"
-      AicApiKey:
-        default: "optional - ai-coustics API key"
       InstanceType:
         default: "optional - instance type (blank uses the optimized default)"
       Architecture:
@@ -75,7 +75,7 @@ Metadata:
       VpcCidr:
         default: "VPC CIDR"
       AllowedSshCidr:
-        default: "Allowed SSH source CIDR"
+        default: "REQUIRED - SSH source CIDR (your IP /32 or VPN range)"
       AllowedHttpCidr:
         default: "Allowed HTTP/HTTPS source CIDR"
       AllowedSipCidr:
@@ -106,10 +106,9 @@ Parameters:
     Type: 'AWS::EC2::KeyPair::KeyName'
     ConstraintDescription: must be the name of an existing EC2 KeyPair.
   AllowedSshCidr:
-    Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address ssh access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
+    Description: "REQUIRED - source CIDR allowed to SSH to the instances: your admin IP as x.x.x.x/32, or your VPN range. 0.0.0.0/0 opens SSH to the whole internet."
     Type: String
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
-    Default: 0.0.0.0/0
     ConstraintDescription: must be a valid network CIDR
   AllowedHttpCidr:
     Description: Please set CIDR to x.x.x.x/32 to allow one specific IP address http(s) access, 0.0.0.0/0 to allow all IP addresses access, or another CIDR range.
@@ -153,9 +152,9 @@ Parameters:
     AllowedPattern: "^$|^arn:aws[a-zA-Z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/.+$"
     ConstraintDescription: "must be a full KMS key ARN, e.g. arn:aws:kms:us-east-1:123456789012:key/1234abcd-..."
   CloudwatchLogRetention:
-    Description: "Number of days to retain cloudwatch logs"
+    Description: "Days to keep jambonz logs in CloudWatch. Applied to the log groups at boot: a shorter value deletes older log events. SOC 2 typically expects 90 days or more."
     Type: Number
-    Default: 3
+    Default: 90
     AllowedValues:
       - 1
       - 3
@@ -166,6 +165,9 @@ Parameters:
       - 60
       - 90
       - 120
+      - 150
+      - 180
+      - 365
   URLPortal:
     Type: String
     Description: "The DNS name that you intend to use for the jambonz portal"
@@ -179,13 +181,15 @@ Parameters:
       - true
       - false
     Default: true
+  ApibanKey:
+    Description: "Optional apiban.org API key for the SIP blocklist on the SBC (get one at https://www.apiban.org). Leave blank to run without apiban."
+    Type: String
+    NoEcho: true
+    Default: ""
   KrispApiKey:
     Description: "Optional Krisp API key for noise isolation and turn taking"
     Type: String
-    Default: ""
-  AicApiKey:
-    Description: "Optional ai-coustics API key for the aicoustics noise isolation and VAD vendors"
-    Type: String
+    NoEcho: true
     Default: ""
   EnableOpenTelemetry:
     Description: "Install OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage."
@@ -302,6 +306,14 @@ Resources:
                     - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}'
                     - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsParameterPath}/*'
                 - !Ref 'AWS::NoValue'
+              # the SIP TLS certificate, if the operator stored one (see jambonz-sip-tls.sh)
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                  - 'ssm:GetParametersByPath'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc/*'
               # Decrypting a SecureString (or the Secrets Manager secret) needs
               # kms:Decrypt when a customer managed key protects it. The
               # AWS-managed default key grants this through the service itself,
@@ -463,7 +475,6 @@ Resources:
               # /etc/default/mediajam ships with empty KRISP_API_KEY + commented
               # redis vars; fill them in for this deployment.
               sudo sed -i -e "s|^KRISP_API_KEY=.*|KRISP_API_KEY=${KrispApiKey}|" /etc/default/mediajam
-              sudo sed -i -e "s|^AIC_SDK_LICENSE=.*|AIC_SDK_LICENSE=${AicApiKey}|" /etc/default/mediajam
               sudo sed -i -e "s|^#\?JAMBONES_REDIS_HOST=.*|JAMBONES_REDIS_HOST=127.0.0.1|" /etc/default/mediajam
               sudo sed -i -e "s|^#\?JAMBONES_REDIS_PORT=.*|JAMBONES_REDIS_PORT=6379|" /etc/default/mediajam
 
@@ -473,7 +484,8 @@ Resources:
               IMDS_TOKEN="$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
               PRIVATE_IPV4="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)" 
               PUBLIC_IPV4="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)" 
-              INSTANCE_ID="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)"
+              # initial admin password: the stack's unique id (shown in the Password output)
+              ADMIN_INITIAL_PASSWORD="$(basename "${AWS::StackId}")"
               AWS_REGION_NAME="$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/placement/region)"
 
               # update ecosystem.config.js with the new DB password
@@ -482,7 +494,7 @@ Resources:
               # replace ip addresses in the ecosystem.config.js file
               sudo sed -i -e "s/\(.*\)PRIVATE_IP\(.*\)/\1$PRIVATE_IPV4\2/g" $HOME/apps/ecosystem.config.js 
               sudo sed -i -e "s/\(.*\)AWS_REGION_NAME\(.*\)/\1$AWS_REGION_NAME\2/g" $HOME/apps/ecosystem.config.js 
-              sudo sed -i -e "s/\(.*\)--JAMBONES_API_BASE_URL--\(.*\)/\1http:\/\/$PUBLIC_IPV4\/v1\2/g" $HOME/apps/ecosystem.config.js 
+              sudo sed -i -e "s/\(.*\)--JAMBONES_API_BASE_URL--\(.*\)/\1http:\/\/$PUBLIC_IPV4\/api\/v1\2/g" $HOME/apps/ecosystem.config.js 
               
               # replace JWT_SECRET
               if [ -n "${SecretsParameterPath}" ]; then
@@ -505,7 +517,7 @@ Resources:
               fi
 
               # reset the database
-              JAMBONES_ADMIN_INITIAL_PASSWORD=$INSTANCE_ID JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
+              JAMBONES_ADMIN_INITIAL_PASSWORD=$ADMIN_INITIAL_PASSWORD JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_PASSWORD=$NEW_DB_PASSWD JAMBONES_MYSQL_DATABASE=jambones JAMBONES_MYSQL_HOST=127.0.0.1 $HOME/apps/api-server/db/reset_admin_password.js
 
               # configure webapp with DNS name
               echo "VITE_API_BASE_URL=http://${URLPortal}/api/v1" > "$HOME/apps/webapp/.env"
@@ -516,6 +528,8 @@ Resources:
               # add row to system information table
               mysql -h 127.0.0.1 -u admin -D jambones -p$NEW_DB_PASSWD -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
 
+              # nginx sets X-Forwarded-For to the client address; the api-server trusts
+              # this one hop (JAMBONES_TRUST_PROXY=1 in the image's ecosystem.config.js)
               sudo cat << EOF > $NGINX_CONFIG
               server {
                   listen 80;
@@ -524,10 +538,12 @@ Resources:
                       rewrite ^/api/(.*)$ /\$1 break;
                       proxy_pass http://127.0.0.1:3002;
                       proxy_set_header Host \$host;
+                      proxy_set_header X-Forwarded-For \$remote_addr;
                   }
                   location / {
                       proxy_pass http://127.0.0.1:3001;
                       proxy_set_header Host \$host;
+                      proxy_set_header X-Forwarded-For \$remote_addr;
                   }
               }
               server {
@@ -536,6 +552,7 @@ Resources:
                 location / {
                   proxy_pass http://127.0.0.1:3002;
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Forwarded-For \$remote_addr;
                 }
               }
               server {
@@ -547,6 +564,7 @@ Resources:
                   proxy_set_header Upgrade \$http_upgrade;
                   proxy_set_header Connection 'upgrade';
                   proxy_set_header Host \$host;
+                  proxy_set_header X-Forwarded-For \$remote_addr;
                   proxy_cache_bypass \$http_upgrade;
                 }
               }
@@ -592,7 +610,7 @@ Resources:
                 sudo systemctl stop jaeger-query.service || true
                 sudo systemctl disable jaeger-query.service
                 # Disable OTEL in feature-server
-                sudo sed -i -e "s/JAMBONES_OTEL_ENABLED: 1/JAMBONES_OTEL_ENABLED: 0/g" $HOME/apps/ecosystem.config.js
+                sudo sed -i -e "s/JAMBONES_OTEL_ENABLED: 1/JAMBONES_OTEL_ENABLED: ''/g" $HOME/apps/ecosystem.config.js
               fi
 
               # Configure and start jambonz-updater BEFORE pm2 so api-server has correct token
@@ -611,18 +629,30 @@ Resources:
               sudo systemctl enable upload_recordings
               sudo systemctl start upload_recordings
 
+              # SIP over TLS (5061) and WSS (8443): installs the certificate from /jambonz/<stack>/sbc
+              # in Parameter Store if one is there (see the README); otherwise they stay off
+              sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/${AWS::StackName}/sbc ${AWS::Region} \
+                || echo "WARNING: SIP over TLS and WSS not enabled, see the message above"
+
               sudo systemctl restart rtpengine
               sudo systemctl restart drachtio
               # mediajam is enabled at build time; restart so it picks up the
               # KRISP_API_KEY / redis env just written to /etc/default/mediajam
               sudo systemctl restart mediajam
 
-              # get an apiban key and install it
-              APIBANKEY=$(curl -X POST -u jambonz:1a074994242182a9e0b67eae93978826 -d "{\"client\": \"$INSTANCE_ID\"}" -s https://apiban.org/sponsor/newkey | jq -r '.ApiKey')
-              sudo sed -i -e "s/API-KEY-HERE/$APIBANKEY/g" /usr/local/bin/apiban/config.json
-              sudo /usr/local/bin/apiban/apiban-client-nftables FULL
+              # apiban SIP blocklist: install the customer's own key (ApibanKey parameter).
+              # Without one the SBC runs without the blocklist and the 4-minute refresh cron is removed.
+              if [ -n "${ApibanKey}" ]; then
+                echo "installing apiban key"
+                sudo sed -i -e "s|API-KEY-HERE|${ApibanKey}|g" /usr/local/bin/apiban/config.json
+                sudo /usr/local/bin/apiban/apiban-client-nftables FULL || echo "WARNING: apiban initial sync failed"
+              else
+                echo "WARNING: no ApibanKey supplied; running without the apiban SIP blocklist"
+                sudo rm -f /etc/cron.d/apiban-client
+              fi
               
-            - URLPortal: !Ref URLPortal
+            - ApibanKey: !Ref ApibanKey
+              URLPortal: !Ref URLPortal
               Cloudwatch: !Ref Cloudwatch
               CloudwatchLogRetention: !Ref CloudwatchLogRetention
               JWT_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref JwtSecret, ""]
@@ -630,7 +660,6 @@ Resources:
               RECORDING_AUTH_SECRET_ARN: !If [GenerateEncryptionSecret, !Ref RecordingAuthSecret, ""]
               SecretsParameterPath: !Ref SecretsParameterPath
               KrispApiKey: !Ref KrispApiKey
-              AicApiKey: !Ref AicApiKey
               EnableOpenTelemetry: !Ref EnableOpenTelemetry
 
   jambonzSecurityGroup:
@@ -749,6 +778,7 @@ Resources:
     Properties:
       Domain: vpc
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
   EIPAssociation:
     Type: 'AWS::EC2::EIPAssociation'
     Properties:
@@ -777,5 +807,5 @@ Outputs:
     Value: admin
     Description: Login username for the jambonz portal
   Password:
-    Value: !Ref jambonzInstance
+    Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
     Description: Initial password for jambonz portal.  You will be forced to change it once you log in for the first time.

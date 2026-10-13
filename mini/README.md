@@ -18,13 +18,13 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `Architecture` | CPU architecture: `amd64` (x86_64) or `arm64` (Graviton). Allowed values are limited to the architectures whose AMIs were copied | amd64 |
 | `InstanceType` | EC2 instance type | c5n.large |
 | `KeyName` | EC2 Key Pair name for SSH access | (required) |
-| `AllowedSshCidr` | CIDR for SSH access | 0.0.0.0/0 |
+| `AllowedSshCidr` | **Required.** CIDR allowed to SSH to the instances: your admin IP as `x.x.x.x/32`, or your VPN range | (none) |
 | `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
 | `AllowedSipCidr` | CIDR for SIP access | 0.0.0.0/0 |
 | `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
 | `VpcCidr` | CIDR range for the VPC | 10.0.0.0/16 |
 | `Cloudwatch` | Enable CloudWatch logging | true |
-| `CloudwatchLogRetention` | Days to retain CloudWatch logs | 3 |
+| `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `URLPortal` | DNS name for the portal | (required) |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | true |
@@ -60,6 +60,7 @@ aws cloudformation create-stack \
   --region us-west-2 \
   --parameters \
     ParameterKey=KeyName,ParameterValue=my-keypair \
+    ParameterKey=AllowedSshCidr,ParameterValue=203.0.113.10/32 \
     ParameterKey=URLPortal,ParameterValue=my-domain.example.com
 ```
 
@@ -90,7 +91,7 @@ Outputs include:
 - **PortalURL** - URL to access the jambonz web portal
 - **ServerIP** - Public IP address of the instance
 - **User** - Admin username (always `admin`)
-- **Password** - Initial admin password (the EC2 instance ID)
+- **Password** - Initial admin password (the stack's unique ID, the last part of its stack ID)
 
 ## Post-install steps
 
@@ -113,11 +114,42 @@ ssh into the ServerIP and install TLS certificates and then restart the portal u
 4. edit the http url and change it to use https, save the file
 5. `npm run build && pm2 restart webapp-app` - restart the webapp under https
 
+### Enable SIP over TLS and WSS
+
+SIP over TLS (port 5061) and SIP over secure WebSocket (WSS, port 8443) need a certificate for the
+name your carriers and SIP clients connect to, for example `sip.<URLPortal>`. Get it from any
+source (certbot, your CA), then store it in SSM Parameter Store, in the stack's region, as three
+SecureString parameters:
+
+```bash
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-mini/sbc/TLS_PRIVKEY --value file://privkey.pem
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-mini/sbc/TLS_CERT --value file://cert.pem
+aws ssm put-parameter --region us-west-2 --type SecureString \
+  --name /jambonz/jambonz-mini/sbc/TLS_CHAIN --value file://chain.pem
+```
+
+The path is `/jambonz/<stack-name>/sbc`; you can create the parameters before the stack. At boot,
+the server installs the certificate and turns on TLS and WSS. Without the parameters, SIP runs over UDP
+and TCP only. If they are incomplete, the key does not match the certificate, or the certificate
+has expired, the server logs the reason in `/var/log/cloud-init-output.log` and starts without TLS.
+A value over 4 KB needs `--tier Advanced`.
+
+To add or renew the certificate later, update the parameters (add `--overwrite`), then apply it on
+the server. Restarting drachtio drops the calls in progress, so do it in a quiet period:
+
+```bash
+sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/jambonz-mini/sbc us-west-2 && sudo systemctl restart drachtio
+```
+
+The parameters are yours: deleting the stack does not delete them.
+
 ## First time login
 
 Now log into the portal for the first time.  
 
-The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the instance id).  You will be prompted to change the password on first login.
+The user is 'admin' and the password will have been listed as part of the outputs above (it is set initially to the stack's unique ID, the last part of its stack ID).  You will be prompted to change the password on first login.
 
 ## Acquiring a license
 
