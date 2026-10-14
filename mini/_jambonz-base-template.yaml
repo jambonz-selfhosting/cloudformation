@@ -713,11 +713,6 @@ Resources:
           FromPort: 9080
           ToPort: 9080
           CidrIp: !Ref AllowedHttpCidr
-        - Description: grafana
-          IpProtocol: tcp
-          FromPort: 3000
-          ToPort: 3000
-          CidrIp: !Ref AllowedHttpCidr
         - Description: smpp
           IpProtocol: tcp
           FromPort: 3020
