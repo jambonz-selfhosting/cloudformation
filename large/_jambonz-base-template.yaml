@@ -850,11 +850,6 @@ Resources:
           CidrIp: !Ref AllowedSipCidr
           Description: sip over wss
         - IpProtocol: tcp
-          FromPort: 4433
-          ToPort: 4433
-          CidrIp:   !Ref AllowedSipCidr
-          Description: Allow sip (wss) from Internet
-        - IpProtocol: tcp
           FromPort: 9090
           ToPort: 9090
           CidrIp:  !Ref VpcCidr
@@ -934,8 +929,8 @@ Resources:
         - IpProtocol: tcp
           FromPort: 3010
           ToPort: 3010
-          CidrIp: !Ref AllowedHttpCidr
-          Description: Allow grafana access
+          CidrIp: !Ref VpcCidr
+          Description: Allow grafana access from the web server nginx proxy (VPC only)
         - IpProtocol: tcp
           FromPort: 8086
           ToPort: 8086
