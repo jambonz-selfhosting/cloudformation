@@ -1055,6 +1055,9 @@ Resources:
             Ebs:
               VolumeType: gp3
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
               DeleteOnTermination: true
         UserData:
           Fn::Base64:
@@ -1500,6 +1503,9 @@ Resources:
             Ebs:
               VolumeType: gp3
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
               DeleteOnTermination: true
         UserData:
           Fn::Base64:
@@ -1949,6 +1955,9 @@ Resources:
             Ebs:
               VolumeType: gp3
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
               DeleteOnTermination: true
         UserData:
           Fn::Base64:
@@ -2245,6 +2254,9 @@ Resources:
             Ebs:
               VolumeType: gp3
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
               DeleteOnTermination: true
         UserData:
           Fn::Base64: 
@@ -2513,6 +2525,9 @@ Resources:
             Ebs:
               VolumeType: gp3
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
               DeleteOnTermination: true
         UserData:
           Fn::Base64:

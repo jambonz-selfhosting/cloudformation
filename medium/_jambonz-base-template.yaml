@@ -1033,6 +1033,9 @@ Resources:
           - DeviceName: /dev/xvda
             Ebs:
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
         UserData:
           Fn::Base64:
             Fn::Sub:
@@ -1667,6 +1670,9 @@ Resources:
           - DeviceName: /dev/xvda
             Ebs:
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
         UserData:
           Fn::Base64:
             Fn::Sub:
@@ -2097,6 +2103,9 @@ Resources:
           - DeviceName: /dev/xvda
             Ebs:
               Encrypted: !If [EnableEBSEncryptionCondition, true, false]
+              # hydrate the root volume from the AMI snapshot at a fixed rate instead of lazily
+              # on first read (cold boots otherwise sit in iowait for minutes)
+              VolumeInitializationRate: 300
         UserData:
           Fn::Base64:
             Fn::Sub:
