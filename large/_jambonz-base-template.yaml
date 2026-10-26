@@ -1321,9 +1321,48 @@ Resources:
 #
 ###########################################
       
+  # read-only CloudWatch for Grafana's CloudWatch datasource (Data Stores dashboard: Aurora + ElastiCache)
+  MonitoringIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: jambonz monitoring server
+      RoleName: !Sub '${AWS::StackName}-monitoring-ec2-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: jambonz
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'cloudwatch:GetMetricData'
+                  - 'cloudwatch:GetMetricStatistics'
+                  - 'cloudwatch:ListMetrics'
+                  - 'cloudwatch:DescribeAlarms'
+                  - 'cloudwatch:DescribeAlarmsForMetric'
+                  - 'cloudwatch:DescribeAlarmHistory'
+                  - 'ec2:DescribeRegions'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeTags'
+                  - 'tag:GetResources'
+                Resource: '*'
+
+  MonitoringInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref MonitoringIamRole
+
   MonitoringServerEC2:
     Type: 'AWS::EC2::Instance'
     Properties:
+      IamInstanceProfile: !Ref MonitoringInstanceProfile
       MetadataOptions:
         HttpEndpoint: enabled
         HttpTokens: required
@@ -1370,7 +1409,28 @@ Resources:
                 sudo systemctl stop jaeger-query.service || true
                 sudo systemctl disable jaeger-query.service
               fi
+
+              # Data Stores dashboard (Aurora + ElastiCache from CloudWatch): the AMI stages it outside
+              # the provisioned folder; enable it with a CloudWatch datasource that uses the instance role
+              if [ -f /var/lib/grafana/dashboards-aws/grafana-dashboard-data-stores.json ]; then
+                echo "enabling CloudWatch datasource and data stores dashboard"
+                sudo tee /etc/grafana/provisioning/datasources/cloudwatch.yml > /dev/null <<EOF
+              apiVersion: 1
+              datasources:
+              - name: CloudWatch
+                type: cloudwatch
+                uid: cloudwatch
+                editable: true
+                jsonData:
+                  authType: default
+                  defaultRegion: ${AWS_REGION}
+              EOF
+                sudo chown grafana:grafana /etc/grafana/provisioning/datasources/cloudwatch.yml
+                sudo mv /var/lib/grafana/dashboards-aws/grafana-dashboard-data-stores.json /var/lib/grafana/dashboards/
+                sudo systemctl restart grafana-server
+              fi
             - EnableOpenTelemetry: !Ref EnableOpenTelemetry
+              AWS_REGION: !Ref AWS::Region
       Tags:
         -
           Key: Name
