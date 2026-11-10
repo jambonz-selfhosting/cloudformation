@@ -759,11 +759,12 @@ Resources:
               - 'route53:ChangeResourceRecordSets'
               - 'route53:ListResourceRecordSets'
             Resource: !Sub 'arn:${AWS::Partition}:route53:::hostedzone/${SipHostedZoneId}'
-          # certificate cache; whoever issues it also stores it
+          # certificate cache and the lock that lets one SBC issue at a time
           - Effect: Allow
             Action:
               - 'ssm:GetParameter'
               - 'ssm:PutParameter'
+              - 'ssm:DeleteParameter'
             Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${TlsCertParamPrefix}/${SipDomain}/*'
           - Effect: Allow
             Action:
