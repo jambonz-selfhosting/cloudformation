@@ -51,6 +51,8 @@ Metadata:
           default: "Networking - defaults suit most deployments"
         Parameters:
           - VpcCidr
+          - ExistingVpcId
+          - ExistingSubnetIds
           - PublicSubnetCIDR
           - PublicSubnetCIDR2
           - AllowedHttpCidr
@@ -67,6 +69,24 @@ Metadata:
           - CloudwatchLogRetention
           - EnableOpenTelemetry
           - EnableEBSEncryption
+      - Label:
+          default: "SIP TLS and WSS from Let's Encrypt - optional"
+        Parameters:
+          - EnableTLS
+          - SipDomain
+          - CertEmail
+          - SipHostedZoneId
+          - TlsCertParamPrefix
+      - Label:
+          default: "Mutual TLS on outbound calls - optional, needs EnableTLS"
+        Parameters:
+          - EnableMtls
+          - MtlsCaCertParam
+          - MtlsCaKeyParam
+          - MtlsCommonName
+          - MtlsCaFile
+          - MtlsVerifyServerCert
+          - MtlsVerifyServerName
     ParameterLabels:
       KeyName:
         default: "REQUIRED - EC2 key pair for SSH access"
@@ -78,6 +98,34 @@ Metadata:
         default: "optional - apiban.org API key (SIP blocklist)"
       KrispApiKey:
         default: "optional - Krisp API key"
+      ExistingVpcId:
+        default: "optional - deploy into this existing VPC (blank creates one)"
+      ExistingSubnetIds:
+        default: "optional - two public subnets in that VPC, comma separated"
+      EnableTLS:
+        default: "Get a Let's Encrypt certificate for SIP TLS and WSS?"
+      SipDomain:
+        default: "SIP domain the certificate covers"
+      CertEmail:
+        default: "Let's Encrypt registration email"
+      SipHostedZoneId:
+        default: "Route 53 hosted zone id of the SIP domain"
+      TlsCertParamPrefix:
+        default: "SSM prefix where the issued certificate is cached"
+      EnableMtls:
+        default: "Present a client certificate on outbound TLS?"
+      MtlsCaCertParam:
+        default: "SSM parameter: private CA certificate"
+      MtlsCaKeyParam:
+        default: "SSM parameter: private CA key (SecureString)"
+      MtlsCommonName:
+        default: "Client certificate CN (blank uses SipDomain)"
+      MtlsCaFile:
+        default: "Trust store for the carrier's certificate"
+      MtlsVerifyServerCert:
+        default: "Verify the carrier's certificate?"
+      MtlsVerifyServerName:
+        default: "Require the carrier's certificate to match the hostname?"
 
 Parameters:
   Architecture:
@@ -195,18 +243,30 @@ Parameters:
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
     Default: 0.0.0.0/0
   VpcCidr:
-    Description: CIDR range for the VPC.
+    Description: "CIDR range of the VPC. When creating a new VPC (ExistingVpcId left blank) this is the CIDR that gets created. When deploying into an existing VPC, set this to that VPC's own CIDR - it is used in security group rules that allow internal traffic between jambonz components."
     Type: String
     ConstraintDescription: must be a valid network CIDR
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
     Default: 172.20.0.0/16
+  ExistingVpcId:
+    Description: "Optional. Leave BLANK (the default) to create a new VPC, subnets, internet gateway and route table. To deploy into a VPC you already have, enter its id (e.g. vpc-0abc123def456789). You must then also set ExistingSubnetIds, and set VpcCidr above to that VPC's CIDR."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^vpc-[0-9a-f]{8,17}$
+    ConstraintDescription: must be blank, or a VPC id of the form vpc-0abc123def456789
+  ExistingSubnetIds:
+    Description: "Optional. Required only when ExistingVpcId is set: exactly TWO PUBLIC subnet ids in that VPC, in different availability zones, comma separated with no spaces (e.g. subnet-0aaa...,subnet-0bbb...). Both subnets need a default route to an internet gateway and auto-assign public IPv4 enabled; two AZs are required by the database, cache and load balancer. Ignored when creating a new VPC."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^subnet-[0-9a-f]{8,17},subnet-[0-9a-f]{8,17}$
+    ConstraintDescription: must be blank, or exactly two comma-separated subnet ids with no spaces (subnet-0aaa...,subnet-0bbb...)
   PublicSubnetCIDR:
-    Description: CIDR for the public subnet in the VPC
+    Description: "CIDR for the public subnet in the VPC. Ignored when ExistingVpcId is set."
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
     Type: String
     Default: 172.20.10.0/24
   PublicSubnetCIDR2:
-    Description: CIDR for a second public subnet that will be in a different availability zone
+    Description: "CIDR for a second public subnet that will be in a different availability zone. Ignored when ExistingVpcId is set."
     AllowedPattern: \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}
     Type: String
     Default: 172.20.11.0/24
@@ -273,8 +333,139 @@ Parameters:
     Type: Number
     Default: 200
     MinValue: 100
+  EnableTLS:
+    Description: "Get a wildcard Let's Encrypt certificate at boot (certbot, Route 53 DNS-01) and enable SIP over TLS (5061) and WSS (8443) on the SBC. Requires SipDomain, CertEmail and SipHostedZoneId, and the zone must be in Route 53 in this account. Leave false to use your own certificate instead: store it under /jambonz/<stack>/sbc in Parameter Store (see the README)."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  SipDomain:
+    Description: "Required when EnableTLS is true: the SIP domain the certificate is issued for, e.g. sip.example.com. *.sip.example.com is requested alongside it so accounts can register under their own SIP realm. Pass the bare domain."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$
+    ConstraintDescription: must be blank, or a lowercase domain name such as sip.example.com
+  CertEmail:
+    Description: "Required when EnableTLS is true: the email Let's Encrypt registers the certificate against and sends expiry notices to."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    ConstraintDescription: must be blank, or a valid email address
+  SipHostedZoneId:
+    Description: "Required when EnableTLS is true: the Route 53 hosted zone id for SipDomain, e.g. Z1234567890ABC. The SBC may write DNS records in this zone only."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^Z[A-Z0-9]{4,32}$
+    ConstraintDescription: must be blank, or a Route 53 hosted zone id such as Z1234567890ABC
+  TlsCertParamPrefix:
+    Description: "Parameter Store prefix where the issued certificate is cached (<prefix>/<SipDomain>/), so a replaced SBC reuses it instead of spending one of Let's Encrypt's 5 duplicate certificates per week. Stacks sharing a SIP domain should share it. The cache outlives the stack."
+    Type: String
+    Default: "/jambonz/tls"
+    AllowedPattern: ^/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$
+    ConstraintDescription: must begin with / and must not end with one, e.g. /jambonz/tls
+  EnableMtls:
+    Description: "Mutual TLS on outbound SIP: drachtio presents a client certificate, signed at boot by your private CA, when a carrier asks for one. Requires EnableTLS. MtlsVerifyServerCert and MtlsVerifyServerName apply to every outbound TLS connection - read them before enabling."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  MtlsCaCertParam:
+    Description: "Required when EnableMtls is true: Parameter Store name of the private CA certificate (PEM), e.g. /example/sip-mtls/client-ca-pem. The carrier loads this into its trust store."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be blank, or an SSM parameter name beginning with /
+  MtlsCaKeyParam:
+    Description: "Required when EnableMtls is true: Parameter Store name of the private CA key (PEM, SecureString). Every SBC can read it, and anyone holding it can issue certificates the carrier accepts - see the README."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be blank, or an SSM parameter name beginning with /
+  MtlsCommonName:
+    Description: "Optional: CN and SAN of the client certificate. Blank uses SipDomain. Set it only if the carrier asked for a specific name."
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$
+    ConstraintDescription: must be blank, or a lowercase domain name such as sip.example.com
+  MtlsCaFile:
+    Description: "Authorities allowed to sign the CARRIER's certificate on outbound TLS. The system bundle suits carriers using a public authority."
+    Type: String
+    Default: "/etc/ssl/certs/ca-certificates.crt"
+    AllowedPattern: ^/[A-Za-z0-9._/-]+$
+    ConstraintDescription: must be an absolute path
+  MtlsVerifyServerCert:
+    Description: "Verify the carrier's certificate against MtlsCaFile on EVERY outbound TLS connection, not only the mTLS carrier. Turning it on can break a trunk whose certificate does not chain to MtlsCaFile."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  MtlsVerifyServerName:
+    Description: "Require the carrier's certificate to match the dialled hostname on EVERY outbound TLS connection. Leave false if any trunk is configured by IP address."
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+
+Rules:
+  # rejected before any resource is created, not in the SBC boot log
+  TlsRequiresDomainEmailAndZone:
+    RuleCondition:
+      Fn::Equals: [{Ref: EnableTLS}, "true"]
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: SipDomain}, ""]
+        AssertDescription: "SipDomain is required when EnableTLS is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: CertEmail}, ""]
+        AssertDescription: "CertEmail is required when EnableTLS is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: SipHostedZoneId}, ""]
+        AssertDescription: "SipHostedZoneId is required when EnableTLS is true."
+  MtlsRequiresTlsAndCa:
+    RuleCondition:
+      Fn::Equals: [{Ref: EnableMtls}, "true"]
+    Assertions:
+      - Assert:
+          Fn::Equals: [{Ref: EnableTLS}, "true"]
+        AssertDescription: "EnableTLS must be true when EnableMtls is true - the client certificate is added to the TLS config it creates."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: MtlsCaCertParam}, ""]
+        AssertDescription: "MtlsCaCertParam is required when EnableMtls is true."
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: MtlsCaKeyParam}, ""]
+        AssertDescription: "MtlsCaKeyParam is required when EnableMtls is true."
+
+  # ExistingVpcId and ExistingSubnetIds only make sense together
+  SubnetsRequireExistingVpcId:
+    RuleCondition:
+      Fn::Equals: [{Ref: ExistingVpcId}, ""]
+    Assertions:
+      - Assert:
+          Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
+        AssertDescription: "ExistingSubnetIds must be left blank when ExistingVpcId is blank. Supplying subnets without a VPC id would silently create a brand new VPC and ignore them."
+  ExistingVpcIdRequiresSubnets:
+    RuleCondition:
+      Fn::Not:
+        - Fn::Equals: [{Ref: ExistingVpcId}, ""]
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Equals: [{Ref: ExistingSubnetIds}, ""]
+        AssertDescription: "ExistingSubnetIds is required when ExistingVpcId is set: exactly two public subnet ids in that VPC, in different availability zones."
 
 Conditions:
+  EnableTlsCondition: !Equals [!Ref EnableTLS, "true"]
+  EnableMtlsCondition: !Equals [!Ref EnableMtls, "true"]
+  HasMtlsCommonName: !Not [!Equals [!Ref MtlsCommonName, ""]]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
 
@@ -283,6 +474,9 @@ Conditions:
   UseDefaultWebMonitoringInstanceType: !Equals [!Ref InstanceTypeWebMonitoring, ""]
   UseDefaultFeatureServerInstanceType: !Equals [!Ref InstanceTypeFeatureServer, ""]
   UseDefaultRecordingInstanceType: !Equals [!Ref RecordingInstanceType, ""]
+
+  # Networking - create a new VPC unless the user pointed us at an existing one
+  CreateVpc: !Equals [!Ref ExistingVpcId, ""]
 
 Resources:
   EncryptionSecret:
@@ -545,6 +739,64 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc'
                   - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jambonz/${AWS::StackName}/sbc/*'
 
+  Route53CertbotPolicy:
+    Type: AWS::IAM::Policy
+    Condition: EnableTlsCondition
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-sbc-certbot'
+      Roles:
+        - !Ref SbcIamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'route53:ListHostedZones'
+              - 'route53:GetChange'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'route53:ChangeResourceRecordSets'
+              - 'route53:ListResourceRecordSets'
+            Resource: !Sub 'arn:${AWS::Partition}:route53:::hostedzone/${SipHostedZoneId}'
+          # certificate cache and the lock that lets one SBC issue at a time
+          - Effect: Allow
+            Action:
+              - 'ssm:GetParameter'
+              - 'ssm:PutParameter'
+              - 'ssm:DeleteParameter'
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${TlsCertParamPrefix}/${SipDomain}/*'
+          - Effect: Allow
+            Action:
+              - 'kms:Decrypt'
+              - 'kms:Encrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
+
+  MtlsCaPolicy:
+    Type: AWS::IAM::Policy
+    Condition: EnableMtlsCondition
+    Properties:
+      PolicyName: !Sub '${AWS::StackName}-sbc-mtls-ca'
+      Roles:
+        - !Ref SbcIamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 'ssm:GetParameter'
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaCertParam}'
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${MtlsCaKeyParam}'
+          - Effect: Allow
+            Action: 'kms:Decrypt'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
+
   FeatureServerIamRole:
     Type: AWS::IAM::Role
     Properties:
@@ -665,6 +917,7 @@ Resources:
 
   VPC:
     Type: AWS::EC2::VPC
+    Condition: CreateVpc
     Properties:
       EnableDnsSupport: true
       EnableDnsHostnames: true
@@ -673,10 +926,12 @@ Resources:
   # Create Internet Gateway
   InternetGateway:
     Type: "AWS::EC2::InternetGateway"
+    Condition: CreateVpc
 
   # Attach Internet Gateway to VPC 
   GatewayToInternet:
     Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
@@ -684,6 +939,7 @@ Resources:
   # Create Public Subnet
   PublicSubnet1:
     Type: AWS::EC2::Subnet
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Ref PublicSubnetCIDR
@@ -693,6 +949,7 @@ Resources:
   # Create a second Public Subnet in a different availability zone
   PublicSubnet2:
     Type: AWS::EC2::Subnet
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Ref PublicSubnetCIDR2
@@ -702,12 +959,14 @@ Resources:
   # Create Public Route Table
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
+    Condition: CreateVpc
     Properties:
       VpcId: !Ref VPC
 
   # Route-out Public Route Table to Internet Gateway (Internet connection)
   PublicRouteIGW1:
     Type: AWS::EC2::Route
+    Condition: CreateVpc
     DependsOn: GatewayToInternet
     Properties:
       RouteTableId: !Ref PublicRouteTable
@@ -717,12 +976,14 @@ Resources:
   # Associate Public Route Table with Public Subnet1
   PublicSubnetRouteTableAssociation1:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateVpc
     Properties:
       SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
 
   PublicSubnetRouteTableAssociation2:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateVpc
     Properties:
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
@@ -732,7 +993,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-ssh-sg'
       GroupDescription: Security group for ssh to jambonz cluster
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -748,7 +1009,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-redis-sg'
       GroupDescription: Security group for jambonz Redis
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 6379
@@ -769,7 +1030,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-mysql-sg'
       GroupDescription: Security group for jambonz MySQL
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3306
@@ -790,7 +1051,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-feature-server-sg'
       GroupDescription: Security group for jambonz Feature Server
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3000
@@ -826,7 +1087,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-sbc-sg'
       GroupDescription: Security group for Sbc  Server
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3000
@@ -897,7 +1158,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-web-monitoring-sg'
       GroupDescription: Security group for jambonz web and monitoring server
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -978,7 +1239,7 @@ Resources:
       Properties:
         GroupName: !Sub '${AWS::StackName}-recording-alb-sg'
         GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server ALB'
-        VpcId: !Ref VPC
+        VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
         SecurityGroupIngress:
           - IpProtocol: tcp
             FromPort: 80
@@ -999,7 +1260,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-recording-instance-sg'
       GroupDescription: !Sub 'Security group for ${AWS::StackName} Recording Server instances'
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3000
@@ -1109,8 +1370,8 @@ Resources:
     Properties:
       Scheme: internal
       Subnets: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       SecurityGroups:
         - !Ref RecordingALBSecurityGroup
       LoadBalancerAttributes:
@@ -1125,7 +1386,7 @@ Resources:
     Properties:
       Port: 3000
       Protocol: HTTP
-      VpcId: !Ref VPC
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref ExistingVpcId]
       HealthCheckProtocol: HTTP
       HealthCheckPort: "3000"
       HealthCheckPath: "/health"
@@ -1150,8 +1411,8 @@ Resources:
     Properties:
       AutoScalingGroupName: !Sub "${AWS::StackName}-recording-asg"
       VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       LaunchTemplate:
         LaunchTemplateId: !Ref RecordingLaunchTemplate
         Version: !GetAtt RecordingLaunchTemplate.LatestVersionNumber
@@ -1212,8 +1473,8 @@ Resources:
       DBSubnetGroupName: !Sub '${AWS::StackName}-mysql-subnetgroup'
       DBSubnetGroupDescription: CloudFormation managed DB subnet group
       SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
         
   DatabaseCluster:
     Type: AWS::RDS::DBCluster
@@ -1270,8 +1531,8 @@ Resources:
       CacheSubnetGroupName: !Sub '${AWS::StackName}-jambonz-cache-subnetgroup'
       Description: !Sub jambonz elasticcache Subnet Group
       SubnetIds:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
         
   ElastiCacheParameterGroup:
     Type: AWS::ElastiCache::ParameterGroup
@@ -1317,7 +1578,7 @@ Resources:
         HttpEndpoint: enabled
         HttpTokens: required
         HttpPutResponseHopLimit: 1
-      SubnetId: !Ref PublicSubnet1
+      SubnetId: !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
       ImageId: !FindInMap [ "Arch2AMI", !Ref Architecture, "WebMonitoringAmi"]
       InstanceType: !If
         - UseDefaultWebMonitoringInstanceType
@@ -1408,7 +1669,10 @@ Resources:
                 JAMBONES_ADMIN_INITIAL_PASSWORD=$ADMIN_INITIAL_PASSWORD JAMBONES_MYSQL_HOST=${JAMBONES_MYSQL_HOST} JAMBONES_MYSQL_USER=admin JAMBONES_MYSQL_DATABASE=jambones $HOME/apps/api-server/db/reset_admin_password.js
 
                 # add row to system information table
-                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\''sip.'"${URLPortal}"''\'', '\''grafana.'"${URLPortal}"''\'')'
+                # must be the name the TLS certificate covers
+                SIP_DOMAIN_DB="${SipDomain}"
+                [ -z "$SIP_DOMAIN_DB" ] && SIP_DOMAIN_DB="sip.${URLPortal}"
+                mysql -h ${JAMBONES_MYSQL_HOST} -u admin -D jambones -e $'insert into system_information (domain_name, sip_domain_name, monitoring_domain_name) values ('\'''"${URLPortal}"''\'', '\'''"$SIP_DOMAIN_DB"''\'', '\''grafana.'"${URLPortal}"''\'')'
 
                 # record the schema version so upgrade-jambonz-db.js knows the DB is initialized
                 SCHEMA_VERSION=$(node -p "require('$HOME/apps/api-server/package.json').version")
@@ -2012,8 +2276,10 @@ Resources:
 
                 # SIP over TLS (5061) and WSS (8443): installs the certificate from /jambonz/<stack>/sbc
                 # in Parameter Store if one is there (see the README); otherwise they stay off
-                sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/${AWS::StackName}/sbc ${AWS_REGION} \
-                  || echo "WARNING: SIP over TLS and WSS not enabled, see the message above"
+                if [[ "${EnableTLS}" != "true" ]]; then
+                  sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/${AWS::StackName}/sbc ${AWS_REGION} \
+                    || echo "WARNING: SIP over TLS and WSS not enabled, see the message above"
+                fi
 
                 sudo systemctl daemon-reload
                 sudo systemctl restart rtpengine
@@ -2047,6 +2313,15 @@ Resources:
                   sudo rm -f /etc/cron.d/apiban-client
                 fi
   
+                if [[ "${EnableTLS}" == "true" ]]; then
+                  echo "SIP TLS for ${SipDomain} (${TlsPolicyDep})"
+                  sudo /usr/local/bin/drachtio_tls.sh "${SipDomain}" "${CertEmail}" "${TlsCertParamPrefix}" ${AWS_REGION} || echo "WARNING: SIP TLS setup failed"
+                fi
+                if [[ "${EnableMtls}" == "true" ]]; then
+                  echo "mTLS (${MtlsPolicyDep})"
+                  sudo /usr/local/bin/drachtio_mtls.sh "${MtlsCn}" "${MtlsCaCertParam}" "${MtlsCaKeyParam}" ${AWS_REGION} "${MtlsCaFile}" "${MtlsVerifyServerName}" "${MtlsVerifyServerCert}" || echo "WARNING: mTLS setup failed"
+                fi
+
                 echo "user data script completed"
               - ApibanKey: !Ref ApibanKey
                 VPC_CIDR: !Ref VpcCidr
@@ -2059,6 +2334,10 @@ Resources:
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 EnablePcaps: !Ref EnablePcaps
+                MtlsCn: !If [HasMtlsCommonName, !Ref MtlsCommonName, !Ref SipDomain]
+                # referenced so the instances wait for the policies to attach
+                TlsPolicyDep: !If [EnableTlsCondition, !Ref Route53CertbotPolicy, 'unused']
+                MtlsPolicyDep: !If [EnableMtlsCondition, !Ref MtlsCaPolicy, 'unused']
 
   SbcServerPlacementGroup:
     Type: AWS::EC2::PlacementGroup
@@ -2082,8 +2361,8 @@ Resources:
       TerminationPolicies:
        - OldestInstance
       VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       Tags:
         - 
           Key: Name
@@ -2311,8 +2590,8 @@ Resources:
       TerminationPolicies:
        - OldestInstance
       VPCZoneIdentifier: 
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !If [CreateVpc, !Ref PublicSubnet1, !Select [0, !Split [",", !Ref ExistingSubnetIds]]]
+        - !If [CreateVpc, !Ref PublicSubnet2, !Select [1, !Split [",", !Ref ExistingSubnetIds]]]
       Tags:
         - 
           Key: Name

@@ -22,7 +22,9 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `AllowedHttpCidr` | CIDR for HTTP/HTTPS access | 0.0.0.0/0 |
 | `AllowedSipCidr` | CIDR for SIP access | 0.0.0.0/0 |
 | `AllowedRtpCidr` | CIDR for RTP traffic | 0.0.0.0/0 |
-| `VpcCidr` | CIDR range for the VPC | 10.0.0.0/16 |
+| `VpcCidr` | CIDR range of the VPC. When using an existing VPC, set this to that VPC's CIDR | 10.0.0.0/16 |
+| `ExistingVpcId` | Optional. Blank creates a new VPC; set to a `vpc-...` id to deploy into a VPC you already have | (blank) |
+| `ExistingSubnetIds` | Optional. Required when `ExistingVpcId` is set: the id of one public subnet in that VPC | (blank) |
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `URLPortal` | DNS name for the portal | (required) |
@@ -38,6 +40,82 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 > `c7g.large` (or `t4g`/`c6g` where `c7g` is unavailable). If you set `InstanceType`
 > explicitly, match it to the selected architecture. arm64 availability is region-dependent —
 > see the top-level README.
+
+## Deploying into an existing VPC
+
+By default the stack creates its own VPC, subnet, internet gateway and route table, and
+nothing else is required. To deploy into a VPC you already have, set these parameters:
+
+| Parameter | Example |
+|-----------|---------|
+| `ExistingVpcId` | `vpc-0abc123def456789` |
+| `ExistingSubnetIds` | `subnet-0abc123def456789` — exactly one public subnet id |
+| `VpcCidr` | `10.0.0.0/16` — the CIDR of that VPC, **not** a new range |
+
+Leave `ExistingVpcId` blank and the stack behaves exactly as it always has.
+
+Both new parameters are validated before any resource is created, so a typo, a stray space,
+or setting one without the other is rejected in seconds instead of failing part-way through
+a create and rolling back.
+
+### `ExistingVpcId` cannot be changed after the stack is created
+
+Treat it as a create-time-only decision. Switching a live stack from its own VPC to an
+existing one (or back) moves the instance to another subnet, and `SubnetId` is a replacement
+property: CloudFormation builds a new instance and deletes the old one, together with the MySQL
+and Redis data it holds.
+
+The dangerous direction is accidental. **CloudFormation substitutes the template default
+for any parameter you omit on an update — it does not keep the previous value.** So an
+update that forgets `ExistingVpcId` silently flips back to "create a new VPC", and because
+`SubnetId` is a replacement property, the single instance — which holds MySQL and Redis,
+and therefore every account, application and CDR — is **replaced and its data lost**,
+while the stack reports `UPDATE_COMPLETE`. Always pass
+it explicitly, or use `--parameters ParameterKey=ExistingVpcId,UsePreviousValue=true`, on
+every update. `aws cloudformation deploy` and console updates that start from the existing
+parameter set are not affected.
+
+### Requirements for the VPC and subnet you supply
+
+- **The subnet must be public.** It needs a default route (`0.0.0.0/0`) to an internet
+  gateway. jambonz needs a public IP for SIP, RTP and the portal, and the instance
+  downloads packages from the internet on first boot. A private subnet behind a NAT
+  gateway will not work.
+- **`VpcCidr` must match the existing VPC's CIDR.** CloudFormation cannot look up the CIDR
+  of an existing VPC, so you have to tell it. It drives the security group rules that allow
+  internal RTP and SMPP traffic. Nothing checks it, and nothing fails at deploy time if it
+  is wrong — the stack reaches `CREATE_COMPLETE` and traffic is silently misrouted.
+- **The subnet needs free addresses** and must be in the region the template was generated
+  for.
+- **Check the subnet's Network ACL.** A fresh VPC gets an allow-all NACL, so this never
+  mattered before. A locked-down enterprise subnet that only permits 80/443 will
+  statelessly drop SIP (5060/5061/8443) and RTP (UDP 40000-60000) while every security
+  group still looks correct — calls connect with no audio.
+- **DNS resolution and DNS hostnames should be enabled** on the VPC. The stack enables both
+  on the VPC it creates. Note that `enableDnsHostnames` is **off** by default for a VPC you
+  created yourself, so check rather than assume.
+
+### Security: what `VpcCidr` opens up in a shared VPC
+
+Two of mini's ingress rules are written against `VpcCidr` rather than against a specific
+source: RTP (UDP 40000-60000) and SMPP (TCP 3020). When the stack created its own VPC, that
+CIDR meant "jambonz only". In a VPC you share with other workloads it means any instance,
+VPC-attached Lambda or container in that VPC can reach those two ports.
+
+Mini is all-in-one, so this is milder than it is for the medium and large deployments —
+MySQL and Redis run on the instance itself and are never exposed to the network at all. But
+if the two rules above are not acceptable in your VPC, narrow `AllowedRtpCidr` and deploy
+into a VPC dedicated to jambonz.
+
+### What the stack does and does not touch
+
+It still creates its own security groups and Elastic IP, inside your VPC. It does not add,
+remove or modify any subnet, route table, route or gateway in your VPC.
+
+One exception on teardown: the Elastic IP carries `DeletionPolicy: Retain`, so
+`delete-stack` reaches `DELETE_COMPLETE` and leaves it allocated and billed — and mini's
+Elastic IP is untagged, so months later it is an unattached address with nothing to say
+which stack created it. Release it by hand after deleting the stack.
 
 ## Generate and Deploy
 
@@ -144,6 +222,34 @@ sudo /usr/local/bin/jambonz-sip-tls.sh /jambonz/jambonz-mini/sbc us-west-2 && su
 ```
 
 The parameters are yours: deleting the stack does not delete them.
+
+#### Or let each SBC get a Let's Encrypt certificate (`EnableTLS`)
+
+If the SIP domain's DNS zone is in Route 53 in this account, set `EnableTLS=true` with `SipDomain`,
+`CertEmail` and `SipHostedZoneId`. At boot each SBC runs `drachtio_tls.sh` from the AMI: certbot
+gets a certificate for `SipDomain` and `*.SipDomain` through a Route 53 DNS-01 challenge, then
+renews it automatically. The certificate is cached under `TlsCertParamPrefix/<SipDomain>/` in
+Parameter Store, so replacement SBCs reuse it instead of using up Let's Encrypt's limit of 5
+duplicate certificates per week. When `EnableTLS` is true, the `/jambonz/<stack-name>/sbc`
+parameters above are ignored. `SipDomain` is also written to the database as the SIP domain.
+
+#### Mutual TLS on outbound calls (`EnableMtls`)
+
+Some carriers require the SBC to present a client certificate. Store a private CA in Parameter
+Store (the certificate as a String, the key as a SecureString) and set `EnableMtls=true` with
+`MtlsCaCertParam` and `MtlsCaKeyParam`. `EnableTLS` must also be true. At boot, each SBC runs
+`drachtio_mtls.sh`: it signs a one-year client certificate with its own key, adds it to drachtio,
+and renews it weekly. Give the carrier the CA certificate, never the key. Every SBC can read the
+CA key, and anyone who has it can issue certificates the carrier will accept.
+
+#### Turning `EnableTLS` or `EnableMtls` on or off for a running stack
+
+Both scripts run only when an instance first boots, so a stack update changes nothing on the SBCs
+that are already running. Replace them after the update: on medium and large, terminate each
+SBC in its Auto Scaling group, one at a time. On mini, run the two commands from the user data by
+hand, because replacing the instance would delete its database. When turning a feature off on mini,
+also stop its renewal timer: `sudo systemctl disable --now drachtio-tls-renew.timer` (or
+`drachtio-mtls-renew.timer`). A replaced SBC never has them.
 
 ## First time login
 
