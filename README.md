@@ -134,6 +134,23 @@ After deploying any stack:
 
 ## FAQ
 
+### Can I deploy into a VPC I already have?
+
+Yes, for all three sizes. By default every template creates its own VPC, subnets, internet
+gateway and route tables. To use an existing VPC instead, set the `ExistingVpcId` and
+`ExistingSubnetIds` parameters at deploy time and set `VpcCidr` to the existing VPC's CIDR.
+Mini takes one public subnet id; medium and large take exactly two, in different
+availability zones, comma separated with no spaces.
+
+The subnets must be public, with a default route to an internet gateway and auto-assign
+public IPv4 enabled — jambonz needs public IPs for SIP, RTP and the portal. Read the
+per-size README before you deploy: several of the requirements fail *silently*, leaving a
+green stack and a broken cluster, and `ExistingVpcId` cannot be changed once the stack
+exists. [mini](mini/README.md), [medium](medium/README.md), [large](large/README.md).
+
+Leaving `ExistingVpcId` blank keeps the original behaviour, so existing stacks are
+unaffected.
+
 ### Why do I need to copy AMIs to my account?
 
 Copying AMIs to your AWS account gives you ownership and control:
