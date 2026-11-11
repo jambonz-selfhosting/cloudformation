@@ -1175,11 +1175,14 @@ Resources:
           ToPort: 3000
           SourceSecurityGroupId: !Ref FeatureServerSecurityGroup
           Description: Allow HTTP access from feature servers
+        # VPC only: the portal and API clients reach the api-server through nginx on 80/443.
+        # A direct :3000 request bypasses nginx, which sets the X-Forwarded-For that the
+        # api-server trusts for req.ip (JAMBONES_TRUST_PROXY=1) and keys its rate limits on.
         - IpProtocol: tcp
           FromPort: 3000
           ToPort: 3000
-          CidrIp: !Ref AllowedHttpCidr
-          Description: Allow api access
+          CidrIp: !Ref VpcCidr
+          Description: Allow api access from the VPC
         - IpProtocol: tcp
           FromPort: 4000
           ToPort: 4000
