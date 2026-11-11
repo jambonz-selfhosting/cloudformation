@@ -1859,6 +1859,15 @@ Resources:
                 sudo systemctl disable jaeger-query.service
               fi
 
+              # Jambonz Metrics dashboard: the AMI's copy queries datasource uid PD39DF8CE8C1D829D, but
+              # datasource.yml provisions the telegraf datasource as uid influxdb-telegraf, so every panel
+              # shows "Datasource PD39DF8CE8C1D829D was not found". Point the dashboard at the provisioned
+              # datasource (Grafana's file provisioner reloads it); a no-op once the AMI's copy is fixed.
+              if sudo grep -q PD39DF8CE8C1D829D /var/lib/grafana/dashboards/grafana-dashboard-jambonz-medium.json 2>/dev/null; then
+                echo "pointing the Jambonz Metrics dashboard at the influxdb-telegraf datasource"
+                sudo sed -i 's/PD39DF8CE8C1D829D/influxdb-telegraf/g' /var/lib/grafana/dashboards/grafana-dashboard-jambonz-medium.json
+              fi
+
               # Data Stores dashboard (Aurora + ElastiCache from CloudWatch): the AMI stages it outside
               # the provisioned folder; enable it with a CloudWatch datasource that uses the instance role
               if [ -f /var/lib/grafana/dashboards-aws/grafana-dashboard-data-stores.json ]; then
