@@ -37,6 +37,7 @@ Metadata:
         Parameters:
           - ApibanKey
           - KrispApiKey
+          - AicApiKey
       - Label:
           default: "Compute - defaults suit most deployments"
         Parameters:
@@ -108,6 +109,8 @@ Metadata:
         default: "optional - apiban.org API key (SIP blocklist)"
       KrispApiKey:
         default: "optional - Krisp API key"
+      AicApiKey:
+        default: "optional - ai-coustics SDK license key"
       WebServerDeployment:
         default: "Web tier deployment (single-instance or autoscaling-alb)"
       HostedZoneId:
@@ -367,6 +370,11 @@ Parameters:
     Default: ""
   KrispApiKey:
     Description: "Optional Krisp API key for noise isolation and turn taking"
+    Type: String
+    NoEcho: true
+    Default: ""
+  AicApiKey:
+    Description: "Optional ai-coustics SDK license key for the aicoustics noise isolation and VAD vendors (obtain from ai-coustics)"
     Type: String
     NoEcho: true
     Default: ""
@@ -2339,6 +2347,7 @@ Resources:
                 # configure mediajam media server (replaces freeswitch)
                 # mediajam doesn't use MySQL; redis is for the license loader.
                 sudo sed -i -e "s|^KRISP_API_KEY=.*|KRISP_API_KEY=${KrispApiKey}|" /etc/default/mediajam
+                sudo sed -i -e "s|^AIC_SDK_LICENSE=.*|AIC_SDK_LICENSE=${AicApiKey}|" /etc/default/mediajam
                 sudo sed -i -e "s|^#\?JAMBONES_REDIS_HOST=.*|JAMBONES_REDIS_HOST=${JAMBONES_REDIS_HOST}|" /etc/default/mediajam
                 sudo sed -i -e "s|^#\?JAMBONES_REDIS_PORT=.*|JAMBONES_REDIS_PORT=6379|" /etc/default/mediajam
 
@@ -2448,6 +2457,7 @@ Resources:
                 CloudwatchLogRetention: !If [ShouldEnableCloudWatch, !Ref CloudwatchLogRetention, 0]
                 DbCachingTTS: !Ref DbCachingTTS
                 KrispApiKey: !Ref KrispApiKey
+                AicApiKey: !Ref AicApiKey
                 EnableOpenTelemetry: !Ref EnableOpenTelemetry
                 RecordingWsBaseUrl: !Sub "ws://${RecordingApplicationLoadBalancer.DNSName}"
                 WEB_SCHEME: !If [UseWebAsg, https, http]
