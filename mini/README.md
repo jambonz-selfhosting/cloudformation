@@ -29,6 +29,7 @@ This directory contains the base CloudFormation template for "jambonz mini" - a 
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `URLPortal` | DNS name for the portal | (required) |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
+| `AicApiKey` | Optional ai-coustics SDK license key for the aicoustics noise isolation and VAD vendors (obtain from ai-coustics) | (none) |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | true |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
 

@@ -60,6 +60,7 @@ The large deployment creates:
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
+| `AicApiKey` | Optional ai-coustics SDK license key for the aicoustics noise isolation and VAD vendors (obtain from ai-coustics) | (none) |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
 | `DbCachingTTS` | Seconds to cache DB query results (0=no caching) | 0 |
 | `StatsSampleRate` | Sampling rate for metrics (0-1) | 1 |
