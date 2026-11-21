@@ -61,6 +61,7 @@ The large deployment creates:
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
 | `PermissionsBoundaryArn` | Optional. ARN of an IAM managed policy set as the permissions boundary on every role the stack creates, for AWS Organizations that require one | (blank) |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
+| `AicApiKey` | Optional ai-coustics SDK license key for the aicoustics noise isolation and VAD vendors (obtain from ai-coustics) | (none) |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
 | `DbCachingTTS` | Seconds to cache DB query results (0=no caching) | 0 |
 | `StatsSampleRate` | Sampling rate for metrics (0-1) | 1 |
