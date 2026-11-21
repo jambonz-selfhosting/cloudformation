@@ -80,6 +80,10 @@ Metadata:
           - EnableOpenTelemetry
           - EnableEBSEncryption
       - Label:
+          default: "AWS Organization policies - optional, leave blank unless required"
+        Parameters:
+          - PermissionsBoundaryArn
+      - Label:
           default: "SIP TLS and WSS from Let's Encrypt - optional"
         Parameters:
           - EnableTLS
@@ -360,6 +364,12 @@ Parameters:
       - true
       - false
     Default: true
+  PermissionsBoundaryArn:
+    Description: "Optional. ARN of an IAM managed policy to set as the permissions boundary on every IAM role this stack creates. Leave blank unless your AWS Organization requires one."
+    Type: String
+    Default: ""
+    AllowedPattern: "^$|^arn:aws[a-z-]*:iam::[0-9]{12}:policy/.+$"
+    ConstraintDescription: "must be blank or an IAM policy ARN (arn:aws:iam::<account>:policy/<name>)"
   ApibanKey:
     Description: "Optional apiban.org API key for the SIP blocklist on the SBC (get one at https://www.apiban.org). Leave blank to run without apiban."
     Type: String
@@ -533,6 +543,7 @@ Conditions:
   CreateWebCertificate: !And [!Condition CreateWebDnsRecords, !Equals [!Ref WebCertificateArn, ""]]
   ShouldEnableCloudWatch: !Equals [!Ref Cloudwatch, "true"]
   EnableEBSEncryptionCondition: !Equals [!Ref EnableEBSEncryption, "true"]
+  HasPermissionsBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
 
   # Instance type conditions - use regional defaults when parameter is blank
   UseDefaultSbcSipInstanceType: !Equals [!Ref InstanceTypeSbcSip, ""]
@@ -615,6 +626,7 @@ Resources:
   SsmSecretsRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Description: Copies the stack's generated secrets into SSM Parameter Store
       AssumeRolePolicyDocument:
         Statement:
@@ -751,6 +763,7 @@ Resources:
   RecordingIamRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Description: jambonz recording servers
       RoleName: !Sub '${AWS::StackName}-recording-ec2-role'
       AssumeRolePolicyDocument:
@@ -1532,6 +1545,7 @@ Resources:
   MonitoringIamRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Description: jambonz monitoring server
       RoleName: !Sub '${AWS::StackName}-monitoring-ec2-role'
       AssumeRolePolicyDocument:
@@ -1670,6 +1684,7 @@ Resources:
   SbcSipIamRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Description: jambonz SBC SIP servers
       RoleName: !Sub '${AWS::StackName}-sbc-sip-ec2-role'
       AssumeRolePolicyDocument:
@@ -2216,6 +2231,7 @@ Resources:
   FeatureServerIamRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Description: jambonz feature servers
       RoleName: !Sub '${AWS::StackName}-feature-server-ec2-role'
       AssumeRolePolicyDocument:
@@ -2509,6 +2525,7 @@ Resources:
   SbcRtpServerIamRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Description: jambonz SBC RTP servers
       RoleName: !Sub '${AWS::StackName}-sbc-rtp-ec2-role'
       AssumeRolePolicyDocument:
@@ -2794,6 +2811,7 @@ Resources:
   WebServerIamRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref AWS::NoValue]
       Description: jambonz web servers
       RoleName: !Sub '${AWS::StackName}-webserver-ec2-role'
       AssumeRolePolicyDocument:

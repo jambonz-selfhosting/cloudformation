@@ -59,6 +59,7 @@ The large deployment creates:
 | `Cloudwatch` | Enable CloudWatch logging | true |
 | `CloudwatchLogRetention` | Days to retain CloudWatch logs (1–365). Enforced on the log groups: a shorter value deletes older events. SOC 2 typically expects ≥ 90 | 90 |
 | `EnableEBSEncryption` | Encrypt all EBS volumes | no |
+| `PermissionsBoundaryArn` | Optional. ARN of an IAM managed policy set as the permissions boundary on every role the stack creates, for AWS Organizations that require one | (blank) |
 | `KrispApiKey` | Optional Krisp API key for noise isolation and turn-taking (contact support@jambonz.org for info) | (none) |
 | `EnableOpenTelemetry` | Enable OpenTelemetry tracing (Cassandra, Jaeger). Increases resource usage | false |
 | `DbCachingTTS` | Seconds to cache DB query results (0=no caching) | 0 |
