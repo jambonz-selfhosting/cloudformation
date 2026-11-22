@@ -15,936 +15,936 @@
 mini:
   us-east-1:
     amd64:
-      MiniAmi: ami-087fd21273a68b213
+      MiniAmi: ami-08c6cf62ac3afacb4
     arm64:
-      MiniAmi: ami-024c87990545ba4a9
+      MiniAmi: ami-0d8954b203a6b4505
   us-east-2:
     amd64:
-      MiniAmi: ami-00b125ce4d8f81ce6
+      MiniAmi: ami-084f20030177b6f19
     arm64:
-      MiniAmi: ami-0d08e6faf33dd705b
+      MiniAmi: ami-0e545df8de638c90f
   us-west-1:
     amd64:
-      MiniAmi: ami-07d357434c87ceaf9
+      MiniAmi: ami-0467823cd60910d59
     arm64:
-      MiniAmi: ami-0f9da7b899e18a42e
+      MiniAmi: ami-0db738c3b9e5c2aca
   us-west-2:
     amd64:
-      MiniAmi: ami-05c2d9720c9dbce9f
+      MiniAmi: ami-01379c3def1aaf0d5
     arm64:
-      MiniAmi: ami-0867770608b01bd0c
+      MiniAmi: ami-0cd9941a88d88fb66
   ca-central-1:
     amd64:
-      MiniAmi: ami-079aa61b80c001bcb
+      MiniAmi: ami-007a61fd79c0bd5dd
     arm64:
-      MiniAmi: ami-0d0908e69cdffeca8
+      MiniAmi: ami-091f2480f05ada91d
   ca-west-1:
     amd64:
-      MiniAmi: ami-07c911916846f7b78
+      MiniAmi: ami-0e7de239f8950417b
     arm64:
-      MiniAmi: ami-0b81e1ba1eff5c39a
+      MiniAmi: ami-011b1d6c9c2603a06
   sa-east-1:
     amd64:
-      MiniAmi: ami-02132f61a1bd9f47d
+      MiniAmi: ami-0e3157d52dabe4fea
     arm64:
-      MiniAmi: ami-0f356bf3eb9b6f16e
+      MiniAmi: ami-0ae81fd82d6d322e8
   mx-central-1:
     amd64:
-      MiniAmi: ami-02fc89e24abd9ff94
+      MiniAmi: ami-0ab0e622ad345e5e2
     arm64:
-      MiniAmi: ami-04ad555199aa48ba9
+      MiniAmi: ami-0b048c082744171ba
   eu-central-1:
     amd64:
-      MiniAmi: ami-0bb9586c172182eb9
+      MiniAmi: ami-0eea3e8ea75ed803c
     arm64:
-      MiniAmi: ami-052650eba2a83859c
+      MiniAmi: ami-043cb98a949045ca3
   eu-central-2:
     amd64:
-      MiniAmi: ami-0a05b52ef0ac448bf
+      MiniAmi: ami-091b2270092f3aa15
     arm64:
-      MiniAmi: ami-01e11191f062fa047
+      MiniAmi: ami-03df168f587fe2df4
   eu-west-1:
     amd64:
-      MiniAmi: ami-0947dc03b7a7798f3
+      MiniAmi: ami-02559fea401325f62
     arm64:
-      MiniAmi: ami-0cb50cd9edb6cdd45
+      MiniAmi: ami-0c6313d66a789e442
   eu-west-2:
     amd64:
-      MiniAmi: ami-05bd9e154ac4b75c8
+      MiniAmi: ami-036378a81401b761b
     arm64:
-      MiniAmi: ami-02fdc5983ed00c795
+      MiniAmi: ami-060df6f6612284a2d
   eu-west-3:
     amd64:
-      MiniAmi: ami-092637c0c2338a8c3
+      MiniAmi: ami-01aa1638cb20f0849
     arm64:
-      MiniAmi: ami-01114b6ad99a4df7c
+      MiniAmi: ami-06a66118cc66fe6d5
   eu-north-1:
     amd64:
-      MiniAmi: ami-0a7e6fea5a64b4a9a
+      MiniAmi: ami-009dc43ecc4d5437d
     arm64:
-      MiniAmi: ami-0b49e8d97944741f6
+      MiniAmi: ami-034eb5eb83f54da04
   eu-south-1:
     amd64:
-      MiniAmi: ami-00cb3054aee824979
+      MiniAmi: ami-0746ca9eae58c3710
     arm64:
-      MiniAmi: ami-0279630bbafca47a2
+      MiniAmi: ami-082df82571b5b28cd
   eu-south-2:
     amd64:
-      MiniAmi: ami-031718303e121a3ba
+      MiniAmi: ami-06a9859c94c843a16
     arm64:
-      MiniAmi: ami-0ef58a75f00379c50
+      MiniAmi: ami-04d64fe0e5e0df6b0
   ap-south-1:
     amd64:
-      MiniAmi: ami-02959264314caff54
+      MiniAmi: ami-0d713e5a8dc5297be
     arm64:
-      MiniAmi: ami-09a1876e8c1507742
+      MiniAmi: ami-076b0b440239c5891
   ap-south-2:
     amd64:
-      MiniAmi: ami-0603cd0dd8e2eedaa
+      MiniAmi: ami-0eb15239a7de4e137
     arm64:
-      MiniAmi: ami-0e0aeaa80131336b2
+      MiniAmi: ami-05291b0939c99739e
   ap-east-1:
     amd64:
-      MiniAmi: ami-02132630eb19adf05
+      MiniAmi: ami-0fe92e79e1c282320
     arm64:
-      MiniAmi: ami-0a65f85e30dafc350
+      MiniAmi: ami-0cc6e264287ac98e0
   ap-east-2:
     amd64:
-      MiniAmi: ami-047146f2c21a68a8d
+      MiniAmi: ami-0c80f0ca81796ea8b
     arm64:
-      MiniAmi: ami-0fe99d42bb83c0048
+      MiniAmi: ami-0cd4e0059310b5c5a
   ap-southeast-1:
     amd64:
-      MiniAmi: ami-0c1206a467d946775
+      MiniAmi: ami-0455b7c40bfb554ff
     arm64:
-      MiniAmi: ami-0cd5f5d6d2b19c4dd
+      MiniAmi: ami-04e75fc771339b32f
   ap-southeast-2:
     amd64:
-      MiniAmi: ami-080ada5b047a8f236
+      MiniAmi: ami-04a8bb986bab48bb2
     arm64:
-      MiniAmi: ami-06e9f3453a5fa1e53
+      MiniAmi: ami-051bf7878e191fe87
   ap-southeast-3:
     amd64:
-      MiniAmi: ami-01ef70f3f68730a53
+      MiniAmi: ami-06612f89c0e0e441e
     arm64:
-      MiniAmi: ami-0cd6aa4217bb20db3
+      MiniAmi: ami-04f875f03bd8b083a
   ap-southeast-4:
     amd64:
-      MiniAmi: ami-09c4f2d9cbd3737ca
+      MiniAmi: ami-08ebaf2b1625db8aa
     arm64:
-      MiniAmi: ami-0df8671e916fbda79
+      MiniAmi: ami-00a43a15689e71470
   ap-southeast-5:
     amd64:
-      MiniAmi: ami-0634328da4dbc3ad9
+      MiniAmi: ami-03513e2c3e82ce4ed
     arm64:
-      MiniAmi: ami-0892b0444d3802736
+      MiniAmi: ami-06c329774bf2d6418
   ap-southeast-6:
     amd64:
-      MiniAmi: ami-00b7cb45caa57dbca
+      MiniAmi: ami-044605e969a94c9fb
     arm64:
-      MiniAmi: ami-0fab2884186d97d8b
+      MiniAmi: ami-0e4732180b9e7dafb
   ap-southeast-7:
     amd64:
-      MiniAmi: ami-0ca49a7feb0e9b1f5
+      MiniAmi: ami-011646021c0f93ccc
     arm64:
-      MiniAmi: ami-0d28b5a4675ee563e
+      MiniAmi: ami-028c10510db4859f3
   ap-northeast-1:
     amd64:
-      MiniAmi: ami-0f13b684e93dd9cea
+      MiniAmi: ami-0dac67f5aa144dd5e
     arm64:
-      MiniAmi: ami-05de9f32a42c5970d
+      MiniAmi: ami-04a55aacf5f0d7e96
   ap-northeast-2:
     amd64:
-      MiniAmi: ami-0835cb5977ebb9a56
+      MiniAmi: ami-0ed7995453d243dda
     arm64:
-      MiniAmi: ami-0618a0067fd1355cb
+      MiniAmi: ami-00cedfece0f560d82
   ap-northeast-3:
     amd64:
-      MiniAmi: ami-094f73d625b6fee89
+      MiniAmi: ami-03f7525c40a06c2f6
     arm64:
-      MiniAmi: ami-0dab132db1a45262c
+      MiniAmi: ami-0c11eae760942fb29
 
 medium:
   us-east-1:
     amd64:
-      SbcAmi: ami-05f464ebefc2d5be2
-      FsAmi: ami-08c8c35ba097d23f4
-      WebMonitoringAmi: ami-09efdf2c67d041768
-      RecordingServerAmi: ami-0fa03971ab3764f18
+      SbcAmi: ami-0f6793413ae88f1e9
+      FsAmi: ami-0626aa1c93bc12f23
+      WebMonitoringAmi: ami-06a852cde00dee8e0
+      RecordingServerAmi: ami-027b8c450e9f76d75
     arm64:
-      SbcAmi: ami-092bbcfe02e4ada85
-      FsAmi: ami-0b4a6707cab88292f
-      WebMonitoringAmi: ami-0c3dbaa5685307fdd
-      RecordingServerAmi: ami-0071e68f9a995c4c9
+      SbcAmi: ami-02559cb4c4c783773
+      FsAmi: ami-05f39392482bf1ee2
+      WebMonitoringAmi: ami-0a1941faa1925fdba
+      RecordingServerAmi: ami-0f5e9971a1a8609f2
   us-east-2:
     amd64:
-      SbcAmi: ami-0188db8dfe42260ee
-      FsAmi: ami-08c6eb2f113d53589
-      WebMonitoringAmi: ami-093d0b407bd748784
-      RecordingServerAmi: ami-027263f6783fb6d9e
+      SbcAmi: ami-0a63e84e7efff3e66
+      FsAmi: ami-0f7902b6ceb62abcb
+      WebMonitoringAmi: ami-08c0936f7bb4532d8
+      RecordingServerAmi: ami-003b5db964824171d
     arm64:
-      SbcAmi: ami-0c2157e638c3f4a13
-      FsAmi: ami-00d9c8e84f895cdbb
-      WebMonitoringAmi: ami-0435e0d9262d09752
-      RecordingServerAmi: ami-036af7f76d0f6bb35
+      SbcAmi: ami-0abe523cb9b8be017
+      FsAmi: ami-096d1383613a655e4
+      WebMonitoringAmi: ami-0d225ef78b9b4e006
+      RecordingServerAmi: ami-010278b666af9716b
   us-west-1:
     amd64:
-      SbcAmi: ami-082ae44084b6d6f6d
-      FsAmi: ami-08f5d00a8f262f208
-      WebMonitoringAmi: ami-04e8831dbb5aa46b2
-      RecordingServerAmi: ami-0c1f2f94a154aab45
+      SbcAmi: ami-006ac1d9163000758
+      FsAmi: ami-0f5b811de481721f5
+      WebMonitoringAmi: ami-07e688f118a779191
+      RecordingServerAmi: ami-0404c7f3f293eada6
     arm64:
-      SbcAmi: ami-0c2b8122d29dca093
-      FsAmi: ami-0522d48f5eae7c356
-      WebMonitoringAmi: ami-0b22cd24aa5714023
-      RecordingServerAmi: ami-000ad32f9ccf08899
+      SbcAmi: ami-0d9d0327a828f09b8
+      FsAmi: ami-09adaa8873d71b56a
+      WebMonitoringAmi: ami-09fd00a44795dfe62
+      RecordingServerAmi: ami-0598474f1e5d5a5ca
   us-west-2:
     amd64:
-      SbcAmi: ami-01bf88ff102abc615
-      FsAmi: ami-09490d06bdec733d1
-      WebMonitoringAmi: ami-0270c20bf6c381946
-      RecordingServerAmi: ami-028ea69fc88197ac7
+      SbcAmi: ami-0235d363d5eef1e17
+      FsAmi: ami-0eb4baeca946d15b1
+      WebMonitoringAmi: ami-0d35e271fdde4dfa9
+      RecordingServerAmi: ami-02ea40f6001628acd
     arm64:
-      SbcAmi: ami-0236c5e835aa1be36
-      FsAmi: ami-0deb3f2d90f81f64d
-      WebMonitoringAmi: ami-015a839d4bd286f20
-      RecordingServerAmi: ami-0a2f98cbc1c9afbcd
+      SbcAmi: ami-08514b235ec06ebda
+      FsAmi: ami-076566f73cfefb7c4
+      WebMonitoringAmi: ami-022123ccbfc450f78
+      RecordingServerAmi: ami-0198499d2665c478d
   ca-central-1:
     amd64:
-      SbcAmi: ami-0608a2d293f86dd6c
-      FsAmi: ami-041b992c3d8fffbb4
-      WebMonitoringAmi: ami-023c0539ea873e4ea
-      RecordingServerAmi: ami-0e9a1c54754a8923c
+      SbcAmi: ami-028a4bd81b44b8f95
+      FsAmi: ami-0716dc898261be337
+      WebMonitoringAmi: ami-03ae2759893477b05
+      RecordingServerAmi: ami-0d8aafaf5a0082d87
     arm64:
-      SbcAmi: ami-01ba4e6a229eaa2ed
-      FsAmi: ami-0de624a1eacee5481
-      WebMonitoringAmi: ami-0b2dfb373ac1ae66f
-      RecordingServerAmi: ami-00e4f569f7e3ce3b5
+      SbcAmi: ami-056ff0e7cfc1e83c4
+      FsAmi: ami-0a32b6e70210af301
+      WebMonitoringAmi: ami-0945b5f218d245e47
+      RecordingServerAmi: ami-0b1f91975c8e90a7e
   ca-west-1:
     amd64:
-      SbcAmi: ami-04105beaeb9d42be8
-      FsAmi: ami-0d4432bd918d49582
-      WebMonitoringAmi: ami-0d33cc44614efeced
-      RecordingServerAmi: ami-01a37d70c3a05bbe8
+      SbcAmi: ami-039bd76f6c289fc0b
+      FsAmi: ami-0c211e9a09e6016bd
+      WebMonitoringAmi: ami-05940f276d0e3dfdf
+      RecordingServerAmi: ami-04def1e6ad4ec14a4
     arm64:
-      SbcAmi: ami-012f6d17c5fd911ed
-      FsAmi: ami-019e4e19c9dd25f52
-      WebMonitoringAmi: ami-02c25c365ff1206d9
-      RecordingServerAmi: ami-03cb9e2db35f582df
+      SbcAmi: ami-0831190117747e65a
+      FsAmi: ami-002e7156bf71a84d3
+      WebMonitoringAmi: ami-0b71fd64ca8459820
+      RecordingServerAmi: ami-0be541b4f35733c9b
   sa-east-1:
     amd64:
-      SbcAmi: ami-0a3fe843d7ea121e0
-      FsAmi: ami-0f1a15726211fd28a
-      WebMonitoringAmi: ami-0d2e091ea7865ddce
-      RecordingServerAmi: ami-0615994deff86c064
+      SbcAmi: ami-073eb0ad5f80f43f8
+      FsAmi: ami-0f25cb0f62d216b1c
+      WebMonitoringAmi: ami-0f7e9fac9df724616
+      RecordingServerAmi: ami-08f2ac09864ab09f7
     arm64:
-      SbcAmi: ami-00f99c61fb7752ecb
-      FsAmi: ami-0b3bf1cf2c228a53a
-      WebMonitoringAmi: ami-0a23b209b4270a95a
-      RecordingServerAmi: ami-0724c30578ff0d6e2
+      SbcAmi: ami-058829a940cd3bdec
+      FsAmi: ami-0b95ee673c0070230
+      WebMonitoringAmi: ami-01adbea9ea6b16a7d
+      RecordingServerAmi: ami-07b9a5c96ae68a9eb
   mx-central-1:
     amd64:
-      SbcAmi: ami-0a8b419250ae9adda
-      FsAmi: ami-0b759a437d7155ddb
-      WebMonitoringAmi: ami-03a1470930e7c1eaf
-      RecordingServerAmi: ami-078f6a7995353fdc6
+      SbcAmi: ami-0529c84070b543ed5
+      FsAmi: ami-07c2f01fe3a76f9a5
+      WebMonitoringAmi: ami-0c70fc9e5f6618cfa
+      RecordingServerAmi: ami-0238f9e2049b70fda
     arm64:
-      SbcAmi: ami-02920886020d8734e
-      FsAmi: ami-033af65047cbb1fe0
-      WebMonitoringAmi: ami-07e2a7e7374034e25
-      RecordingServerAmi: ami-033bb0f0561a6cc54
+      SbcAmi: ami-04d89dc8c932ec998
+      FsAmi: ami-0e5780d8cc956d4e2
+      WebMonitoringAmi: ami-0348ecaa15c1481ed
+      RecordingServerAmi: ami-0d8ce1b03646e11c4
   eu-central-1:
     amd64:
-      SbcAmi: ami-094854db7c1b0f03a
-      FsAmi: ami-065024bebe2909ec5
-      WebMonitoringAmi: ami-061af737d74b81273
-      RecordingServerAmi: ami-037964bf2842447db
+      SbcAmi: ami-0df44583f88bed455
+      FsAmi: ami-0d48d6cb3b739f2dd
+      WebMonitoringAmi: ami-0ab4ab40df0a8b14b
+      RecordingServerAmi: ami-0ddcd6b88ca643148
     arm64:
-      SbcAmi: ami-0eaae889b2da3f65f
-      FsAmi: ami-086f59a738bc1b1d4
-      WebMonitoringAmi: ami-017bd35957d4d90f4
-      RecordingServerAmi: ami-01b1e84e38434be46
+      SbcAmi: ami-03e4572e8f432365f
+      FsAmi: ami-034bb53a7d196386a
+      WebMonitoringAmi: ami-0831dc9dd00cdeabc
+      RecordingServerAmi: ami-0c0c4602768c69d99
   eu-central-2:
     amd64:
-      SbcAmi: ami-09cbe3dc862a685b1
-      FsAmi: ami-0be64ec10a20cbf9d
-      WebMonitoringAmi: ami-0df400419826c3885
-      RecordingServerAmi: ami-0992d3300d70b15ee
+      SbcAmi: ami-074c3799793584a3c
+      FsAmi: ami-0a776317198c4da02
+      WebMonitoringAmi: ami-09ea36eb3a0ba4c30
+      RecordingServerAmi: ami-070cd7235b5322c84
     arm64:
-      SbcAmi: ami-0ed29c5d7bdf8944b
-      FsAmi: ami-09e0f072d3a8f3400
-      WebMonitoringAmi: ami-06b607d4c5d1dc131
-      RecordingServerAmi: ami-0fd649a596d2147e6
+      SbcAmi: ami-0e8cf180cbc5a5223
+      FsAmi: ami-083660842b261f42f
+      WebMonitoringAmi: ami-059fa316f05b484fe
+      RecordingServerAmi: ami-0c05395a2f49b8729
   eu-west-1:
     amd64:
-      SbcAmi: ami-0de284371d023a3c8
-      FsAmi: ami-02421d42b9bf62b3f
-      WebMonitoringAmi: ami-0de5f648d38b4b549
-      RecordingServerAmi: ami-03fd62619b733871a
+      SbcAmi: ami-099b703148a0084b9
+      FsAmi: ami-0390b666165246cc2
+      WebMonitoringAmi: ami-0daa99682e7d310fb
+      RecordingServerAmi: ami-0b0c900ce3682012c
     arm64:
-      SbcAmi: ami-036e7202fbfbd3e5b
-      FsAmi: ami-062edede89796dd2a
-      WebMonitoringAmi: ami-0957bc756a44710d8
-      RecordingServerAmi: ami-0ca6fd365d9998bee
+      SbcAmi: ami-018c07b1ae334beea
+      FsAmi: ami-09a55c308596998c6
+      WebMonitoringAmi: ami-035ac43e1b4c02e74
+      RecordingServerAmi: ami-0e169a549919c3df4
   eu-west-2:
     amd64:
-      SbcAmi: ami-0ab9f13213bf8f0b5
-      FsAmi: ami-04fe66a59e5af11ab
-      WebMonitoringAmi: ami-0215ffb3a64fd04fc
-      RecordingServerAmi: ami-092777dadb18f8bb0
+      SbcAmi: ami-03c91a9e9013a6cc6
+      FsAmi: ami-0e96eea385df050f3
+      WebMonitoringAmi: ami-02d43ea846510822d
+      RecordingServerAmi: ami-09a66bedee44740d6
     arm64:
-      SbcAmi: ami-051e3ebcfb4d7d408
-      FsAmi: ami-0f19792becff14276
-      WebMonitoringAmi: ami-0b85d97f4ee2ca5b6
-      RecordingServerAmi: ami-039f1f2e2e922d805
+      SbcAmi: ami-012a00cb3ebfc530b
+      FsAmi: ami-08d6539dbf79dffe0
+      WebMonitoringAmi: ami-06951abc24f1f1051
+      RecordingServerAmi: ami-059e4a4590558a3e1
   eu-west-3:
     amd64:
-      SbcAmi: ami-0debbbf94ffa32eb8
-      FsAmi: ami-07fe89b27e3416d2c
-      WebMonitoringAmi: ami-0312ba168f1db4863
-      RecordingServerAmi: ami-015021eea536e0053
+      SbcAmi: ami-0b0cc3cc3f45c7bb2
+      FsAmi: ami-0891c5561445ea2b5
+      WebMonitoringAmi: ami-0951cad74d66e387a
+      RecordingServerAmi: ami-0fcb419ce9856c3cd
     arm64:
-      SbcAmi: ami-03fa4c774f979ccba
-      FsAmi: ami-0a2299a1bd69f7d18
-      WebMonitoringAmi: ami-096112164a62ba84a
-      RecordingServerAmi: ami-0f03b74abe85b9cbb
+      SbcAmi: ami-085fdc7613de53cd9
+      FsAmi: ami-0d46a29f902420ec9
+      WebMonitoringAmi: ami-083c204ca0fd87a29
+      RecordingServerAmi: ami-0af73da113c1c2bab
   eu-north-1:
     amd64:
-      SbcAmi: ami-02d7cd2ce444ebab0
-      FsAmi: ami-05b365f1c1b1658e1
-      WebMonitoringAmi: ami-0ce4c0dd5b2a89986
-      RecordingServerAmi: ami-0c29e84312e271d01
+      SbcAmi: ami-06cef36e1b6230b40
+      FsAmi: ami-03f1be50b498c5c95
+      WebMonitoringAmi: ami-0d24d0856b37f0f7d
+      RecordingServerAmi: ami-0d436d8065fe3bc02
     arm64:
-      SbcAmi: ami-09f623e6a39364d32
-      FsAmi: ami-017f9945c3822fd4c
-      WebMonitoringAmi: ami-07faa4264df33d127
-      RecordingServerAmi: ami-0d6155b67d3cabd29
+      SbcAmi: ami-02b283c30e4af8ee4
+      FsAmi: ami-077de67dce7041c1b
+      WebMonitoringAmi: ami-0f81f635c580a8c03
+      RecordingServerAmi: ami-0d94fc978c28b58d0
   eu-south-1:
     amd64:
-      SbcAmi: ami-046ccec1248574f01
-      FsAmi: ami-04857b4dbb5c6de67
-      WebMonitoringAmi: ami-0dd4d9a56c20dfbfa
-      RecordingServerAmi: ami-0788ac924d795b5b6
+      SbcAmi: ami-01dbda4f06d843ed5
+      FsAmi: ami-0e9c62e193733eece
+      WebMonitoringAmi: ami-099c022bf6665881a
+      RecordingServerAmi: ami-0773374793bbb78fa
     arm64:
-      SbcAmi: ami-0c2403a194f84b235
-      FsAmi: ami-001647987e0846290
-      WebMonitoringAmi: ami-0925b9884ba58f4b6
-      RecordingServerAmi: ami-035de27c8234c9f67
+      SbcAmi: ami-0d18716a1717caa78
+      FsAmi: ami-0dcadb3765b122225
+      WebMonitoringAmi: ami-07a6e548813f40415
+      RecordingServerAmi: ami-09d755187c8177b88
   eu-south-2:
     amd64:
-      SbcAmi: ami-06c9e7580f93c1ecb
-      FsAmi: ami-08b60c9c2f1195d55
-      WebMonitoringAmi: ami-0591f7ff2ee1b4dd8
-      RecordingServerAmi: ami-0d6a19df047734eac
+      SbcAmi: ami-0dd379f4c1686e677
+      FsAmi: ami-0ab1f7af6eee4b69a
+      WebMonitoringAmi: ami-082ae99a1fd40d6ec
+      RecordingServerAmi: ami-044c407b49e16d2df
     arm64:
-      SbcAmi: ami-0d4489ff509aab73a
-      FsAmi: ami-081f225c1bf166a75
-      WebMonitoringAmi: ami-08f8a5e06d64b6ebe
-      RecordingServerAmi: ami-08d1bb85c88c2cd65
+      SbcAmi: ami-0a7a4e1ac16fc5708
+      FsAmi: ami-039d7506de818b109
+      WebMonitoringAmi: ami-020d850aaa3854734
+      RecordingServerAmi: ami-0e91af5923f3ee870
   ap-south-1:
     amd64:
-      SbcAmi: ami-0e0dae4e21be5aee3
-      FsAmi: ami-02f689e9d5be8952f
-      WebMonitoringAmi: ami-02654a588e942d2ee
-      RecordingServerAmi: ami-0942b20ff11a053eb
+      SbcAmi: ami-00815307988b86f5a
+      FsAmi: ami-0f5a7bdab3d3f9403
+      WebMonitoringAmi: ami-0773f2ea0a04f1899
+      RecordingServerAmi: ami-0a2e7172b453f6b2d
     arm64:
-      SbcAmi: ami-0d4a0641591d9ef10
-      FsAmi: ami-0147870573afbc8f0
-      WebMonitoringAmi: ami-0069c361219d5b544
-      RecordingServerAmi: ami-07771d097671cff88
+      SbcAmi: ami-010110061af9263f3
+      FsAmi: ami-044c5d895b6020b0b
+      WebMonitoringAmi: ami-09356bf6ebb35271a
+      RecordingServerAmi: ami-04aedacb9edd8a06a
   ap-south-2:
     amd64:
-      SbcAmi: ami-0ca2e0b6d2555d43c
-      FsAmi: ami-0389c7d8f270d273c
-      WebMonitoringAmi: ami-06b99164a9475c43c
-      RecordingServerAmi: ami-083c4fc2e40f42d2f
+      SbcAmi: ami-024b77a329db726b7
+      FsAmi: ami-0d5bfe37230070c18
+      WebMonitoringAmi: ami-0a45f8d3519ca022b
+      RecordingServerAmi: ami-0760b633ccab77596
     arm64:
-      SbcAmi: ami-0b89b3f5188311d95
-      FsAmi: ami-0eff66ecbe03e6f6f
-      WebMonitoringAmi: ami-0b5dee678d73a393b
-      RecordingServerAmi: ami-0fe2e76b5a896e8e3
+      SbcAmi: ami-09c3f1448da9f923f
+      FsAmi: ami-00369eca583d52e7d
+      WebMonitoringAmi: ami-0c4a4bc2c680a2029
+      RecordingServerAmi: ami-07884f17451987890
   ap-east-1:
     amd64:
-      SbcAmi: ami-0ac62f3d58e3ce221
-      FsAmi: ami-0da67a76d7cd773fc
-      WebMonitoringAmi: ami-0ea84d10daa24183b
-      RecordingServerAmi: ami-0b30b85d9d66bb58a
+      SbcAmi: ami-0664f92ef46d4cefe
+      FsAmi: ami-025764b7e51468cd5
+      WebMonitoringAmi: ami-0af747607233a40b2
+      RecordingServerAmi: ami-0739ef2e30bf4133f
     arm64:
-      SbcAmi: ami-00e64831689940a34
-      FsAmi: ami-068f8f69201436029
-      WebMonitoringAmi: ami-096f746f89bc4e2c0
-      RecordingServerAmi: ami-0e2cffbe365d436ca
+      SbcAmi: ami-071d5c065f9637998
+      FsAmi: ami-08f3d634bd2766bb1
+      WebMonitoringAmi: ami-04316544c69de9ff4
+      RecordingServerAmi: ami-02289731dcedca091
   ap-east-2:
     amd64:
-      SbcAmi: ami-09c91e2d3f48bb24f
-      FsAmi: ami-08c9510bb2c574bdf
-      WebMonitoringAmi: ami-0d59cfb6a7d3f71b2
-      RecordingServerAmi: ami-0275cdbb4f60d2d7a
+      SbcAmi: ami-0ec3b688155671426
+      FsAmi: ami-0fe13d3439e8c8e55
+      WebMonitoringAmi: ami-09ce6e68aab827fc1
+      RecordingServerAmi: ami-074a6d8efb746a09f
     arm64:
-      SbcAmi: ami-09a5fff9a886b69a8
-      FsAmi: ami-03e4cf8334a7bf443
-      WebMonitoringAmi: ami-06d3e826e1c752c31
-      RecordingServerAmi: ami-03c66dd530bc1810c
+      SbcAmi: ami-062d736b23b76f773
+      FsAmi: ami-069a2447f56b9884e
+      WebMonitoringAmi: ami-09d4aa34ee199d5fb
+      RecordingServerAmi: ami-06b5fe3dd14d33ce6
   ap-southeast-1:
     amd64:
-      SbcAmi: ami-053073e1915f25ed9
-      FsAmi: ami-0f32a99510fcbfb15
-      WebMonitoringAmi: ami-0a23aa0f80a9ca70f
-      RecordingServerAmi: ami-081b295e7de7086cb
+      SbcAmi: ami-03aaa984d3c69c6dd
+      FsAmi: ami-08070607863dc87b1
+      WebMonitoringAmi: ami-0cf2c08082fc868e0
+      RecordingServerAmi: ami-03c9fbcecdd1b0f30
     arm64:
-      SbcAmi: ami-00686e5f5c515e4e5
-      FsAmi: ami-059baa257a5e4befc
-      WebMonitoringAmi: ami-0c39a9432e034ad3d
-      RecordingServerAmi: ami-000fb350a6216e92d
+      SbcAmi: ami-049ca46abda610f2d
+      FsAmi: ami-0d9ca96a8a75e4d08
+      WebMonitoringAmi: ami-058e9d2d304208405
+      RecordingServerAmi: ami-05f4e3e0c6512a7e1
   ap-southeast-2:
     amd64:
-      SbcAmi: ami-0d6666fc72f438f28
-      FsAmi: ami-00f8330ed752e3545
-      WebMonitoringAmi: ami-072ea4b56af48546c
-      RecordingServerAmi: ami-0ab93194281a54d6d
+      SbcAmi: ami-08e8cd32c2a241c1f
+      FsAmi: ami-074b5b1fc40984d9c
+      WebMonitoringAmi: ami-09518ea35cff614b0
+      RecordingServerAmi: ami-07c246acd09b9f707
     arm64:
-      SbcAmi: ami-09870875f79cc57fc
-      FsAmi: ami-0764802fe059460e6
-      WebMonitoringAmi: ami-00e659e471bb6e469
-      RecordingServerAmi: ami-09fdf7915e19de9fb
+      SbcAmi: ami-02f62247c4a797875
+      FsAmi: ami-080b21ae9561c6ffc
+      WebMonitoringAmi: ami-0106630fd302e452a
+      RecordingServerAmi: ami-0d0818f51668cbe3e
   ap-southeast-3:
     amd64:
-      SbcAmi: ami-0e3013fabc2302c0a
-      FsAmi: ami-0de2ea0e9c688a2d2
-      WebMonitoringAmi: ami-0508777d3265c193f
-      RecordingServerAmi: ami-0d36ebe4c73aee004
+      SbcAmi: ami-0465cc2d1ed220746
+      FsAmi: ami-09bf636a111c2c912
+      WebMonitoringAmi: ami-066820c83f6f2f138
+      RecordingServerAmi: ami-0a5ab641c674b10de
     arm64:
-      SbcAmi: ami-02a253ba267d38c54
-      FsAmi: ami-08ac0213e78f8beb7
-      WebMonitoringAmi: ami-09b3784cb988b5a95
-      RecordingServerAmi: ami-048682a81cd1b512d
+      SbcAmi: ami-05ffab00764f6cacc
+      FsAmi: ami-0a1863fd97dc35550
+      WebMonitoringAmi: ami-01493e82e77194c9d
+      RecordingServerAmi: ami-0e73514f241996d46
   ap-southeast-4:
     amd64:
-      SbcAmi: ami-023381a362b3f0ba3
-      FsAmi: ami-0fc14a6069e56d583
-      WebMonitoringAmi: ami-0ce436064b583ae3d
-      RecordingServerAmi: ami-05e46d1c59b650d9e
+      SbcAmi: ami-03b687a6c32a1aabd
+      FsAmi: ami-05d5ce122b059c049
+      WebMonitoringAmi: ami-0aff13b001f461942
+      RecordingServerAmi: ami-020ae6105104b9a1c
     arm64:
-      SbcAmi: ami-0ebca4890117f6ae1
-      FsAmi: ami-0e8971c446035e347
-      WebMonitoringAmi: ami-009c3a236e6258b3e
-      RecordingServerAmi: ami-0f4ba16781b754cc5
+      SbcAmi: ami-0ef2a66a98377fc0b
+      FsAmi: ami-03f49c137573ee7f1
+      WebMonitoringAmi: ami-0c0ef701b2d6fc797
+      RecordingServerAmi: ami-026c864682261d7a6
   ap-southeast-5:
     amd64:
-      SbcAmi: ami-089e2c70f94512deb
-      FsAmi: ami-0aa1fbbbbb4e73931
-      WebMonitoringAmi: ami-04fa9b7d7033bcff4
-      RecordingServerAmi: ami-0ba9a0c6bb5b59e04
+      SbcAmi: ami-04850354c83d64834
+      FsAmi: ami-0d1babbec7fcecd02
+      WebMonitoringAmi: ami-07da21bdfbe71582a
+      RecordingServerAmi: ami-0775c839a909dcc7d
     arm64:
-      SbcAmi: ami-0c14cd187b771d2a9
-      FsAmi: ami-0991e2db2df5ab993
-      WebMonitoringAmi: ami-0b50a2a4d41f6127b
-      RecordingServerAmi: ami-0a1a4cb40f8c5a6d5
+      SbcAmi: ami-01d0f9c8d4bf924de
+      FsAmi: ami-0f2e46c932e49c242
+      WebMonitoringAmi: ami-022879cd3832feca7
+      RecordingServerAmi: ami-0a2277677a9611627
   ap-southeast-6:
     amd64:
-      SbcAmi: ami-0b4a6a5e860918365
-      FsAmi: ami-04015de4b8e4c6657
-      WebMonitoringAmi: ami-0602ba8293619ff4a
-      RecordingServerAmi: ami-0c026d8218f3ccf10
+      SbcAmi: ami-056f2faf67e2fcb62
+      FsAmi: ami-02974be007676fe18
+      WebMonitoringAmi: ami-0327b5aaed442aebf
+      RecordingServerAmi: ami-04814c5240ca61822
     arm64:
-      SbcAmi: ami-04dfea9131c19324f
-      FsAmi: ami-04575f27a8df82236
-      WebMonitoringAmi: ami-08167d6e271f7294e
-      RecordingServerAmi: ami-03fc8c4ce2a9915be
+      SbcAmi: ami-0eeb0f85d299870bf
+      FsAmi: ami-0e83d9da12728f5c7
+      WebMonitoringAmi: ami-040e7e124f4d93490
+      RecordingServerAmi: ami-0efac97cd6890d61f
   ap-southeast-7:
     amd64:
-      SbcAmi: ami-0b5596c6f32fde12f
-      FsAmi: ami-0ba6a5672c7403dce
-      WebMonitoringAmi: ami-0cb14d5c4a1c92f9b
-      RecordingServerAmi: ami-0d2ea2fa92ce675ea
+      SbcAmi: ami-0749a906bd7682ff2
+      FsAmi: ami-098dc986a47ffbf27
+      WebMonitoringAmi: ami-017e179a197ed113a
+      RecordingServerAmi: ami-0eb8ec946858e3e89
     arm64:
-      SbcAmi: ami-0a9582deee2792857
-      FsAmi: ami-0674a49116b76d714
-      WebMonitoringAmi: ami-065e052c1ead62088
-      RecordingServerAmi: ami-097d1fbc15e55a940
+      SbcAmi: ami-04f1ec667946e8ba2
+      FsAmi: ami-0187b7ea03f319e3a
+      WebMonitoringAmi: ami-029c69284a90cc1ad
+      RecordingServerAmi: ami-0cd659dce514d351b
   ap-northeast-1:
     amd64:
-      SbcAmi: ami-0b8845bb9e4956c12
-      FsAmi: ami-0ff7d078ec928a1c4
-      WebMonitoringAmi: ami-0dc7c40f1115c3e55
-      RecordingServerAmi: ami-04e9301a602bf1288
+      SbcAmi: ami-0314ce094e977874a
+      FsAmi: ami-0408a0e33a2458d8a
+      WebMonitoringAmi: ami-0b127081889e93b03
+      RecordingServerAmi: ami-084ad42a718a30824
     arm64:
-      SbcAmi: ami-0b942cc1f49839487
-      FsAmi: ami-09c2406d4a65ea43e
-      WebMonitoringAmi: ami-04af7dc8fb9ae714b
-      RecordingServerAmi: ami-02eb1e51152068afa
+      SbcAmi: ami-0d5f8f3216b84f4ff
+      FsAmi: ami-06066e67345b4c469
+      WebMonitoringAmi: ami-07fbaa8323ea4b818
+      RecordingServerAmi: ami-06c4f6857b847781a
   ap-northeast-2:
     amd64:
-      SbcAmi: ami-090277cd836713dd7
-      FsAmi: ami-0559e6178a1886626
-      WebMonitoringAmi: ami-000015f4e280f4363
-      RecordingServerAmi: ami-07038bacc2371101a
+      SbcAmi: ami-08bd2bb10e0d8c58c
+      FsAmi: ami-0bced60daeba0072f
+      WebMonitoringAmi: ami-03dc37168a2450d48
+      RecordingServerAmi: ami-0cd35376b0ba1be5b
     arm64:
-      SbcAmi: ami-047d4249329c0ffda
-      FsAmi: ami-068b957b1222a5235
-      WebMonitoringAmi: ami-00e8e09af6ace174c
-      RecordingServerAmi: ami-06967387d21cc278b
+      SbcAmi: ami-0bbbb61737b9cb090
+      FsAmi: ami-066658fc8f0447654
+      WebMonitoringAmi: ami-0087ca423a89ecb67
+      RecordingServerAmi: ami-0b45a6ec308a6ba91
   ap-northeast-3:
     amd64:
-      SbcAmi: ami-0085112f7a9bcfa03
-      FsAmi: ami-020c6dea79ed888af
-      WebMonitoringAmi: ami-0b83b24e4a46233c1
-      RecordingServerAmi: ami-012abb87a360933bd
+      SbcAmi: ami-0bb23e9a4d7f56b87
+      FsAmi: ami-03c2b66c32ec344cc
+      WebMonitoringAmi: ami-0e149d24ff3e0f7ed
+      RecordingServerAmi: ami-01dee84acb9259e05
     arm64:
-      SbcAmi: ami-08757dab8ccd7770d
-      FsAmi: ami-0470e42e915ad3826
-      WebMonitoringAmi: ami-0c3ae001d7890a958
-      RecordingServerAmi: ami-00776663e9c65d312
+      SbcAmi: ami-01f94557a224af8b1
+      FsAmi: ami-097a50c28bdd06cc8
+      WebMonitoringAmi: ami-00ed63e4bb48d047a
+      RecordingServerAmi: ami-0d59e41cdaab90dc5
 
 large:
   us-east-1:
     amd64:
-      SbcSipAmi: ami-0aa76ae0f24ce72fb
-      SbcRtpAmi: ami-0e527b20b12766534
-      FsAmi: ami-08c8c35ba097d23f4
-      WebserverAmi: ami-0e613cf25514b5d21
-      MonitoringServerAmi: ami-04b33b0346e8ddff3
-      RecordingServerAmi: ami-0fa03971ab3764f18
+      SbcSipAmi: ami-06acd897b64926846
+      SbcRtpAmi: ami-072ff9bbb247940e1
+      FsAmi: ami-0626aa1c93bc12f23
+      WebserverAmi: ami-00ede6efa6df40345
+      MonitoringServerAmi: ami-0a72dff2351d663e6
+      RecordingServerAmi: ami-027b8c450e9f76d75
     arm64:
-      SbcSipAmi: ami-00ca76bb7964f9b79
-      SbcRtpAmi: ami-089ef9738c3714eca
-      FsAmi: ami-0b4a6707cab88292f
-      WebserverAmi: ami-0f282a075d3e3920d
-      MonitoringServerAmi: ami-05a11bfa21a1925df
-      RecordingServerAmi: ami-0071e68f9a995c4c9
+      SbcSipAmi: ami-05e04c4ca17d7a7f5
+      SbcRtpAmi: ami-06cbff605f9b66936
+      FsAmi: ami-05f39392482bf1ee2
+      WebserverAmi: ami-0a351f58455b54966
+      MonitoringServerAmi: ami-03ecc1717eb628df1
+      RecordingServerAmi: ami-0f5e9971a1a8609f2
   us-east-2:
     amd64:
-      SbcSipAmi: ami-0c84179c6c87877ab
-      SbcRtpAmi: ami-0088e90cb5ea5c3cd
-      FsAmi: ami-08c6eb2f113d53589
-      WebserverAmi: ami-08f4c4643fb31ec31
-      MonitoringServerAmi: ami-01dc67544c5e3b233
-      RecordingServerAmi: ami-027263f6783fb6d9e
+      SbcSipAmi: ami-067aa34962f09194d
+      SbcRtpAmi: ami-0b23eaa761f80f0e5
+      FsAmi: ami-0f7902b6ceb62abcb
+      WebserverAmi: ami-06a017e90514e652e
+      MonitoringServerAmi: ami-0d97e37ad5258efaa
+      RecordingServerAmi: ami-003b5db964824171d
     arm64:
-      SbcSipAmi: ami-03b0f18c625037391
-      SbcRtpAmi: ami-0b182ef7d57bfc637
-      FsAmi: ami-00d9c8e84f895cdbb
-      WebserverAmi: ami-00b496b6a6c3a0b81
-      MonitoringServerAmi: ami-07ec23b11419430e6
-      RecordingServerAmi: ami-036af7f76d0f6bb35
+      SbcSipAmi: ami-0cb330e18718e5118
+      SbcRtpAmi: ami-08c0712baa7d01f68
+      FsAmi: ami-096d1383613a655e4
+      WebserverAmi: ami-0c60f6b2bc2bddb2b
+      MonitoringServerAmi: ami-08ecd5eac8be8bd1d
+      RecordingServerAmi: ami-010278b666af9716b
   us-west-1:
     amd64:
-      SbcSipAmi: ami-03c88ed015f1a9cb3
-      SbcRtpAmi: ami-089fc939a2de57a7e
-      FsAmi: ami-08f5d00a8f262f208
-      WebserverAmi: ami-02a8537a96b5fb0b6
-      MonitoringServerAmi: ami-0cf8cb3a2f2ee91bc
-      RecordingServerAmi: ami-0c1f2f94a154aab45
+      SbcSipAmi: ami-0a315190143398ee2
+      SbcRtpAmi: ami-0cb9b20a8d045e880
+      FsAmi: ami-0f5b811de481721f5
+      WebserverAmi: ami-06bf8b3f78b59064a
+      MonitoringServerAmi: ami-0cc20c9118f125834
+      RecordingServerAmi: ami-0404c7f3f293eada6
     arm64:
-      SbcSipAmi: ami-013a9b54e3c2df97d
-      SbcRtpAmi: ami-07172315b7354b3ad
-      FsAmi: ami-0522d48f5eae7c356
-      WebserverAmi: ami-0b896225377affccc
-      MonitoringServerAmi: ami-03f80ef3e9898dbc9
-      RecordingServerAmi: ami-000ad32f9ccf08899
+      SbcSipAmi: ami-0df4784c41442716e
+      SbcRtpAmi: ami-0f3483b4743690a65
+      FsAmi: ami-09adaa8873d71b56a
+      WebserverAmi: ami-0eb823b806eda9048
+      MonitoringServerAmi: ami-02754f611631aa649
+      RecordingServerAmi: ami-0598474f1e5d5a5ca
   us-west-2:
     amd64:
-      SbcSipAmi: ami-00dbb9a8a9055365b
-      SbcRtpAmi: ami-05590970dba675057
-      FsAmi: ami-09490d06bdec733d1
-      WebserverAmi: ami-0b22b7075449baad1
-      MonitoringServerAmi: ami-00e3ebbe25f238ed6
-      RecordingServerAmi: ami-028ea69fc88197ac7
+      SbcSipAmi: ami-049a3c3381cacd276
+      SbcRtpAmi: ami-09f720e1bd4820d4e
+      FsAmi: ami-0eb4baeca946d15b1
+      WebserverAmi: ami-07f4dfbced33e56dc
+      MonitoringServerAmi: ami-081b6bcf7f4663d92
+      RecordingServerAmi: ami-02ea40f6001628acd
     arm64:
-      SbcSipAmi: ami-00168ca5dfd395deb
-      SbcRtpAmi: ami-0ac09c72df9ded16d
-      FsAmi: ami-0deb3f2d90f81f64d
-      WebserverAmi: ami-04c36065700d6287e
-      MonitoringServerAmi: ami-0a79a53dd46d7a615
-      RecordingServerAmi: ami-0a2f98cbc1c9afbcd
+      SbcSipAmi: ami-0fe5cc7e1eca564d1
+      SbcRtpAmi: ami-0f30011ae3f572504
+      FsAmi: ami-076566f73cfefb7c4
+      WebserverAmi: ami-00b262ccc87840da1
+      MonitoringServerAmi: ami-07c600df1cac871b2
+      RecordingServerAmi: ami-0198499d2665c478d
   ca-central-1:
     amd64:
-      SbcSipAmi: ami-0514cf28f2cec3e46
-      SbcRtpAmi: ami-0801e6577c9af7845
-      FsAmi: ami-041b992c3d8fffbb4
-      WebserverAmi: ami-066643b85b0f2da6b
-      MonitoringServerAmi: ami-0175ede43cb6bee9d
-      RecordingServerAmi: ami-0e9a1c54754a8923c
+      SbcSipAmi: ami-075d34fbaea9270be
+      SbcRtpAmi: ami-0745329d9fdd79aed
+      FsAmi: ami-0716dc898261be337
+      WebserverAmi: ami-06d9c16cdeb361d2f
+      MonitoringServerAmi: ami-0947e5ab88514059a
+      RecordingServerAmi: ami-0d8aafaf5a0082d87
     arm64:
-      SbcSipAmi: ami-0de8566d5c29c2fb3
-      SbcRtpAmi: ami-07ee451a097f2b8b1
-      FsAmi: ami-0de624a1eacee5481
-      WebserverAmi: ami-08068ff0d81d35ffb
-      MonitoringServerAmi: ami-09d4a87dc90cf899a
-      RecordingServerAmi: ami-00e4f569f7e3ce3b5
+      SbcSipAmi: ami-03179b4594e52fe7a
+      SbcRtpAmi: ami-04a1415340ba6113a
+      FsAmi: ami-0a32b6e70210af301
+      WebserverAmi: ami-096a7028b9523f966
+      MonitoringServerAmi: ami-089c538cfb7515dfd
+      RecordingServerAmi: ami-0b1f91975c8e90a7e
   ca-west-1:
     amd64:
-      SbcSipAmi: ami-01aa25b3b28210397
-      SbcRtpAmi: ami-06a5b0f8ed7dd7163
-      FsAmi: ami-0d4432bd918d49582
-      WebserverAmi: ami-06d573ac5e61f96f8
-      MonitoringServerAmi: ami-0a7dea5b2028d9d7a
-      RecordingServerAmi: ami-01a37d70c3a05bbe8
+      SbcSipAmi: ami-087b24381b7c452fe
+      SbcRtpAmi: ami-01fcb07eb2a43d679
+      FsAmi: ami-0c211e9a09e6016bd
+      WebserverAmi: ami-07e5376fb4b6476ad
+      MonitoringServerAmi: ami-078b1aa48bfb3a34b
+      RecordingServerAmi: ami-04def1e6ad4ec14a4
     arm64:
-      SbcSipAmi: ami-0c1872722132cab7a
-      SbcRtpAmi: ami-08bb7727e9fae3ef8
-      FsAmi: ami-019e4e19c9dd25f52
-      WebserverAmi: ami-0e40de97a62bbad88
-      MonitoringServerAmi: ami-0c6bd5a04cebdc404
-      RecordingServerAmi: ami-03cb9e2db35f582df
+      SbcSipAmi: ami-05ea5b9b3e5dd3e52
+      SbcRtpAmi: ami-0060f7433b8a96e02
+      FsAmi: ami-002e7156bf71a84d3
+      WebserverAmi: ami-0ef076263e121319e
+      MonitoringServerAmi: ami-0cfcd14bc74c5d822
+      RecordingServerAmi: ami-0be541b4f35733c9b
   sa-east-1:
     amd64:
-      SbcSipAmi: ami-0989f3a33ad07a2ba
-      SbcRtpAmi: ami-04829d40d3a1a139c
-      FsAmi: ami-0f1a15726211fd28a
-      WebserverAmi: ami-06d995e79e301fdfb
-      MonitoringServerAmi: ami-0be8d97ea61ea242a
-      RecordingServerAmi: ami-0615994deff86c064
+      SbcSipAmi: ami-0c2ffd81a55a1aa46
+      SbcRtpAmi: ami-01a3071b22b2b8ca0
+      FsAmi: ami-0f25cb0f62d216b1c
+      WebserverAmi: ami-0be982205612af599
+      MonitoringServerAmi: ami-04b1931406a24ca7a
+      RecordingServerAmi: ami-08f2ac09864ab09f7
     arm64:
-      SbcSipAmi: ami-09d7c546fd805c43f
-      SbcRtpAmi: ami-095246913044e98a4
-      FsAmi: ami-0b3bf1cf2c228a53a
-      WebserverAmi: ami-05cfb4f24d4c53704
-      MonitoringServerAmi: ami-0833567edb5008271
-      RecordingServerAmi: ami-0724c30578ff0d6e2
+      SbcSipAmi: ami-03649159da763ef7f
+      SbcRtpAmi: ami-0a84697b226f2538b
+      FsAmi: ami-0b95ee673c0070230
+      WebserverAmi: ami-04f06074e1b08bd43
+      MonitoringServerAmi: ami-0e87970ea3a02f5ac
+      RecordingServerAmi: ami-07b9a5c96ae68a9eb
   mx-central-1:
     amd64:
-      SbcSipAmi: ami-0adabf640c1a16afa
-      SbcRtpAmi: ami-03927f1436cfe21ee
-      FsAmi: ami-0b759a437d7155ddb
-      WebserverAmi: ami-015bf08ad9529f309
-      MonitoringServerAmi: ami-0bf6c160f341532cc
-      RecordingServerAmi: ami-078f6a7995353fdc6
+      SbcSipAmi: ami-02ab298befb95e68f
+      SbcRtpAmi: ami-03b9ba6003c76f9f0
+      FsAmi: ami-07c2f01fe3a76f9a5
+      WebserverAmi: ami-067acf2caaf41678a
+      MonitoringServerAmi: ami-024db450edddd4466
+      RecordingServerAmi: ami-0238f9e2049b70fda
     arm64:
-      SbcSipAmi: ami-07053b0b6f8d7f71d
-      SbcRtpAmi: ami-025085041dccc87e7
-      FsAmi: ami-033af65047cbb1fe0
-      WebserverAmi: ami-06df24f4091224dde
-      MonitoringServerAmi: ami-09844ce941cadc980
-      RecordingServerAmi: ami-033bb0f0561a6cc54
+      SbcSipAmi: ami-00adf65d79298d0cb
+      SbcRtpAmi: ami-0ace61d4217bf3696
+      FsAmi: ami-0e5780d8cc956d4e2
+      WebserverAmi: ami-0a26c2107b054501a
+      MonitoringServerAmi: ami-02d8d8c003e49db5f
+      RecordingServerAmi: ami-0d8ce1b03646e11c4
   eu-central-1:
     amd64:
-      SbcSipAmi: ami-0aecf860dcf25361c
-      SbcRtpAmi: ami-00f7166b65c276d65
-      FsAmi: ami-065024bebe2909ec5
-      WebserverAmi: ami-0dce6ee1e50369edc
-      MonitoringServerAmi: ami-0108005bdc5a0f6a8
-      RecordingServerAmi: ami-037964bf2842447db
+      SbcSipAmi: ami-0e122a83c0b93c3fc
+      SbcRtpAmi: ami-0f795178605eddb5c
+      FsAmi: ami-0d48d6cb3b739f2dd
+      WebserverAmi: ami-04cf906f11a0babf6
+      MonitoringServerAmi: ami-0374397794109d92a
+      RecordingServerAmi: ami-0ddcd6b88ca643148
     arm64:
-      SbcSipAmi: ami-0303207eb28d9febe
-      SbcRtpAmi: ami-0e2a43a6e9548a080
-      FsAmi: ami-086f59a738bc1b1d4
-      WebserverAmi: ami-0d0aea427819d0ff7
-      MonitoringServerAmi: ami-06d3b867065b2781c
-      RecordingServerAmi: ami-01b1e84e38434be46
+      SbcSipAmi: ami-08d0355da5266ba1d
+      SbcRtpAmi: ami-03b6386f65efe2b33
+      FsAmi: ami-034bb53a7d196386a
+      WebserverAmi: ami-0a1228350116da4cd
+      MonitoringServerAmi: ami-023bddd41579e9da2
+      RecordingServerAmi: ami-0c0c4602768c69d99
   eu-central-2:
     amd64:
-      SbcSipAmi: ami-072cc03e7e896db87
-      SbcRtpAmi: ami-0536057e981f32eb3
-      FsAmi: ami-0be64ec10a20cbf9d
-      WebserverAmi: ami-04aaed8f5c5115193
-      MonitoringServerAmi: ami-04963e6d26960b5bd
-      RecordingServerAmi: ami-0992d3300d70b15ee
+      SbcSipAmi: ami-02d84cb39988b594c
+      SbcRtpAmi: ami-0d67f088e959d0b2d
+      FsAmi: ami-0a776317198c4da02
+      WebserverAmi: ami-0642b97ce1ffb1369
+      MonitoringServerAmi: ami-0f5ad9f67061339f9
+      RecordingServerAmi: ami-070cd7235b5322c84
     arm64:
-      SbcSipAmi: ami-03d0a0175152a570b
-      SbcRtpAmi: ami-028cf622312bc9a94
-      FsAmi: ami-09e0f072d3a8f3400
-      WebserverAmi: ami-0cd61f877ce8203ad
-      MonitoringServerAmi: ami-007fc347399432dc9
-      RecordingServerAmi: ami-0fd649a596d2147e6
+      SbcSipAmi: ami-00d1c8b24477c86d8
+      SbcRtpAmi: ami-0f57f3274c0754497
+      FsAmi: ami-083660842b261f42f
+      WebserverAmi: ami-0eaacd5b33a105bb7
+      MonitoringServerAmi: ami-00966e9ef9001bfc9
+      RecordingServerAmi: ami-0c05395a2f49b8729
   eu-west-1:
     amd64:
-      SbcSipAmi: ami-0ceac34f675633c8a
-      SbcRtpAmi: ami-0307efa63057f267b
-      FsAmi: ami-02421d42b9bf62b3f
-      WebserverAmi: ami-0f9f8095df872a84f
-      MonitoringServerAmi: ami-085695b91e2dca89a
-      RecordingServerAmi: ami-03fd62619b733871a
+      SbcSipAmi: ami-03addc460a9e38eb5
+      SbcRtpAmi: ami-004bd07e626d9f94a
+      FsAmi: ami-0390b666165246cc2
+      WebserverAmi: ami-0a1e0d191c278d921
+      MonitoringServerAmi: ami-08f0b88912ded429f
+      RecordingServerAmi: ami-0b0c900ce3682012c
     arm64:
-      SbcSipAmi: ami-01153002e40e0d0f5
-      SbcRtpAmi: ami-09abbef1f5e5fcb9b
-      FsAmi: ami-062edede89796dd2a
-      WebserverAmi: ami-0a154056182996c6e
-      MonitoringServerAmi: ami-0f0601ac0bf79b4d5
-      RecordingServerAmi: ami-0ca6fd365d9998bee
+      SbcSipAmi: ami-04474cfd398fcb6e7
+      SbcRtpAmi: ami-02528f23690c2620e
+      FsAmi: ami-09a55c308596998c6
+      WebserverAmi: ami-0225989e7b901e55a
+      MonitoringServerAmi: ami-002c26aba28aaca78
+      RecordingServerAmi: ami-0e169a549919c3df4
   eu-west-2:
     amd64:
-      SbcSipAmi: ami-042025f0c42542681
-      SbcRtpAmi: ami-09e74bdb2c03f33eb
-      FsAmi: ami-04fe66a59e5af11ab
-      WebserverAmi: ami-0f3baa385caa3549d
-      MonitoringServerAmi: ami-08138df99684950ea
-      RecordingServerAmi: ami-092777dadb18f8bb0
+      SbcSipAmi: ami-016e00aa191895cd5
+      SbcRtpAmi: ami-07cc5afbcb6592e64
+      FsAmi: ami-0e96eea385df050f3
+      WebserverAmi: ami-0f039a262d232bf65
+      MonitoringServerAmi: ami-0e6d4855aac46a263
+      RecordingServerAmi: ami-09a66bedee44740d6
     arm64:
-      SbcSipAmi: ami-0bc13123c8671ec06
-      SbcRtpAmi: ami-019d988e0b8870e4d
-      FsAmi: ami-0f19792becff14276
-      WebserverAmi: ami-09f803530edc0bed6
-      MonitoringServerAmi: ami-00c10a5bb673f08a6
-      RecordingServerAmi: ami-039f1f2e2e922d805
+      SbcSipAmi: ami-0581b4286bb76f199
+      SbcRtpAmi: ami-0803f0639c00edf71
+      FsAmi: ami-08d6539dbf79dffe0
+      WebserverAmi: ami-028356e4d62fc06cf
+      MonitoringServerAmi: ami-0af20419cdbb3cef4
+      RecordingServerAmi: ami-059e4a4590558a3e1
   eu-west-3:
     amd64:
-      SbcSipAmi: ami-0d95b1496351ef7b2
-      SbcRtpAmi: ami-00f8cecd9b1a2b467
-      FsAmi: ami-07fe89b27e3416d2c
-      WebserverAmi: ami-0e5bd286108786ba1
-      MonitoringServerAmi: ami-0c71a064d2375d494
-      RecordingServerAmi: ami-015021eea536e0053
+      SbcSipAmi: ami-024ce870a948b3e9f
+      SbcRtpAmi: ami-0ca25e6f07d3c8011
+      FsAmi: ami-0891c5561445ea2b5
+      WebserverAmi: ami-0379ba86101ec2bc0
+      MonitoringServerAmi: ami-08685ebdb1a9b6751
+      RecordingServerAmi: ami-0fcb419ce9856c3cd
     arm64:
-      SbcSipAmi: ami-0878a8a8365c7d29f
-      SbcRtpAmi: ami-05dc1d574268bd1e3
-      FsAmi: ami-0a2299a1bd69f7d18
-      WebserverAmi: ami-0c9109e094369e410
-      MonitoringServerAmi: ami-0726fae4d27fd0f09
-      RecordingServerAmi: ami-0f03b74abe85b9cbb
+      SbcSipAmi: ami-0c08ff2af36a65a3a
+      SbcRtpAmi: ami-0946793b98f61f215
+      FsAmi: ami-0d46a29f902420ec9
+      WebserverAmi: ami-0b49406087a3fc1cc
+      MonitoringServerAmi: ami-0a537bbbac104ead1
+      RecordingServerAmi: ami-0af73da113c1c2bab
   eu-north-1:
     amd64:
-      SbcSipAmi: ami-0bdc1e259ec1255a0
-      SbcRtpAmi: ami-0f76e2ecb35c45e74
-      FsAmi: ami-05b365f1c1b1658e1
-      WebserverAmi: ami-07d3310c1c80ba59f
-      MonitoringServerAmi: ami-03a8d0cbf22d9383f
-      RecordingServerAmi: ami-0c29e84312e271d01
+      SbcSipAmi: ami-02354460bf2a5b85f
+      SbcRtpAmi: ami-00ff038708e6e91d6
+      FsAmi: ami-03f1be50b498c5c95
+      WebserverAmi: ami-0ca3ae8040c082a4d
+      MonitoringServerAmi: ami-0bd4ebdf22eb87f9d
+      RecordingServerAmi: ami-0d436d8065fe3bc02
     arm64:
-      SbcSipAmi: ami-05f195cc348fc2d02
-      SbcRtpAmi: ami-0eef960440201999f
-      FsAmi: ami-017f9945c3822fd4c
-      WebserverAmi: ami-0484500e03ddb6237
-      MonitoringServerAmi: ami-0268bea0fc9cd114c
-      RecordingServerAmi: ami-0d6155b67d3cabd29
+      SbcSipAmi: ami-0a027b25500cfb14a
+      SbcRtpAmi: ami-0bcf02e3434101d70
+      FsAmi: ami-077de67dce7041c1b
+      WebserverAmi: ami-0645bf8598cea78d3
+      MonitoringServerAmi: ami-0e88da59673fb0f58
+      RecordingServerAmi: ami-0d94fc978c28b58d0
   eu-south-1:
     amd64:
-      SbcSipAmi: ami-0ab1109243b021b14
-      SbcRtpAmi: ami-0b74ff4ab9bc5b082
-      FsAmi: ami-04857b4dbb5c6de67
-      WebserverAmi: ami-0e618410a2f5ebe8b
-      MonitoringServerAmi: ami-05e2f017784fe9c40
-      RecordingServerAmi: ami-0788ac924d795b5b6
+      SbcSipAmi: ami-0e48e2af2d621ecb3
+      SbcRtpAmi: ami-083515214e7236831
+      FsAmi: ami-0e9c62e193733eece
+      WebserverAmi: ami-099d9a9d9b9195638
+      MonitoringServerAmi: ami-013732f3b2accea2b
+      RecordingServerAmi: ami-0773374793bbb78fa
     arm64:
-      SbcSipAmi: ami-0423b0808efff30c0
-      SbcRtpAmi: ami-054aacb041d960978
-      FsAmi: ami-001647987e0846290
-      WebserverAmi: ami-03ecafeab1a2c4a6f
-      MonitoringServerAmi: ami-0755a959f657242f1
-      RecordingServerAmi: ami-035de27c8234c9f67
+      SbcSipAmi: ami-0b0ba4fec93333907
+      SbcRtpAmi: ami-0b2a7be3b93bfe318
+      FsAmi: ami-0dcadb3765b122225
+      WebserverAmi: ami-018c1d9ebb5e9b0f7
+      MonitoringServerAmi: ami-0d6317465d1ca967d
+      RecordingServerAmi: ami-09d755187c8177b88
   eu-south-2:
     amd64:
-      SbcSipAmi: ami-048d8bceec7e5410c
-      SbcRtpAmi: ami-0b6e04fd4c72e6c0c
-      FsAmi: ami-08b60c9c2f1195d55
-      WebserverAmi: ami-0be2b90d5a5fee180
-      MonitoringServerAmi: ami-03643968d0afdc94b
-      RecordingServerAmi: ami-0d6a19df047734eac
+      SbcSipAmi: ami-049495a841b54fbf7
+      SbcRtpAmi: ami-0e79d969f752dc155
+      FsAmi: ami-0ab1f7af6eee4b69a
+      WebserverAmi: ami-04cbac58bda166bd1
+      MonitoringServerAmi: ami-04db1cf0520e1ca1b
+      RecordingServerAmi: ami-044c407b49e16d2df
     arm64:
-      SbcSipAmi: ami-09ad86308d7a2f0c7
-      SbcRtpAmi: ami-0d0ab8fb4853d7224
-      FsAmi: ami-081f225c1bf166a75
-      WebserverAmi: ami-01a8b8f6a996d686f
-      MonitoringServerAmi: ami-0ac8b3dbf4adecad7
-      RecordingServerAmi: ami-08d1bb85c88c2cd65
+      SbcSipAmi: ami-04c7d51d6fba45028
+      SbcRtpAmi: ami-00e4960abed66f3f4
+      FsAmi: ami-039d7506de818b109
+      WebserverAmi: ami-043775436c4c85916
+      MonitoringServerAmi: ami-04b14b10dc16b2bf0
+      RecordingServerAmi: ami-0e91af5923f3ee870
   ap-south-1:
     amd64:
-      SbcSipAmi: ami-0fbb3c011ee69295f
-      SbcRtpAmi: ami-0e5fe123737104148
-      FsAmi: ami-02f689e9d5be8952f
-      WebserverAmi: ami-035658a8f5361692d
-      MonitoringServerAmi: ami-0398e8d3a6cd83373
-      RecordingServerAmi: ami-0942b20ff11a053eb
+      SbcSipAmi: ami-0169fe9492317661b
+      SbcRtpAmi: ami-0fd414cb0e935242d
+      FsAmi: ami-0f5a7bdab3d3f9403
+      WebserverAmi: ami-091c0fc74f16cb3dd
+      MonitoringServerAmi: ami-0df1663f75144e7c5
+      RecordingServerAmi: ami-0a2e7172b453f6b2d
     arm64:
-      SbcSipAmi: ami-0815cdfe8d8ccea93
-      SbcRtpAmi: ami-09523330109594a05
-      FsAmi: ami-0147870573afbc8f0
-      WebserverAmi: ami-00692bd67725a0f33
-      MonitoringServerAmi: ami-0c29a7b4e12d5f228
-      RecordingServerAmi: ami-07771d097671cff88
+      SbcSipAmi: ami-0d169990c9fbb7a1f
+      SbcRtpAmi: ami-07813014d0be60927
+      FsAmi: ami-044c5d895b6020b0b
+      WebserverAmi: ami-010ebd2153aa47169
+      MonitoringServerAmi: ami-05e970e45cb0099c9
+      RecordingServerAmi: ami-04aedacb9edd8a06a
   ap-south-2:
     amd64:
-      SbcSipAmi: ami-0add65bb89d571b7e
-      SbcRtpAmi: ami-017d0901bd07418fe
-      FsAmi: ami-0389c7d8f270d273c
-      WebserverAmi: ami-03f3a24347331e8fc
-      MonitoringServerAmi: ami-0702c077870a57fb9
-      RecordingServerAmi: ami-083c4fc2e40f42d2f
+      SbcSipAmi: ami-072177af3bd5824fb
+      SbcRtpAmi: ami-0ae2e102f674a3ed0
+      FsAmi: ami-0d5bfe37230070c18
+      WebserverAmi: ami-039ed9107cbab5e7e
+      MonitoringServerAmi: ami-0220c05184e1c5afd
+      RecordingServerAmi: ami-0760b633ccab77596
     arm64:
-      SbcSipAmi: ami-0148ff28f271f4c53
-      SbcRtpAmi: ami-0a57d15535e39f05f
-      FsAmi: ami-0eff66ecbe03e6f6f
-      WebserverAmi: ami-0f31e5dffc437b3e3
-      MonitoringServerAmi: ami-0d4bbc4557d88b84d
-      RecordingServerAmi: ami-0fe2e76b5a896e8e3
+      SbcSipAmi: ami-0c9b2d0d2e4b1acdb
+      SbcRtpAmi: ami-00c847a1b4e6fb8cb
+      FsAmi: ami-00369eca583d52e7d
+      WebserverAmi: ami-042c2ca9a0c3980df
+      MonitoringServerAmi: ami-0ba1b5a2a946cac9b
+      RecordingServerAmi: ami-07884f17451987890
   ap-east-1:
     amd64:
-      SbcSipAmi: ami-06fa8f9e529dc424c
-      SbcRtpAmi: ami-0df2361e0c23571cd
-      FsAmi: ami-0da67a76d7cd773fc
-      WebserverAmi: ami-077280041243babef
-      MonitoringServerAmi: ami-039037a05a57b476b
-      RecordingServerAmi: ami-0b30b85d9d66bb58a
+      SbcSipAmi: ami-0b958bb776f2b1b57
+      SbcRtpAmi: ami-0ff122cc40e37e3f9
+      FsAmi: ami-025764b7e51468cd5
+      WebserverAmi: ami-06745838f3f54a1e2
+      MonitoringServerAmi: ami-020ba82a95fb670ed
+      RecordingServerAmi: ami-0739ef2e30bf4133f
     arm64:
-      SbcSipAmi: ami-0e63a1e44acf34ab3
-      SbcRtpAmi: ami-0ed0812b55bc9f8ab
-      FsAmi: ami-068f8f69201436029
-      WebserverAmi: ami-02de0216459418957
-      MonitoringServerAmi: ami-01d52892c1d2cc4cc
-      RecordingServerAmi: ami-0e2cffbe365d436ca
+      SbcSipAmi: ami-083c726567d632b89
+      SbcRtpAmi: ami-00c3735912041a26d
+      FsAmi: ami-08f3d634bd2766bb1
+      WebserverAmi: ami-0e21b82084a9ca686
+      MonitoringServerAmi: ami-059aa7ac5d2b31610
+      RecordingServerAmi: ami-02289731dcedca091
   ap-east-2:
     amd64:
-      SbcSipAmi: ami-0c837f6cfecccbf52
-      SbcRtpAmi: ami-0ff8ea60c7215e9f2
-      FsAmi: ami-08c9510bb2c574bdf
-      WebserverAmi: ami-09b7303eff995f1bd
-      MonitoringServerAmi: ami-0910444263dd04169
-      RecordingServerAmi: ami-0275cdbb4f60d2d7a
+      SbcSipAmi: ami-05b40cce8cced0d18
+      SbcRtpAmi: ami-0ddc32bd0e7cc69ef
+      FsAmi: ami-0fe13d3439e8c8e55
+      WebserverAmi: ami-05aa22e786a564478
+      MonitoringServerAmi: ami-0104be7d2f007768a
+      RecordingServerAmi: ami-074a6d8efb746a09f
     arm64:
-      SbcSipAmi: ami-0ccf679f15db64e08
-      SbcRtpAmi: ami-0004585be9ec69820
-      FsAmi: ami-03e4cf8334a7bf443
-      WebserverAmi: ami-0905d272d0be7f316
-      MonitoringServerAmi: ami-0b571fd2d5c6928eb
-      RecordingServerAmi: ami-03c66dd530bc1810c
+      SbcSipAmi: ami-041c2a914df11df60
+      SbcRtpAmi: ami-03cfd990bc600aac6
+      FsAmi: ami-069a2447f56b9884e
+      WebserverAmi: ami-01818cd197cef0c70
+      MonitoringServerAmi: ami-0fe3e57e97a0a53fb
+      RecordingServerAmi: ami-06b5fe3dd14d33ce6
   ap-southeast-1:
     amd64:
-      SbcSipAmi: ami-0e6331e7a3ba57146
-      SbcRtpAmi: ami-08698238c48484c62
-      FsAmi: ami-0f32a99510fcbfb15
-      WebserverAmi: ami-0f5cb2abc4164f223
-      MonitoringServerAmi: ami-005828672f36a384f
-      RecordingServerAmi: ami-081b295e7de7086cb
+      SbcSipAmi: ami-0c17d11ceca5a55cb
+      SbcRtpAmi: ami-0ab11cb529db40ac7
+      FsAmi: ami-08070607863dc87b1
+      WebserverAmi: ami-0247fe553a36d83a3
+      MonitoringServerAmi: ami-0d1aa37dbd80528b5
+      RecordingServerAmi: ami-03c9fbcecdd1b0f30
     arm64:
-      SbcSipAmi: ami-0399abaf8cc6f730e
-      SbcRtpAmi: ami-0d0424a29d599cac5
-      FsAmi: ami-059baa257a5e4befc
-      WebserverAmi: ami-0dd8b27eecce89dcc
-      MonitoringServerAmi: ami-0341888d0fcd56f8a
-      RecordingServerAmi: ami-000fb350a6216e92d
+      SbcSipAmi: ami-0056ef258f5a23ead
+      SbcRtpAmi: ami-0271e6cd5da234734
+      FsAmi: ami-0d9ca96a8a75e4d08
+      WebserverAmi: ami-0dd059fdf88bf13ee
+      MonitoringServerAmi: ami-0c6cf2e252c5f67b8
+      RecordingServerAmi: ami-05f4e3e0c6512a7e1
   ap-southeast-2:
     amd64:
-      SbcSipAmi: ami-02c258c40f0ed036d
-      SbcRtpAmi: ami-0cbdb74822427fc5c
-      FsAmi: ami-00f8330ed752e3545
-      WebserverAmi: ami-0f2794a5166cbae55
-      MonitoringServerAmi: ami-0d0c352dc7a77ba1e
-      RecordingServerAmi: ami-0ab93194281a54d6d
+      SbcSipAmi: ami-00c7909ff389b08ab
+      SbcRtpAmi: ami-0d6e1a855a708dddf
+      FsAmi: ami-074b5b1fc40984d9c
+      WebserverAmi: ami-08509abdf42f7e1ce
+      MonitoringServerAmi: ami-0a33c7fdf94b63e44
+      RecordingServerAmi: ami-07c246acd09b9f707
     arm64:
-      SbcSipAmi: ami-00332e98aa658243f
-      SbcRtpAmi: ami-0a2d0fbac3ad42a0c
-      FsAmi: ami-0764802fe059460e6
-      WebserverAmi: ami-06b1d6cac614d3b5f
-      MonitoringServerAmi: ami-0314da654a1ac413f
-      RecordingServerAmi: ami-09fdf7915e19de9fb
+      SbcSipAmi: ami-08231a4ec8ecd0900
+      SbcRtpAmi: ami-0012cc0843373f9c3
+      FsAmi: ami-080b21ae9561c6ffc
+      WebserverAmi: ami-023457b74cbd60fc0
+      MonitoringServerAmi: ami-027b3455d1345bf1c
+      RecordingServerAmi: ami-0d0818f51668cbe3e
   ap-southeast-3:
     amd64:
-      SbcSipAmi: ami-0e11f45fba4ef9698
-      SbcRtpAmi: ami-0b8dc7f136187675d
-      FsAmi: ami-0de2ea0e9c688a2d2
-      WebserverAmi: ami-08c50eb10822f9201
-      MonitoringServerAmi: ami-0da7dad45b0e5933b
-      RecordingServerAmi: ami-0d36ebe4c73aee004
+      SbcSipAmi: ami-09b166cf92fe28fd5
+      SbcRtpAmi: ami-071f08e13b4853f14
+      FsAmi: ami-09bf636a111c2c912
+      WebserverAmi: ami-047f46b9809108c8c
+      MonitoringServerAmi: ami-069b7ef16bb80577d
+      RecordingServerAmi: ami-0a5ab641c674b10de
     arm64:
-      SbcSipAmi: ami-06838607378b31032
-      SbcRtpAmi: ami-0d52cd2ad007459e7
-      FsAmi: ami-08ac0213e78f8beb7
-      WebserverAmi: ami-0d7ebd87b84abd0fd
-      MonitoringServerAmi: ami-01fb6248d938dc3a7
-      RecordingServerAmi: ami-048682a81cd1b512d
+      SbcSipAmi: ami-0e00593ef63bec2c6
+      SbcRtpAmi: ami-07b6e12ccc3532f94
+      FsAmi: ami-0a1863fd97dc35550
+      WebserverAmi: ami-0d2a2168872b16838
+      MonitoringServerAmi: ami-0369e231c80d55e52
+      RecordingServerAmi: ami-0e73514f241996d46
   ap-southeast-4:
     amd64:
-      SbcSipAmi: ami-078ba52ee03614339
-      SbcRtpAmi: ami-04861bf6651e44971
-      FsAmi: ami-0fc14a6069e56d583
-      WebserverAmi: ami-08893cc67beeca431
-      MonitoringServerAmi: ami-01ddb844cb1afe3b4
-      RecordingServerAmi: ami-05e46d1c59b650d9e
+      SbcSipAmi: ami-0cf3b9d8c06dc004b
+      SbcRtpAmi: ami-0d834d7186ff25ac2
+      FsAmi: ami-05d5ce122b059c049
+      WebserverAmi: ami-0c41026c278126495
+      MonitoringServerAmi: ami-0f2ac89fd5a112792
+      RecordingServerAmi: ami-020ae6105104b9a1c
     arm64:
-      SbcSipAmi: ami-06d7e6d643955aadc
-      SbcRtpAmi: ami-0566e5b0062c8b315
-      FsAmi: ami-0e8971c446035e347
-      WebserverAmi: ami-09d0d60d40fc50bd6
-      MonitoringServerAmi: ami-01c49d836b454a03f
-      RecordingServerAmi: ami-0f4ba16781b754cc5
+      SbcSipAmi: ami-00fb8f214c028ff05
+      SbcRtpAmi: ami-043a5ac66647c5576
+      FsAmi: ami-03f49c137573ee7f1
+      WebserverAmi: ami-0db7205152c6a3ba1
+      MonitoringServerAmi: ami-0fea4fd20fffc85b7
+      RecordingServerAmi: ami-026c864682261d7a6
   ap-southeast-5:
     amd64:
-      SbcSipAmi: ami-04d7ad22388079c1f
-      SbcRtpAmi: ami-0a336ccbd65bdab94
-      FsAmi: ami-0aa1fbbbbb4e73931
-      WebserverAmi: ami-032445fa54456c650
-      MonitoringServerAmi: ami-0c4f7def1aac2c37a
-      RecordingServerAmi: ami-0ba9a0c6bb5b59e04
+      SbcSipAmi: ami-09d896f08a5745dcf
+      SbcRtpAmi: ami-03081d224e3cb166b
+      FsAmi: ami-0d1babbec7fcecd02
+      WebserverAmi: ami-0118c2b5421168031
+      MonitoringServerAmi: ami-041fef3fe3c638629
+      RecordingServerAmi: ami-0775c839a909dcc7d
     arm64:
-      SbcSipAmi: ami-00ad87295a29698b7
-      SbcRtpAmi: ami-0f86d04360255729c
-      FsAmi: ami-0991e2db2df5ab993
-      WebserverAmi: ami-092b3862c722c7dc1
-      MonitoringServerAmi: ami-0685a276da16c277f
-      RecordingServerAmi: ami-0a1a4cb40f8c5a6d5
+      SbcSipAmi: ami-0f2ce784a077e7682
+      SbcRtpAmi: ami-0d4fa28dbee068131
+      FsAmi: ami-0f2e46c932e49c242
+      WebserverAmi: ami-0066eddf4818cd095
+      MonitoringServerAmi: ami-08edb6ce2de67807d
+      RecordingServerAmi: ami-0a2277677a9611627
   ap-southeast-6:
     amd64:
-      SbcSipAmi: ami-0c9a5516ac4d14d00
-      SbcRtpAmi: ami-04db244a102a50419
-      FsAmi: ami-04015de4b8e4c6657
-      WebserverAmi: ami-017a10620257ba471
-      MonitoringServerAmi: ami-09ec32de92389d54a
-      RecordingServerAmi: ami-0c026d8218f3ccf10
+      SbcSipAmi: ami-0ca9a8053d3f7b370
+      SbcRtpAmi: ami-0c4ba59b931f86186
+      FsAmi: ami-02974be007676fe18
+      WebserverAmi: ami-0673127db365c07a0
+      MonitoringServerAmi: ami-0bee65c2d984e6f08
+      RecordingServerAmi: ami-04814c5240ca61822
     arm64:
-      SbcSipAmi: ami-0f44ece27f83eb89f
-      SbcRtpAmi: ami-043c3589186202382
-      FsAmi: ami-04575f27a8df82236
-      WebserverAmi: ami-0b00bc070708843a6
-      MonitoringServerAmi: ami-085815355d830fa15
-      RecordingServerAmi: ami-03fc8c4ce2a9915be
+      SbcSipAmi: ami-051cedaf4e7f1b4f8
+      SbcRtpAmi: ami-0f5b746c381c9b296
+      FsAmi: ami-0e83d9da12728f5c7
+      WebserverAmi: ami-09a2a8471e5751b4b
+      MonitoringServerAmi: ami-091a88b05a28d7d2f
+      RecordingServerAmi: ami-0efac97cd6890d61f
   ap-southeast-7:
     amd64:
-      SbcSipAmi: ami-0b48c3684bbebb790
-      SbcRtpAmi: ami-00c49e555b59d3277
-      FsAmi: ami-0ba6a5672c7403dce
-      WebserverAmi: ami-0acc1ae51b90dcbb8
-      MonitoringServerAmi: ami-0df0a87b5edf31461
-      RecordingServerAmi: ami-0d2ea2fa92ce675ea
+      SbcSipAmi: ami-0392908d0d483a7d5
+      SbcRtpAmi: ami-0802992492d39db3c
+      FsAmi: ami-098dc986a47ffbf27
+      WebserverAmi: ami-08751011a053e8170
+      MonitoringServerAmi: ami-0b80b01d7734322b4
+      RecordingServerAmi: ami-0eb8ec946858e3e89
     arm64:
-      SbcSipAmi: ami-0d93508e86ffd6c02
-      SbcRtpAmi: ami-00a280968a3bb4e19
-      FsAmi: ami-0674a49116b76d714
-      WebserverAmi: ami-0d5f7f4709b9eb20f
-      MonitoringServerAmi: ami-0db741d8fe38801cd
-      RecordingServerAmi: ami-097d1fbc15e55a940
+      SbcSipAmi: ami-0559ae35c4d642773
+      SbcRtpAmi: ami-0a2c7a186feeecd9e
+      FsAmi: ami-0187b7ea03f319e3a
+      WebserverAmi: ami-03feabd8842e659bf
+      MonitoringServerAmi: ami-0bc9af4bc2873d243
+      RecordingServerAmi: ami-0cd659dce514d351b
   ap-northeast-1:
     amd64:
-      SbcSipAmi: ami-01b4bdf49a2dd9be3
-      SbcRtpAmi: ami-0a0f4c859e2ac6449
-      FsAmi: ami-0ff7d078ec928a1c4
-      WebserverAmi: ami-0ebb062058752f163
-      MonitoringServerAmi: ami-0cb9de751a074af6e
-      RecordingServerAmi: ami-04e9301a602bf1288
+      SbcSipAmi: ami-0d77572e941bfefd9
+      SbcRtpAmi: ami-0e955b0d42b415a3e
+      FsAmi: ami-0408a0e33a2458d8a
+      WebserverAmi: ami-0db89096847d35fe1
+      MonitoringServerAmi: ami-0ecae27662043065e
+      RecordingServerAmi: ami-084ad42a718a30824
     arm64:
-      SbcSipAmi: ami-06010725ebdbe9ff3
-      SbcRtpAmi: ami-0893dc947e3c1395c
-      FsAmi: ami-09c2406d4a65ea43e
-      WebserverAmi: ami-06fa496788300847b
-      MonitoringServerAmi: ami-031e45956987c90d1
-      RecordingServerAmi: ami-02eb1e51152068afa
+      SbcSipAmi: ami-0943700e941b12415
+      SbcRtpAmi: ami-067ad9d464a61e94d
+      FsAmi: ami-06066e67345b4c469
+      WebserverAmi: ami-0fb3d37c146ae55be
+      MonitoringServerAmi: ami-0f7c566a3896e1c65
+      RecordingServerAmi: ami-06c4f6857b847781a
   ap-northeast-2:
     amd64:
-      SbcSipAmi: ami-03f3acba543f9e8ad
-      SbcRtpAmi: ami-082bb57996e212d0d
-      FsAmi: ami-0559e6178a1886626
-      WebserverAmi: ami-0776974431329c71d
-      MonitoringServerAmi: ami-037efa4550772354b
-      RecordingServerAmi: ami-07038bacc2371101a
+      SbcSipAmi: ami-001cdfec504538c03
+      SbcRtpAmi: ami-081aaba1bd4ea80be
+      FsAmi: ami-0bced60daeba0072f
+      WebserverAmi: ami-0268e696030177b6b
+      MonitoringServerAmi: ami-017978d4343a26b6d
+      RecordingServerAmi: ami-0cd35376b0ba1be5b
     arm64:
-      SbcSipAmi: ami-00513eed1525b2179
-      SbcRtpAmi: ami-076ccd7c5dd392c84
-      FsAmi: ami-068b957b1222a5235
-      WebserverAmi: ami-021cac6482862e260
-      MonitoringServerAmi: ami-0d5620125661ae9fa
-      RecordingServerAmi: ami-06967387d21cc278b
+      SbcSipAmi: ami-00906616feb6b1f8a
+      SbcRtpAmi: ami-0b6f22bf9d59a9e29
+      FsAmi: ami-066658fc8f0447654
+      WebserverAmi: ami-0ae14437df4e2bc7b
+      MonitoringServerAmi: ami-00c7415eba4433fc0
+      RecordingServerAmi: ami-0b45a6ec308a6ba91
   ap-northeast-3:
     amd64:
-      SbcSipAmi: ami-03e944ee2c6a66243
-      SbcRtpAmi: ami-0464424c358d32606
-      FsAmi: ami-020c6dea79ed888af
-      WebserverAmi: ami-0cd568a3ae52b6b3b
-      MonitoringServerAmi: ami-0fcfc425898208117
-      RecordingServerAmi: ami-012abb87a360933bd
+      SbcSipAmi: ami-09684b58fffa1179a
+      SbcRtpAmi: ami-0ab98d2cfa74427e8
+      FsAmi: ami-03c2b66c32ec344cc
+      WebserverAmi: ami-0866b6e5d0719a3c1
+      MonitoringServerAmi: ami-04871ae86a6a83708
+      RecordingServerAmi: ami-01dee84acb9259e05
     arm64:
-      SbcSipAmi: ami-01e2d0f1ea2fa4c2a
-      SbcRtpAmi: ami-069278390a02c6040
-      FsAmi: ami-0470e42e915ad3826
-      WebserverAmi: ami-037ba55a651dfc6da
-      MonitoringServerAmi: ami-0552f8496a9b1c54d
-      RecordingServerAmi: ami-00776663e9c65d312
+      SbcSipAmi: ami-05a7a82f804bb4206
+      SbcRtpAmi: ami-03fc5b4a94bf476b2
+      FsAmi: ami-097a50c28bdd06cc8
+      WebserverAmi: ami-0e03a1d6b66b64c20
+      MonitoringServerAmi: ami-0813e5fdc9781138d
+      RecordingServerAmi: ami-0d59e41cdaab90dc5
 
