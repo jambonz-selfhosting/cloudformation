@@ -994,16 +994,18 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: !Ref AllowedHttpCidr
-        - Description: homer
+        # VPC only: nothing outside the instance needs these. nginx serves the portal (3001), the API (3002)
+        # and Grafana (3010) on 80/443, and the api-server reaches the pcap server on 127.0.0.1:9080.
+        - Description: pcap server (Recent Calls traces), VPC only
           IpProtocol: tcp
           FromPort: 9080
           ToPort: 9080
-          CidrIp: !Ref AllowedHttpCidr
-        - Description: grafana
+          CidrIp: !Ref VpcCidr
+        - Description: local http services on 3000, VPC only
           IpProtocol: tcp
           FromPort: 3000
           ToPort: 3000
-          CidrIp: !Ref AllowedHttpCidr
+          CidrIp: !Ref VpcCidr
         - Description: smpp
           IpProtocol: tcp
           FromPort: 3020
